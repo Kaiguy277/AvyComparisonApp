@@ -1,50 +1,79 @@
-# Welcome to your Expo app 👋
+# Avy Comparison
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+iPhone app for comparing avalanche forecasts side by side, with live SNOTEL
+weather station data and NWS mountain weather outlooks.
 
-## Get started
+Native port of [AvalancheComparison](../AvalancheComparison) (the web version).
+The Supabase backend is shared between web and mobile — no backend changes were
+needed.
 
-1. Install dependencies
+## Stack
 
-   ```bash
-   npm install
-   ```
+- Expo SDK 54 + React Native 0.81 + React 19
+- Expo Router (file-based routing)
+- NativeWind v4 (Tailwind classes in RN)
+- Supabase (forecast cache, edge functions for SNOTEL / weather / Quick Take AI)
+- TanStack Query
+- AsyncStorage (zone & Quick Take preferences)
+- react-native-svg (temperature sparklines)
 
-2. Start the app
+## Develop with Expo Go
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Scan the QR code with the Expo Go app on iOS. All current dependencies are
+included in Expo Go's standard runtime, so no dev client is required for
+day-to-day work.
 
-## Learn more
+## Distribute through TestFlight
 
-To learn more about developing your project with Expo, look at the following resources:
+Production builds run on [EAS Build](https://docs.expo.dev/build/introduction/)
+and submit to App Store Connect via `eas submit`.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```sh
+# Build a release IPA on EAS' macOS workers
+eas build --platform ios --profile production
 
-## Join the community
+# Upload to App Store Connect → TestFlight
+eas submit --platform ios --latest
+```
 
-Join our community of developers creating universal apps.
+Before the first submit, fill in the `submit.production.ios` block in
+`eas.json`:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `ascAppId` — App Store Connect app ID (create the app shell first at
+  appstoreconnect.apple.com, then copy the numeric ID from the URL)
+- `appleTeamId` — Apple Developer team ID (Membership page in
+  developer.apple.com)
+
+EAS will prompt for an App Store Connect API key on the first build — generate
+one in App Store Connect → Users and Access → Integrations → App Store Connect
+API.
+
+Bundle identifier: `com.kaimyers.avycomparison`
+
+## Project layout
+
+```
+app/                       Expo Router screens
+  _layout.tsx              Root stack + providers (QueryClient, theme)
+  index.tsx                Avalanche summary screen (single-route app)
+components/
+  avalanche/               Domain components (zone selector, cards, sparkline)
+  ui/                      Generic UI primitives (Card, Badge, Button, etc.)
+constants/                 Theme tokens
+hooks/                     Color scheme hook
+lib/
+  supabase.ts              Supabase client (AsyncStorage-backed auth)
+  api/avalanche.ts         API wrapper around the Supabase edge functions
+  zones.ts                 Region/center/zone hierarchy
+```
+
+## Environment
+
+`.env` holds the public Supabase URL and anon key (intentionally public; RLS
+gates write access). Expo exposes any var prefixed with `EXPO_PUBLIC_` to the
+client bundle.
