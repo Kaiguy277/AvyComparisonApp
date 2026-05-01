@@ -1,26 +1,86 @@
 import "../global.css";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { useEffect } from "react";
+import { View } from "react-native";
+import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
 import "react-native-reanimated";
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  useFonts as useSerifFonts,
+  InstrumentSerif_400Regular,
+  InstrumentSerif_400Regular_Italic,
+} from "@expo-google-fonts/instrument-serif";
+import {
+  InstrumentSans_400Regular,
+  InstrumentSans_500Medium,
+  InstrumentSans_600SemiBold,
+  InstrumentSans_700Bold,
+} from "@expo-google-fonts/instrument-sans";
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_700Bold,
+} from "@expo-google-fonts/jetbrains-mono";
+
+import { palette } from "@/constants/design";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient();
 
+const navTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: palette.ink[950],
+    card: palette.ink[900],
+    text: palette.ink[100],
+    border: palette.ink[700],
+    primary: palette.frost[400],
+    notification: palette.frost[400],
+  },
+  fonts: {
+    regular: { fontFamily: "InstrumentSans_400Regular", fontWeight: "400" as const },
+    medium: { fontFamily: "InstrumentSans_500Medium", fontWeight: "500" as const },
+    bold: { fontFamily: "InstrumentSans_700Bold", fontWeight: "700" as const },
+    heavy: { fontFamily: "InstrumentSans_700Bold", fontWeight: "700" as const },
+  },
+};
+
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const [loaded] = useSerifFonts({
+    InstrumentSerif_400Regular,
+    InstrumentSerif_400Regular_Italic,
+    InstrumentSans_400Regular,
+    InstrumentSans_500Medium,
+    InstrumentSans_600SemiBold,
+    InstrumentSans_700Bold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_700Bold,
+  });
+
+  useEffect(() => {
+    if (loaded) SplashScreen.hideAsync().catch(() => {});
+  }, [loaded]);
+
+  if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;
+
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen
-            name="index"
-            options={{ title: "Avalanche Conditions" }}
-          />
+      <ThemeProvider value={navTheme}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: palette.ink[950] },
+          }}
+        >
+          <Stack.Screen name="index" />
         </Stack>
-        <StatusBar style="auto" />
+        <StatusBar style="light" />
       </ThemeProvider>
     </QueryClientProvider>
   );

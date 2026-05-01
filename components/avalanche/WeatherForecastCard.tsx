@@ -1,5 +1,7 @@
-import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/ui/Text";
+import { palette } from "@/constants/design";
 import type {
   AvgDiscussion,
   NacWeatherProduct,
@@ -22,8 +24,14 @@ export function WeatherForecastCard({
   if (isLoading) {
     return (
       <View className="flex-row items-center gap-2">
-        <ActivityIndicator size="small" />
-        <Text className="text-sm text-muted-foreground">Loading weather forecast...</Text>
+        <ActivityIndicator size="small" color={palette.ink[300]} />
+        <Text
+          variant="mono"
+          className="text-ink-300"
+          style={{ fontSize: 11, letterSpacing: 1.2 }}
+        >
+          FETCHING FORECAST…
+        </Text>
       </View>
     );
   }
@@ -50,32 +58,68 @@ export function WeatherForecastCard({
   let sourceUrl: string | null = null;
 
   if (hasAvg) {
-    sourceLabel = `NWS Avalanche Weather Guidance (${avgDiscussion!.wfo})`;
+    sourceLabel = `NWS AVG · ${avgDiscussion!.wfo}`;
     sourceTime = avgDiscussion!.issuedTime;
     sourceUrl = `https://forecast.weather.gov/product.php?site=${avgDiscussion!.wfo}&issuedby=${avgDiscussion!.wfo}&product=AVG&format=CI&version=1`;
   } else if (hasNac) {
-    sourceLabel = "Avalanche Center Weather Discussion";
+    sourceLabel = "Avalanche center weather";
     sourceTime = nacWeather!.publishedTime ?? null;
   } else {
-    sourceLabel = `NWS Mountain Forecast (${nwsForecast!.gridpoint})`;
+    sourceLabel = `NWS · ${nwsForecast!.gridpoint}`;
     sourceUrl = nwsForecast!.forecastPageUrl;
   }
 
   return (
-    <View className="gap-2">
-      <Text className="text-sm text-muted-foreground leading-5">{discussion}</Text>
-      <View className="flex-row items-center justify-between flex-wrap gap-2 pt-1">
-        <Text className="text-[10px] text-muted-foreground/60 flex-1">
-          {sourceLabel}
-          {sourceTime ? ` — ${new Date(sourceTime).toLocaleString()}` : ""}
-        </Text>
+    <View>
+      <Text
+        className="text-ink-100"
+        style={{ fontSize: 14, lineHeight: 21 }}
+      >
+        {discussion}
+      </Text>
+      <View
+        className="flex-row items-center justify-between mt-3 pt-3"
+        style={{ borderTopWidth: 0.5, borderColor: palette.ink[700], gap: 12 }}
+      >
+        <View className="flex-1">
+          <Text
+            variant="mono"
+            weight="medium"
+            className="text-ink-300"
+            style={{ fontSize: 10, letterSpacing: 1.2 }}
+          >
+            {sourceLabel}
+          </Text>
+          {sourceTime ? (
+            <Text
+              variant="mono"
+              className="text-ink-400"
+              style={{ fontSize: 9, letterSpacing: 0.8, marginTop: 2 }}
+            >
+              {new Date(sourceTime).toLocaleString()}
+            </Text>
+          ) : null}
+        </View>
         {sourceUrl ? (
           <Pressable
             onPress={() => Linking.openURL(sourceUrl!)}
             className="flex-row items-center gap-1"
+            hitSlop={8}
           >
-            <Text className="text-xs text-primary">View full forecast</Text>
-            <Ionicons name="open-outline" size={12} color="#0d9488" />
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-frost-400"
+              style={{ fontSize: 10, letterSpacing: 1.2 }}
+            >
+              FULL FORECAST
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={11}
+              color={palette.frost[400]}
+              style={{ transform: [{ rotate: "-45deg" }] }}
+            />
           </Pressable>
         ) : null}
       </View>

@@ -1,32 +1,36 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Linking,
   Pressable,
   RefreshControl,
   ScrollView,
-  Text,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardEyebrow,
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Collapsible } from "@/components/ui/Collapsible";
+import { Text } from "@/components/ui/Text";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
 import { ZoneCard } from "@/components/avalanche/ZoneCard";
 import { ZoneComparisonMatrix } from "@/components/avalanche/ZoneComparisonMatrix";
-import { freshnessConfig } from "@/components/avalanche/dangerColors";
+import { TopoBackground } from "@/components/visual/TopoBackground";
+import { freshness, palette } from "@/constants/design";
 import {
   avalancheApi,
   type AvalancheSummary,
@@ -50,7 +54,24 @@ interface WeatherForecastBundle {
   zoneAvgLocations: Record<string, AvgLocation[]>;
 }
 
+const months = [
+  "JANUARY",
+  "FEBRUARY",
+  "MARCH",
+  "APRIL",
+  "MAY",
+  "JUNE",
+  "JULY",
+  "AUGUST",
+  "SEPTEMBER",
+  "OCTOBER",
+  "NOVEMBER",
+  "DECEMBER",
+];
+
 export default function Index() {
+  const insets = useSafeAreaInsets();
+
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>(DEFAULT_ZONE_IDS);
   const [quickTakeEnabled, setQuickTakeEnabled] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
@@ -64,12 +85,37 @@ export default function Index() {
   const [scrapedAt, setScrapedAt] = useState<string | null>(null);
   const [zonesScraped, setZonesScraped] = useState<ScrapedZoneInfo[]>([]);
   const [loadSource, setLoadSource] = useState<"cached" | "live" | null>(null);
-  const [weatherForecastData, setWeatherForecastData] = useState<WeatherForecastBundle | null>(
-    null,
-  );
+  const [weatherForecastData, setWeatherForecastData] =
+    useState<WeatherForecastBundle | null>(null);
 
   const quickTakeEnabledRef = useRef(quickTakeEnabled);
   quickTakeEnabledRef.current = quickTakeEnabled;
+
+  // Subtle reveal anim when results arrive
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (summary) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      fadeAnim.setValue(0);
+    }
+  }, [summary, fadeAnim]);
+
+  const today = useMemo(() => {
+    const d = new Date();
+    return {
+      day: String(d.getDate()).padStart(2, "0"),
+      month: months[d.getMonth()],
+      year: d.getFullYear(),
+      weekday: d
+        .toLocaleDateString("en-US", { weekday: "long" })
+        .toUpperCase(),
+    };
+  }, []);
 
   // Load saved prefs
   useEffect(() => {
@@ -105,6 +151,7 @@ export default function Index() {
   }, []);
 
   const toggleQuickTake = useCallback((enabled: boolean) => {
+    Haptics.selectionAsync().catch(() => {});
     setQuickTakeEnabled(enabled);
     AsyncStorage.setItem(QUICK_TAKE_KEY, String(enabled)).catch(() => {});
   }, []);
@@ -200,9 +247,13 @@ export default function Index() {
 
   const fetchSummary = useCallback(async () => {
     if (selectedZoneIds.length === 0) {
-      Alert.alert("No zones selected", "Please select at least one zone to view forecasts.");
+      Alert.alert(
+        "No zones selected",
+        "Please select at least one zone to view forecasts.",
+      );
       return;
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
     setIsLoading(true);
     setLoadSource(null);
@@ -283,10 +334,12 @@ export default function Index() {
         fetchWeatherForecast(selectedZoneIds);
         generateQuickTake(allZones);
       } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         Alert.alert("Error", "Failed to fetch avalanche conditions.");
       }
     } catch (err) {
       console.error("Fetch error", err);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Alert.alert("Error", "Failed to fetch avalanche conditions. Please try again.");
     } finally {
       setIsLoading(false);
@@ -300,8 +353,15 @@ export default function Index() {
 
   if (!prefsLoaded) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator size="large" />
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: palette.ink[950],
+        }}
+      >
+        <ActivityIndicator size="large" color={palette.frost[400]} />
       </View>
     );
   }
@@ -311,263 +371,600 @@ export default function Index() {
     JSON.stringify([...DEFAULT_ZONE_IDS].sort());
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ paddingBottom: 48 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={isLoading}
-          onRefresh={fetchSummary}
-          tintColor="#0d9488"
-        />
-      }
-    >
-      {/* Hero */}
-      <View className="px-4 pt-6 pb-4 bg-sky-50">
-        <View className="self-center bg-primary/10 rounded-full px-3 py-1 mb-3 flex-row items-center gap-2">
-          <Ionicons name="triangle-outline" size={14} color="#0d9488" />
-          <Text className="text-sm font-medium text-primary">Backcountry</Text>
-        </View>
-        <Text className="text-3xl font-bold text-foreground text-center">
-          Avalanche Conditions
-        </Text>
-        <Text className="text-base text-muted-foreground text-center mt-2">
-          Forecasts, weather outlooks, and station data side by side.
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: palette.ink[950] }}>
+      <TopoBackground height={580} intensity="low" />
 
-      {/* Zone selector */}
-      <View className="px-4 mt-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Forecast Zones</CardTitle>
-            <CardDescription>
-              {selectedZoneIds.length} of {AVAILABLE_ZONES.length} zones selected
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HierarchicalZoneSelector
-              selectedZoneIds={selectedZoneIds}
-              onSelectionChange={updateSelectedZones}
-            />
-            <View className="flex-row justify-end gap-2 mt-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => updateSelectedZones([])}
-                disabled={selectedZoneIds.length === 0}
-              >
-                Clear
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => updateSelectedZones(DEFAULT_ZONE_IDS)}
-                disabled={isDefaultSelection}
-              >
-                Reset
-              </Button>
-            </View>
-          </CardContent>
-        </Card>
-      </View>
-
-      {/* Action */}
-      <View className="px-4 mt-4 items-center gap-3">
-        <Button
-          onPress={fetchSummary}
-          disabled={isLoading}
-          loading={isLoading}
-          size="lg"
-          leftIcon={<Ionicons name="snow" size={18} color="white" />}
-        >
-          {isLoading ? "Fetching..." : "Get Current Conditions"}
-        </Button>
-        <Pressable
-          onPress={() => toggleQuickTake(!quickTakeEnabled)}
-          className="flex-row items-center gap-2"
-        >
-          <Checkbox
-            checked={quickTakeEnabled}
-            onChange={() => toggleQuickTake(!quickTakeEnabled)}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 8,
+          paddingBottom: insets.bottom + 64,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={fetchSummary}
+            tintColor={palette.frost[400]}
+            colors={[palette.frost[400]]}
+            progressBackgroundColor={palette.ink[800]}
           />
-          <Text className="text-sm text-muted-foreground">Include AI Quick Take</Text>
-        </Pressable>
-      </View>
+        }
+      >
+        {/* HERO */}
+        <View style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 28 }}>
+          <View className="flex-row items-baseline gap-2 mb-3">
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-frost-400"
+              style={{ fontSize: 10, letterSpacing: 2.4 }}
+            >
+              ◇ AVY · COMPARISON
+            </Text>
+            <View style={{ flex: 1 }} />
+            <Text
+              variant="mono"
+              className="text-ink-400"
+              style={{ fontSize: 10, letterSpacing: 1.6 }}
+            >
+              {today.weekday}
+            </Text>
+          </View>
 
-      {/* Status badges */}
-      {scrapedAt ? (
-        <View className="px-4 mt-3 flex-row flex-wrap items-center justify-center gap-2">
-          <Text className="text-xs text-muted-foreground">
-            Updated: {new Date(scrapedAt).toLocaleString()}
+          <View className="flex-row items-baseline gap-3 mb-2">
+            <Text
+              variant="mono"
+              weight="bold"
+              className="text-ink-50"
+              style={{ fontSize: 56, lineHeight: 60, letterSpacing: -1 }}
+            >
+              {today.day}
+            </Text>
+            <View>
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-ink-200"
+                style={{ fontSize: 11, letterSpacing: 2.4 }}
+              >
+                {today.month}
+              </Text>
+              <Text
+                variant="mono"
+                className="text-ink-400"
+                style={{ fontSize: 11, letterSpacing: 2.4 }}
+              >
+                {today.year}
+              </Text>
+            </View>
+          </View>
+
+          <Text
+            variant="display"
+            className="text-ink-50"
+            style={{
+              fontSize: 56,
+              lineHeight: 60,
+              letterSpacing: -1.5,
+              marginTop: 14,
+            }}
+          >
+            Conditions
           </Text>
-          {loadSource === "cached" ? <Badge variant="outline">Cached</Badge> : null}
-          {isSnotelLoading ? (
-            <Badge variant="secondary">Loading stations…</Badge>
-          ) : null}
-          {isWeatherForecastLoading ? (
-            <Badge variant="secondary">Loading weather…</Badge>
-          ) : null}
-        </View>
-      ) : null}
+          <Text
+            variant="display-italic"
+            className="text-ink-300"
+            style={{
+              fontSize: 24,
+              lineHeight: 32,
+              marginTop: 4,
+            }}
+          >
+            before you head out.
+          </Text>
 
-      {/* Quick take */}
-      {summary && quickTakeEnabled && (isQuickTakeLoading || summary.quickTake) ? (
-        <View className="px-4 mt-6">
-          <Card className="border-primary/30">
+          <View
+            style={{
+              height: 0.5,
+              backgroundColor: palette.ink[700],
+              marginTop: 22,
+              marginBottom: 14,
+            }}
+          />
+
+          <Text
+            className="text-ink-300"
+            style={{ fontSize: 14, lineHeight: 21 }}
+          >
+            Side-by-side avalanche forecasts, mountain weather outlooks, and live SNOTEL
+            stations across the United States.
+          </Text>
+        </View>
+
+        {/* ZONE PICKER */}
+        <View style={{ paddingHorizontal: 16 }}>
+          <Card>
             <CardHeader>
-              <View className="flex-row items-center gap-2">
-                <Ionicons name="information-circle-outline" size={20} color="#0d9488" />
-                <CardTitle>Quick Take</CardTitle>
-                <Badge variant="outline">AI</Badge>
+              <View className="flex-row items-baseline justify-between">
+                <CardEyebrow>01 · ZONES</CardEyebrow>
+                <Text
+                  variant="mono"
+                  weight="medium"
+                  className="text-ink-100"
+                  style={{ fontSize: 11, letterSpacing: 1.4 }}
+                >
+                  {selectedZoneIds.length} / {AVAILABLE_ZONES.length}
+                </Text>
               </View>
+              <CardTitle className="mt-2">Pick the zones you ride.</CardTitle>
             </CardHeader>
             <CardContent>
-              {isQuickTakeLoading ? (
-                <View className="flex-row items-center gap-2">
-                  <ActivityIndicator size="small" />
-                  <Text className="text-sm text-muted-foreground">
-                    Generating Quick Take for {summary.zones.length} zone
-                    {summary.zones.length !== 1 ? "s" : ""}…
-                  </Text>
-                </View>
-              ) : (
-                <Text className="text-base text-foreground leading-6">
-                  {summary.quickTake}
-                </Text>
-              )}
+              <HierarchicalZoneSelector
+                selectedZoneIds={selectedZoneIds}
+                onSelectionChange={updateSelectedZones}
+              />
+              <View
+                className="flex-row gap-2 mt-4"
+                style={{ justifyContent: "flex-end" }}
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => updateSelectedZones([])}
+                  disabled={selectedZoneIds.length === 0}
+                >
+                  Clear
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => updateSelectedZones(DEFAULT_ZONE_IDS)}
+                  disabled={isDefaultSelection}
+                >
+                  Reset
+                </Button>
+              </View>
             </CardContent>
           </Card>
         </View>
-      ) : null}
 
-      {/* Comparison matrix */}
-      {summary && summary.zones.length > 0 ? (
-        <View className="px-4 mt-6">
-          <ZoneComparisonMatrix zones={summary.zones} />
-        </View>
-      ) : null}
-
-      {/* Zone details */}
-      {summary && summary.zones.length > 0 ? (
-        <View className="px-4 mt-6 gap-4">
-          <Text className="text-xl font-bold text-foreground">Zone Details</Text>
-          {summary.zones.map((zone) => (
-            <ZoneCard
-              key={zone.id}
-              zone={zone}
-              isSnotelLoading={isSnotelLoading}
-              isWeatherForecastLoading={isWeatherForecastLoading}
-              weatherForecast={getZoneWeatherForecast(zone.id)}
+        {/* ACTION */}
+        <View
+          style={{
+            paddingHorizontal: 16,
+            marginTop: 18,
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <Button
+            onPress={fetchSummary}
+            disabled={isLoading}
+            loading={isLoading}
+            size="lg"
+            className="w-full"
+            leftIcon={
+              <Ionicons
+                name="snow"
+                size={16}
+                color={palette.ink[950]}
+              />
+            }
+          >
+            {isLoading ? "Loading…" : "Get current conditions"}
+          </Button>
+          <Pressable
+            onPress={() => toggleQuickTake(!quickTakeEnabled)}
+            className="flex-row items-center gap-2.5"
+            hitSlop={6}
+          >
+            <Checkbox
+              checked={quickTakeEnabled}
+              onChange={() => toggleQuickTake(!quickTakeEnabled)}
+              size="sm"
             />
-          ))}
-        </View>
-      ) : null}
-
-      {/* Sources */}
-      {summary ? (
-        <View className="px-4 mt-6">
-          <Collapsible title="Data Sources & Freshness">
-            <View className="gap-2">
-              {zonesScraped.map((zone) => {
-                const f = freshnessConfig[zone.freshness.status];
-                return (
-                  <View
-                    key={zone.id}
-                    className="flex-row items-center justify-between py-1"
-                  >
-                    <Text className="text-sm text-foreground flex-1" numberOfLines={2}>
-                      {zone.name}{" "}
-                      <Text className="text-muted-foreground">({zone.center})</Text>
-                    </Text>
-                    {zone.success ? (
-                      <Badge variant="outline" textClassName={f.color}>
-                        {f.label}
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">Failed</Badge>
-                    )}
-                  </View>
-                );
-              })}
-              <View className="pt-3 mt-3 border-t border-border gap-2">
-                <Text className="text-xs font-semibold text-foreground">Data Sources</Text>
-                <SourceLink
-                  label="National Avalanche Center API"
-                  description="Avalanche forecasts & danger ratings"
-                  url="https://avalanche.org/"
-                />
-                <SourceLink
-                  label="NOAA National Weather Service"
-                  description="Mountain weather forecasts"
-                  url="https://www.weather.gov/"
-                />
-                <SourceLink
-                  label="Synoptic Data (MesoWest)"
-                  description="Weather station observations"
-                  url="https://synopticdata.com/"
-                />
-                <SourceLink
-                  label="Utah Avalanche Center"
-                  description="UAC forecasts (direct API)"
-                  url="https://utahavalanchecenter.org/"
-                />
-              </View>
-            </View>
-          </Collapsible>
-        </View>
-      ) : null}
-
-      {summary ? (
-        <View className="px-4 mt-6 p-4 rounded-lg border border-border bg-muted/40">
-          <Text className="text-sm text-muted-foreground">
-            Data sourced from the National Avalanche Center, NOAA/NWS, and the Synoptic
-            weather station network. Always read the original forecasts from your local
-            avalanche center before making travel decisions.
-          </Text>
-          {quickTakeEnabled && summary.quickTake ? (
-            <Text className="text-xs text-muted-foreground mt-2">
-              The "Quick Take" summary is generated by AI based on the forecast data above.
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-ink-300"
+              style={{ fontSize: 11, letterSpacing: 1.4 }}
+            >
+              INCLUDE AI QUICK TAKE
             </Text>
-          ) : null}
+          </Pressable>
         </View>
-      ) : null}
 
-      {!summary && !isLoading ? (
-        <View className="items-center mt-12 px-4">
-          <Ionicons name="triangle-outline" size={64} color="#cbd5e1" />
-          <Text className="text-muted-foreground text-center mt-3">
-            Select your zones and tap "Get Current Conditions" to fetch the latest forecasts.
-          </Text>
-        </View>
-      ) : null}
-    </ScrollView>
+        {/* STATUS BAR */}
+        {scrapedAt ? (
+          <View
+            style={{
+              marginTop: 24,
+              marginHorizontal: 16,
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              borderRadius: 14,
+              backgroundColor: palette.ink[900],
+              borderWidth: 0.5,
+              borderColor: palette.ink[700],
+            }}
+            className="flex-row items-center justify-between flex-wrap gap-2"
+          >
+            <View className="flex-row items-center gap-2">
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: palette.frost[400],
+                }}
+              />
+              <Text
+                variant="mono"
+                className="text-ink-200"
+                style={{ fontSize: 11, letterSpacing: 1.2 }}
+              >
+                {new Date(scrapedAt)
+                  .toLocaleString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    month: "short",
+                    day: "numeric",
+                  })
+                  .toUpperCase()}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-2">
+              {loadSource === "cached" ? (
+                <Badge variant="frost">Cached</Badge>
+              ) : (
+                <Badge variant="aspen">Live</Badge>
+              )}
+              {isSnotelLoading ? <Badge variant="subtle">stations…</Badge> : null}
+              {isWeatherForecastLoading ? <Badge variant="subtle">weather…</Badge> : null}
+            </View>
+          </View>
+        ) : null}
+
+        {/* RESULTS */}
+        {summary ? (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            {/* QUICK TAKE — full-bleed editorial moment */}
+            {quickTakeEnabled && (isQuickTakeLoading || summary.quickTake) ? (
+              <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
+                <View
+                  style={{
+                    borderRadius: 18,
+                    backgroundColor: palette.ink[900],
+                    paddingHorizontal: 22,
+                    paddingTop: 22,
+                    paddingBottom: 22,
+                    borderWidth: 0.5,
+                    borderColor: palette.frost[600],
+                    overflow: "hidden",
+                  }}
+                >
+                  <View className="flex-row items-baseline justify-between">
+                    <View className="flex-row items-baseline gap-2">
+                      <Text
+                        variant="mono"
+                        weight="medium"
+                        className="text-frost-400"
+                        style={{ fontSize: 10, letterSpacing: 2.4 }}
+                      >
+                        QUICK TAKE
+                      </Text>
+                      <Text
+                        variant="mono"
+                        className="text-ink-400"
+                        style={{ fontSize: 9, letterSpacing: 1.4 }}
+                      >
+                        AI
+                      </Text>
+                    </View>
+                    <Text
+                      variant="mono"
+                      className="text-ink-400"
+                      style={{ fontSize: 9, letterSpacing: 1.4 }}
+                    >
+                      {summary.zones.length} ZONE{summary.zones.length !== 1 ? "S" : ""}
+                    </Text>
+                  </View>
+                  {isQuickTakeLoading ? (
+                    <View className="flex-row items-center gap-2 mt-3">
+                      <ActivityIndicator size="small" color={palette.ink[300]} />
+                      <Text
+                        variant="mono"
+                        className="text-ink-300"
+                        style={{ fontSize: 11, letterSpacing: 1.2 }}
+                      >
+                        SYNTHESIZING…
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text
+                      variant="display"
+                      className="text-ink-50 mt-3"
+                      style={{ fontSize: 22, lineHeight: 30 }}
+                    >
+                      {summary.quickTake}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ) : null}
+
+            {/* MATRIX */}
+            {summary.zones.length > 0 ? (
+              <View style={{ paddingHorizontal: 16, marginTop: 28 }}>
+                <ZoneComparisonMatrix zones={summary.zones} />
+              </View>
+            ) : null}
+
+            {/* DETAILS */}
+            {summary.zones.length > 0 ? (
+              <View style={{ marginTop: 28 }}>
+                <View
+                  style={{
+                    paddingHorizontal: 24,
+                    flexDirection: "row",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text
+                    variant="display"
+                    className="text-ink-50"
+                    style={{ fontSize: 32, lineHeight: 36 }}
+                  >
+                    Zones
+                  </Text>
+                  <Text
+                    variant="mono"
+                    className="text-ink-400"
+                    style={{ fontSize: 11, letterSpacing: 1.4 }}
+                  >
+                    {summary.zones.length}
+                  </Text>
+                </View>
+                <View style={{ paddingHorizontal: 16, gap: 14 }}>
+                  {summary.zones.map((zone) => (
+                    <ZoneCard
+                      key={zone.id}
+                      zone={zone}
+                      isSnotelLoading={isSnotelLoading}
+                      isWeatherForecastLoading={isWeatherForecastLoading}
+                      weatherForecast={getZoneWeatherForecast(zone.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {/* SOURCES */}
+            <View style={{ paddingHorizontal: 16, marginTop: 28 }}>
+              <Collapsible
+                title={
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-ink-200"
+                    style={{ fontSize: 11, letterSpacing: 1.6 }}
+                  >
+                    SOURCES · FRESHNESS
+                  </Text>
+                }
+              >
+                <View className="gap-2.5">
+                  {zonesScraped.map((zone) => {
+                    const f = freshness[zone.freshness.status];
+                    return (
+                      <View
+                        key={zone.id}
+                        className="flex-row items-center justify-between"
+                        style={{
+                          paddingVertical: 6,
+                          gap: 10,
+                        }}
+                      >
+                        <View className="flex-1">
+                          <Text
+                            className="text-ink-100"
+                            style={{ fontSize: 13 }}
+                            numberOfLines={1}
+                          >
+                            {zone.name}
+                          </Text>
+                          <Text
+                            variant="mono"
+                            className="text-ink-400"
+                            style={{ fontSize: 9, letterSpacing: 1.2 }}
+                          >
+                            {zone.center}
+                          </Text>
+                        </View>
+                        {zone.success ? (
+                          <Badge fill={f.fill} ink={f.ink}>
+                            {f.label}
+                          </Badge>
+                        ) : (
+                          <Badge variant="danger">FAILED</Badge>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View
+                  style={{
+                    marginTop: 14,
+                    paddingTop: 14,
+                    borderTopWidth: 0.5,
+                    borderColor: palette.ink[700],
+                    gap: 8,
+                  }}
+                >
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-ink-400 mb-1"
+                    style={{ fontSize: 9, letterSpacing: 1.6 }}
+                  >
+                    UPSTREAM
+                  </Text>
+                  <SourceLink
+                    label="National Avalanche Center"
+                    note="Forecasts · ratings"
+                    url="https://avalanche.org/"
+                  />
+                  <SourceLink
+                    label="NOAA / NWS"
+                    note="Mountain weather"
+                    url="https://www.weather.gov/"
+                  />
+                  <SourceLink
+                    label="Synoptic · MesoWest"
+                    note="Station observations"
+                    url="https://synopticdata.com/"
+                  />
+                  <SourceLink
+                    label="Utah Avalanche Center"
+                    note="UAC direct API"
+                    url="https://utahavalanchecenter.org/"
+                  />
+                </View>
+              </Collapsible>
+            </View>
+
+            {/* DISCLAIMER */}
+            <View
+              style={{
+                marginTop: 22,
+                marginHorizontal: 16,
+                padding: 18,
+                borderRadius: 16,
+                borderWidth: 0.5,
+                borderColor: palette.ink[700],
+                backgroundColor: palette.ink[900],
+              }}
+            >
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-aspen-400"
+                style={{ fontSize: 10, letterSpacing: 1.8, marginBottom: 6 }}
+              >
+                READ THIS
+              </Text>
+              <Text
+                className="text-ink-200"
+                style={{ fontSize: 13, lineHeight: 20 }}
+              >
+                Always read the original forecasts from your local avalanche center
+                before making travel decisions. This app summarizes — it does not
+                replace.
+              </Text>
+              {quickTakeEnabled && summary.quickTake ? (
+                <Text
+                  className="text-ink-400 mt-2"
+                  style={{ fontSize: 11, lineHeight: 17 }}
+                >
+                  Quick Take is generated by AI from the forecasts above.
+                </Text>
+              ) : null}
+            </View>
+          </Animated.View>
+        ) : null}
+
+        {/* EMPTY STATE */}
+        {!summary && !isLoading ? (
+          <View
+            style={{
+              marginTop: 32,
+              marginHorizontal: 16,
+              padding: 28,
+              borderRadius: 18,
+              borderWidth: 0.5,
+              borderColor: palette.ink[700],
+              backgroundColor: palette.ink[900],
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                borderWidth: 0.5,
+                borderColor: palette.frost[600],
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 14,
+              }}
+            >
+              <Ionicons
+                name="triangle-outline"
+                size={26}
+                color={palette.frost[400]}
+              />
+            </View>
+            <Text
+              variant="display"
+              className="text-ink-50 text-center"
+              style={{ fontSize: 22, lineHeight: 28 }}
+            >
+              Ready when you are.
+            </Text>
+            <Text
+              className="text-ink-300 text-center mt-2"
+              style={{ fontSize: 14, lineHeight: 21, maxWidth: 280 }}
+            >
+              Confirm your zones above, then tap{" "}
+              <Text variant="mono" weight="medium" className="text-ink-100">
+                Get current conditions
+              </Text>
+              .
+            </Text>
+          </View>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 function SourceLink({
   label,
-  description,
+  note,
   url,
 }: {
   label: string;
-  description: string;
+  note: string;
   url: string;
 }) {
   return (
-    <View className="flex-row items-center justify-between gap-3">
-      <Pressable
-        onPress={() => Linking.openURL(url)}
-        className="flex-row items-center gap-1 flex-1"
-      >
-        <Text className="text-sm text-primary" numberOfLines={1}>
-          {label}
-        </Text>
-        <Ionicons name="open-outline" size={12} color="#0d9488" />
-      </Pressable>
-      <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-        {description}
+    <Pressable
+      onPress={() => Linking.openURL(url)}
+      className="flex-row items-center justify-between"
+      hitSlop={6}
+    >
+      <Text className="text-ink-200" style={{ fontSize: 13 }}>
+        {label}
       </Text>
-    </View>
+      <View className="flex-row items-center gap-2">
+        <Text
+          variant="mono"
+          className="text-ink-400"
+          style={{ fontSize: 10, letterSpacing: 1 }}
+        >
+          {note}
+        </Text>
+        <Ionicons
+          name="arrow-forward"
+          size={11}
+          color={palette.ink[400]}
+          style={{ transform: [{ rotate: "-45deg" }] }}
+        />
+      </View>
+    </Pressable>
   );
 }

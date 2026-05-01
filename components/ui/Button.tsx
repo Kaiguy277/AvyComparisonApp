@@ -1,7 +1,9 @@
-import { Pressable, Text, ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
+import { Text } from "./Text";
 
-export type ButtonVariant = "default" | "outline" | "ghost" | "destructive";
+export type ButtonVariant = "primary" | "outline" | "ghost" | "frost";
 export type ButtonSize = "default" | "sm" | "lg";
 
 interface ButtonProps {
@@ -13,25 +15,37 @@ interface ButtonProps {
   size?: ButtonSize;
   className?: string;
   leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
+  haptic?: boolean;
 }
 
-const variantStyles: Record<ButtonVariant, { container: string; text: string }> = {
-  default: { container: "bg-primary active:opacity-80", text: "text-primary-foreground" },
-  outline: {
-    container: "border border-border bg-transparent active:bg-muted",
-    text: "text-foreground",
+const variantStyles: Record<ButtonVariant, { container: string; text: string; spinner: string }> = {
+  primary: {
+    container: "bg-ink-50 active:bg-ink-100",
+    text: "text-ink-950",
+    spinner: "#070A14",
   },
-  ghost: { container: "bg-transparent active:bg-muted", text: "text-foreground" },
-  destructive: {
-    container: "bg-destructive active:opacity-80",
-    text: "text-destructive-foreground",
+  outline: {
+    container: "border border-ink-600 bg-transparent active:bg-ink-800",
+    text: "text-ink-100",
+    spinner: "#E1E7F0",
+  },
+  ghost: {
+    container: "bg-transparent active:bg-ink-800",
+    text: "text-ink-200",
+    spinner: "#B8C2D6",
+  },
+  frost: {
+    container: "bg-frost-400/15 border border-frost-400/40 active:bg-frost-400/25",
+    text: "text-frost-400",
+    spinner: "#67D5F0",
   },
 };
 
 const sizeStyles: Record<ButtonSize, { container: string; text: string }> = {
-  default: { container: "h-10 px-4", text: "text-sm" },
-  sm: { container: "h-8 px-3", text: "text-xs" },
-  lg: { container: "h-12 px-6", text: "text-base" },
+  default: { container: "h-11 px-5", text: "text-sm" },
+  sm: { container: "h-9 px-4", text: "text-xs" },
+  lg: { container: "h-14 px-6", text: "text-base tracking-[0.06em]" },
 };
 
 export function Button({
@@ -39,32 +53,47 @@ export function Button({
   onPress,
   disabled,
   loading,
-  variant = "default",
+  variant = "primary",
   size = "default",
   className = "",
   leftIcon,
+  rightIcon,
+  haptic = true,
 }: ButtonProps) {
   const v = variantStyles[variant];
   const s = sizeStyles[size];
   const isDisabled = disabled || loading;
+
+  const handlePress = () => {
+    if (haptic) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onPress?.();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       disabled={isDisabled}
-      className={`flex-row items-center justify-center gap-2 rounded-md ${v.container} ${s.container} ${
-        isDisabled ? "opacity-50" : ""
+      className={`flex-row items-center justify-center gap-2.5 rounded-full ${v.container} ${s.container} ${
+        isDisabled ? "opacity-40" : ""
       } ${className}`}
     >
       {loading ? (
-        <ActivityIndicator size="small" color="white" />
+        <ActivityIndicator size="small" color={v.spinner} />
       ) : (
         <>
           {leftIcon ? <View>{leftIcon}</View> : null}
           {typeof children === "string" ? (
-            <Text className={`font-semibold ${v.text} ${s.text}`}>{children}</Text>
+            <Text
+              variant="mono"
+              weight="medium"
+              className={`uppercase tracking-[0.16em] ${v.text} ${s.text}`}
+            >
+              {children}
+            </Text>
           ) : (
             children
           )}
+          {rightIcon ? <View>{rightIcon}</View> : null}
         </>
       )}
     </Pressable>

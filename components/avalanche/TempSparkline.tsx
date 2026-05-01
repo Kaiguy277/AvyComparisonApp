@@ -58,9 +58,9 @@ export function TempSparkline({
 
   if (!pathData || !data || data.length < 2) return null;
 
-  const strokeColor = "#6b7280";
-  const axisColor = "#d1d5db";
-  const freezingLineColor = "rgba(56, 189, 248, 0.4)";
+  const strokeColor = "#E1E7F0";
+  const axisColor = "#3B4A6B";
+  const freezingLineColor = "rgba(103, 213, 240, 0.45)";
 
   const freezingTemp = 32;
   const showFreezingLine = pathData.min < freezingTemp && pathData.max > freezingTemp;
@@ -119,7 +119,7 @@ export function TempSparkline({
         x={pathData.leftPadding - 3}
         y={pathData.topPadding + 6}
         fontSize={7}
-        fill="#6b7280"
+        fill="#8794AE"
         textAnchor="end"
       >
         {`${pathData.max}°`}
@@ -128,7 +128,7 @@ export function TempSparkline({
         x={pathData.leftPadding - 3}
         y={height - pathData.bottomPadding + 4}
         fontSize={7}
-        fill="#6b7280"
+        fill="#8794AE"
         textAnchor="end"
       >
         {`${pathData.min}°`}
@@ -137,12 +137,12 @@ export function TempSparkline({
         x={pathData.leftPadding}
         y={height - 1}
         fontSize={7}
-        fill="#6b7280"
+        fill="#8794AE"
         textAnchor="start"
       >
         {`-${hours}h`}
       </SvgText>
-      <SvgText x={width - 2} y={height - 1} fontSize={7} fill="#6b7280" textAnchor="end">
+      <SvgText x={width - 2} y={height - 1} fontSize={7} fill="#8794AE" textAnchor="end">
         0h
       </SvgText>
       <Path

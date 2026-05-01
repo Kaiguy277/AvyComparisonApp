@@ -1,25 +1,39 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { LayoutAnimation, Platform, Pressable, UIManager, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Badge } from "@/components/ui/Badge";
+import * as Haptics from "expo-haptics";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Text } from "@/components/ui/Text";
+import { palette } from "@/constants/design";
 import {
   REGION_STRUCTURE,
   type AvalancheCenter,
   type Region,
 } from "@/lib/zones";
 
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 interface Props {
   selectedZoneIds: string[];
   onSelectionChange: (zoneIds: string[]) => void;
 }
 
-export function HierarchicalZoneSelector({ selectedZoneIds, onSelectionChange }: Props) {
+const animateNext = () =>
+  LayoutAnimation.configureNext({
+    duration: 200,
+    create: { type: "easeInEaseOut", property: "opacity" },
+    update: { type: "easeInEaseOut" },
+  });
+
+export function HierarchicalZoneSelector({
+  selectedZoneIds,
+  onSelectionChange,
+}: Props) {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedCenters, setExpandedCenters] = useState<Set<string>>(
-    new Set(
-      REGION_STRUCTURE.flatMap((r) => r.centers.map((c) => `${r.id}-${c.id}`)),
-    ),
+    new Set(REGION_STRUCTURE.flatMap((r) => r.centers.map((c) => `${r.id}-${c.id}`))),
   );
 
   const toggleSet = (set: Set<string>, key: string) => {
@@ -30,46 +44,47 @@ export function HierarchicalZoneSelector({ selectedZoneIds, onSelectionChange }:
   };
 
   const getRegionZones = (region: Region) =>
-    region.centers.flatMap((center) => center.zones.map((z) => z.id));
+    region.centers.flatMap((c) => c.zones.map((z) => z.id));
   const getCenterZones = (center: AvalancheCenter) => center.zones.map((z) => z.id);
 
-  const isRegionSelected = (region: Region): boolean | "indeterminate" => {
-    const zoneIds = getRegionZones(region);
-    const count = zoneIds.filter((id) => selectedZoneIds.includes(id)).length;
-    if (count === 0) return false;
-    if (count === zoneIds.length) return true;
+  const isRegionSelected = (r: Region): boolean | "indeterminate" => {
+    const ids = getRegionZones(r);
+    const c = ids.filter((id) => selectedZoneIds.includes(id)).length;
+    if (c === 0) return false;
+    if (c === ids.length) return true;
     return "indeterminate";
   };
 
-  const isCenterSelected = (center: AvalancheCenter): boolean | "indeterminate" => {
-    const zoneIds = getCenterZones(center);
-    const count = zoneIds.filter((id) => selectedZoneIds.includes(id)).length;
-    if (count === 0) return false;
-    if (count === zoneIds.length) return true;
+  const isCenterSelected = (c: AvalancheCenter): boolean | "indeterminate" => {
+    const ids = getCenterZones(c);
+    const n = ids.filter((id) => selectedZoneIds.includes(id)).length;
+    if (n === 0) return false;
+    if (n === ids.length) return true;
     return "indeterminate";
   };
 
   const handleRegionToggle = (region: Region) => {
-    const zoneIds = getRegionZones(region);
-    const state = isRegionSelected(region);
-    if (state === true) {
-      onSelectionChange(selectedZoneIds.filter((id) => !zoneIds.includes(id)));
+    Haptics.selectionAsync().catch(() => {});
+    const ids = getRegionZones(region);
+    if (isRegionSelected(region) === true) {
+      onSelectionChange(selectedZoneIds.filter((id) => !ids.includes(id)));
     } else {
-      onSelectionChange([...new Set([...selectedZoneIds, ...zoneIds])]);
+      onSelectionChange([...new Set([...selectedZoneIds, ...ids])]);
     }
   };
 
   const handleCenterToggle = (center: AvalancheCenter) => {
-    const zoneIds = getCenterZones(center);
-    const state = isCenterSelected(center);
-    if (state === true) {
-      onSelectionChange(selectedZoneIds.filter((id) => !zoneIds.includes(id)));
+    Haptics.selectionAsync().catch(() => {});
+    const ids = getCenterZones(center);
+    if (isCenterSelected(center) === true) {
+      onSelectionChange(selectedZoneIds.filter((id) => !ids.includes(id)));
     } else {
-      onSelectionChange([...new Set([...selectedZoneIds, ...zoneIds])]);
+      onSelectionChange([...new Set([...selectedZoneIds, ...ids])]);
     }
   };
 
   const handleZoneToggle = (zoneId: string) => {
+    Haptics.selectionAsync().catch(() => {});
     if (selectedZoneIds.includes(zoneId)) {
       onSelectionChange(selectedZoneIds.filter((id) => id !== zoneId));
     } else {
@@ -78,107 +93,160 @@ export function HierarchicalZoneSelector({ selectedZoneIds, onSelectionChange }:
   };
 
   return (
-    <View className="gap-3">
-      {REGION_STRUCTURE.map((region) => {
+    <View>
+      {REGION_STRUCTURE.map((region, regionIdx) => {
         const isExpanded = expandedRegions.has(region.id);
         const regionState = isRegionSelected(region);
         const regionZones = getRegionZones(region);
         const regionSelected = regionZones.filter((id) =>
           selectedZoneIds.includes(id),
         ).length;
+        const isLastRegion = regionIdx === REGION_STRUCTURE.length - 1;
         return (
           <View
             key={region.id}
-            className="border border-border rounded-lg overflow-hidden"
+            style={{
+              borderBottomWidth: isLastRegion ? 0 : 0.5,
+              borderColor: palette.ink[700],
+            }}
           >
-            <View className="bg-muted/50 p-3 flex-row items-center gap-2">
-              <Pressable
-                onPress={() =>
-                  setExpandedRegions((prev) => toggleSet(prev, region.id))
-                }
-                hitSlop={8}
-                className="p-1"
-              >
+            <Pressable
+              onPress={() => {
+                animateNext();
+                setExpandedRegions((p) => toggleSet(p, region.id));
+              }}
+              className="flex-row items-center py-3 pl-1 pr-1"
+            >
+              <View style={{ width: 18, alignItems: "center" }}>
                 <Ionicons
                   name={isExpanded ? "chevron-down" : "chevron-forward"}
-                  size={16}
-                  color="#6b7280"
+                  size={12}
+                  color={palette.ink[400]}
                 />
-              </Pressable>
-              <Checkbox checked={regionState} onChange={() => handleRegionToggle(region)} />
-              <Pressable className="flex-1" onPress={() => handleRegionToggle(region)}>
-                <Text className="text-sm font-medium text-foreground">{region.name}</Text>
-              </Pressable>
-              <Badge variant="outline">
-                {regionSelected} / {regionZones.length}
-              </Badge>
-            </View>
+              </View>
+              <View style={{ marginRight: 12 }}>
+                <Checkbox
+                  checked={regionState}
+                  onChange={() => handleRegionToggle(region)}
+                  size="sm"
+                />
+              </View>
+              <View className="flex-1">
+                <Text
+                  variant="display"
+                  className="text-ink-50"
+                  style={{ fontSize: 18, lineHeight: 22 }}
+                >
+                  {region.name}
+                </Text>
+              </View>
+              <Text
+                variant="mono"
+                className="text-ink-400"
+                style={{ fontSize: 11, letterSpacing: 1 }}
+              >
+                {regionSelected}/{regionZones.length}
+              </Text>
+            </Pressable>
 
             {isExpanded ? (
-              <View className="p-3 gap-2">
+              <View style={{ paddingBottom: 12 }}>
                 {region.centers.map((center) => {
-                  const centerKey = `${region.id}-${center.id}`;
-                  const isCenterExpanded = expandedCenters.has(centerKey);
-                  const centerState = isCenterSelected(center);
-                  const centerZones = getCenterZones(center);
-                  const centerSelected = centerZones.filter((id) =>
+                  const ckey = `${region.id}-${center.id}`;
+                  const cExpanded = expandedCenters.has(ckey);
+                  const cState = isCenterSelected(center);
+                  const cZones = getCenterZones(center);
+                  const cSelected = cZones.filter((id) =>
                     selectedZoneIds.includes(id),
                   ).length;
                   return (
                     <View
                       key={center.id}
-                      className="border border-border rounded-md overflow-hidden"
+                      style={{
+                        marginLeft: 26,
+                        paddingLeft: 14,
+                        borderLeftWidth: 0.5,
+                        borderColor: palette.ink[700],
+                      }}
                     >
-                      <View className="p-2 flex-row items-center gap-2 bg-card">
-                        <Pressable
-                          onPress={() =>
-                            setExpandedCenters((prev) => toggleSet(prev, centerKey))
-                          }
-                          hitSlop={8}
-                          className="p-1"
-                        >
+                      <Pressable
+                        onPress={() => {
+                          animateNext();
+                          setExpandedCenters((p) => toggleSet(p, ckey));
+                        }}
+                        className="flex-row items-center py-2"
+                      >
+                        <View style={{ width: 14, alignItems: "center" }}>
                           <Ionicons
-                            name={isCenterExpanded ? "chevron-down" : "chevron-forward"}
-                            size={14}
-                            color="#6b7280"
+                            name={cExpanded ? "chevron-down" : "chevron-forward"}
+                            size={10}
+                            color={palette.ink[400]}
                           />
-                        </Pressable>
-                        <Checkbox
-                          checked={centerState}
-                          onChange={() => handleCenterToggle(center)}
-                          size="sm"
-                        />
-                        <Pressable
-                          className="flex-1"
-                          onPress={() => handleCenterToggle(center)}
-                        >
-                          <Text className="text-sm font-medium text-foreground">
+                        </View>
+                        <View style={{ marginRight: 10, marginLeft: 4 }}>
+                          <Checkbox
+                            checked={cState}
+                            onChange={() => handleCenterToggle(center)}
+                            size="sm"
+                          />
+                        </View>
+                        <View className="flex-1 flex-row items-baseline gap-2">
+                          <Text
+                            variant="mono"
+                            weight="medium"
+                            className="text-frost-400"
+                            style={{ fontSize: 10, letterSpacing: 1 }}
+                          >
+                            {center.id}
+                          </Text>
+                          <Text
+                            className="text-ink-200 flex-1"
+                            style={{ fontSize: 13 }}
+                            numberOfLines={1}
+                          >
                             {center.name}
                           </Text>
-                        </Pressable>
-                        <Badge variant="secondary">
-                          {centerSelected} / {center.zones.length}
-                        </Badge>
-                      </View>
+                        </View>
+                        <Text
+                          variant="mono"
+                          className="text-ink-400"
+                          style={{ fontSize: 10, letterSpacing: 1 }}
+                        >
+                          {cSelected}/{cZones.length}
+                        </Text>
+                      </Pressable>
 
-                      {isCenterExpanded ? (
-                        <View className="p-2 pl-10 bg-muted/20 gap-1.5">
-                          {center.zones.map((zone) => (
-                            <Pressable
-                              key={zone.id}
-                              onPress={() => handleZoneToggle(zone.id)}
-                              className="flex-row items-center gap-2 py-1"
-                            >
-                              <Checkbox
-                                checked={selectedZoneIds.includes(zone.id)}
-                                onChange={() => handleZoneToggle(zone.id)}
-                                size="sm"
-                              />
-                              <Text className="text-sm text-foreground flex-1">
-                                {zone.name}
-                              </Text>
-                            </Pressable>
-                          ))}
+                      {cExpanded ? (
+                        <View
+                          style={{
+                            paddingLeft: 28,
+                            paddingBottom: 6,
+                          }}
+                        >
+                          {center.zones.map((zone) => {
+                            const sel = selectedZoneIds.includes(zone.id);
+                            return (
+                              <Pressable
+                                key={zone.id}
+                                onPress={() => handleZoneToggle(zone.id)}
+                                className="flex-row items-center py-1.5"
+                              >
+                                <View style={{ marginRight: 10 }}>
+                                  <Checkbox
+                                    checked={sel}
+                                    onChange={() => handleZoneToggle(zone.id)}
+                                    size="sm"
+                                  />
+                                </View>
+                                <Text
+                                  className={sel ? "text-ink-100" : "text-ink-300"}
+                                  style={{ fontSize: 13 }}
+                                >
+                                  {zone.name}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
                         </View>
                       ) : null}
                     </View>

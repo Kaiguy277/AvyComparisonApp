@@ -1,7 +1,9 @@
-import { View, Text, Pressable, Linking, Alert } from "react-native";
+import { Alert, Linking, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { WeatherObservation } from "@/lib/api/avalanche";
+import { Text } from "@/components/ui/Text";
 import { TempSparkline } from "./TempSparkline";
+import { palette } from "@/constants/design";
+import type { WeatherObservation } from "@/lib/api/avalanche";
 
 interface Props {
   observations: WeatherObservation[];
@@ -12,127 +14,188 @@ export function WeatherStationCard({ observations, note }: Props) {
   if (!observations || observations.length === 0) return null;
 
   return (
-    <View className="rounded-lg border border-blue-500/30 p-3 bg-card">
-      <View className="flex-row items-center gap-2 mb-2">
-        <Ionicons name="pulse-outline" size={16} color="#3b82f6" />
-        <Text className="text-base font-semibold text-foreground">
-          Weather Station Observations
-        </Text>
-      </View>
+    <View>
       {note ? (
-        <Text className="text-xs italic text-muted-foreground mb-3">{note}</Text>
+        <Text
+          className="text-ink-400 italic mb-3"
+          style={{ fontSize: 12, lineHeight: 17 }}
+        >
+          {note}
+        </Text>
       ) : null}
 
-      {observations.map((obs, idx) => {
-        const lastUpdated = obs.timestamp
-          ? new Date(obs.timestamp).toLocaleString()
-          : null;
-        const hasWind = obs.wind !== null && obs.wind !== undefined;
-        const stationUrl = `https://mesowest.utah.edu/cgi-bin/droman/meso_base_dyn.cgi?stn=${obs.stationTriplet}`;
+      <View className="gap-4">
+        {observations.map((obs, idx) => {
+          const lastUpdated = obs.timestamp
+            ? new Date(obs.timestamp).toLocaleString()
+            : null;
+          const hasWind = obs.wind !== null && obs.wind !== undefined;
+          const stationUrl = `https://mesowest.utah.edu/cgi-bin/droman/meso_base_dyn.cgi?stn=${obs.stationTriplet}`;
 
-        return (
-          <View key={idx} className={idx > 0 ? "mt-4 pt-4 border-t border-border/50" : ""}>
-            <View className="flex-row items-center justify-between">
-              <Pressable
-                onPress={() => {
-                  Alert.alert(obs.stationName, [
-                    `Station ID: ${obs.stationTriplet}`,
-                    `Elevation: ${obs.elevation.toLocaleString()}'`,
-                    `Data Quality: ${obs.dataQuality}`,
-                    lastUpdated ? `Last Updated: ${lastUpdated}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join("\n"), [
-                    { text: "View Station Data", onPress: () => Linking.openURL(stationUrl) },
-                    { text: "Close", style: "cancel" },
-                  ]);
-                }}
-                className="flex-row items-center gap-1.5 flex-1"
-              >
-                <Text className="text-xs font-medium text-foreground">
-                  {obs.stationName}
+          return (
+            <View
+              key={idx}
+              style={{
+                paddingTop: idx === 0 ? 0 : 14,
+                borderTopWidth: idx === 0 ? 0 : 0.5,
+                borderColor: palette.ink[700],
+              }}
+            >
+              {/* Header */}
+              <View className="flex-row items-baseline justify-between mb-3">
+                <Pressable
+                  onPress={() =>
+                    Alert.alert(
+                      obs.stationName,
+                      [
+                        `ID · ${obs.stationTriplet}`,
+                        `Elevation · ${obs.elevation.toLocaleString()}'`,
+                        `Quality · ${obs.dataQuality}`,
+                        lastUpdated ? `Updated · ${lastUpdated}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join("\n"),
+                      [
+                        {
+                          text: "View station",
+                          onPress: () => Linking.openURL(stationUrl),
+                        },
+                        { text: "Close", style: "cancel" },
+                      ],
+                    )
+                  }
+                  className="flex-row items-baseline gap-2 flex-1"
+                  hitSlop={6}
+                >
+                  <Text
+                    variant="display"
+                    className="text-ink-50"
+                    style={{ fontSize: 16, lineHeight: 20 }}
+                    numberOfLines={1}
+                  >
+                    {obs.stationName}
+                  </Text>
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={12}
+                    color={palette.ink[400]}
+                  />
+                </Pressable>
+                <Text
+                  variant="mono"
+                  weight="medium"
+                  className="text-ink-300"
+                  style={{ fontSize: 11 }}
+                >
+                  {obs.elevation.toLocaleString()}′
                 </Text>
-                <Ionicons name="information-circle-outline" size={14} color="#6b7280" />
-              </Pressable>
-              <Text className="text-xs font-semibold text-muted-foreground">
-                {obs.elevation.toLocaleString()}' Elev
-              </Text>
+              </View>
+
+              {/* Current row */}
+              <View className="flex-row items-center gap-4 mb-3">
+                {obs.temperature.current !== null ? (
+                  <Reading
+                    icon="thermometer-outline"
+                    color="#FCA5A5"
+                    value={`${obs.temperature.current}°`}
+                  />
+                ) : null}
+                {obs.snow.depth !== null ? (
+                  <Reading
+                    icon="snow-outline"
+                    color={palette.frost[400]}
+                    value={`${obs.snow.depth}″`}
+                    suffix="depth"
+                  />
+                ) : null}
+                {hasWind &&
+                (obs.wind!.speedCurrent !== null || obs.wind!.direction !== null) ? (
+                  <Reading
+                    icon="navigate-outline"
+                    color="#7DD3C0"
+                    value={`${obs.wind!.direction || ""} ${obs.wind!.speedCurrent !== null ? obs.wind!.speedCurrent + " mph" : ""}`.trim()}
+                  />
+                ) : null}
+              </View>
+
+              <PeriodBlock
+                label="LAST 24 H"
+                snowChange={obs.snow.depth24hrChange}
+                precip={obs.snow.precip24hr}
+                tempHigh={obs.temperature.high24hr}
+                tempLow={obs.temperature.low24hr}
+                hourly={obs.temperature.hourly24hr}
+                hours={24}
+                wind={
+                  hasWind
+                    ? {
+                        direction: obs.wind!.direction24hr,
+                        avg: obs.wind!.speedAvg24hr,
+                        max: obs.wind!.speedMax24hr,
+                      }
+                    : null
+                }
+              />
+
+              <View style={{ height: 12 }} />
+
+              <PeriodBlock
+                label="LAST 72 H"
+                snowChange={obs.snow.depth72hrChange}
+                precip={obs.snow.precip72hr}
+                tempHigh={obs.temperature.high72hr}
+                tempLow={obs.temperature.low72hr}
+                hourly={obs.temperature.hourly72hr}
+                hours={72}
+                wind={
+                  hasWind
+                    ? {
+                        direction: obs.wind!.direction72hr,
+                        avg: obs.wind!.speedAvg72hr,
+                        max: obs.wind!.speedMax72hr,
+                      }
+                    : null
+                }
+              />
             </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
-            {/* Current */}
-            <View className="flex-row items-center gap-4 mt-2">
-              {obs.temperature.current !== null ? (
-                <View className="flex-row items-center gap-1">
-                  <Ionicons name="thermometer-outline" size={12} color="#f87171" />
-                  <Text className="text-sm font-semibold text-foreground">
-                    {obs.temperature.current}°F
-                  </Text>
-                </View>
-              ) : null}
-              {obs.snow.depth !== null ? (
-                <View className="flex-row items-center gap-1">
-                  <Ionicons name="snow-outline" size={12} color="#3b82f6" />
-                  <Text className="text-sm font-semibold text-foreground">
-                    {obs.snow.depth}" depth
-                  </Text>
-                </View>
-              ) : null}
-              {hasWind &&
-              (obs.wind!.speedCurrent !== null || obs.wind!.direction !== null) ? (
-                <View className="flex-row items-center gap-1">
-                  <Ionicons name="navigate-outline" size={12} color="#14b8a6" />
-                  <Text className="text-sm font-semibold text-foreground">
-                    {obs.wind!.direction ? `${obs.wind!.direction} ` : ""}
-                    {obs.wind!.speedCurrent !== null
-                      ? `${obs.wind!.speedCurrent} mph`
-                      : ""}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-
-            {/* 24h block */}
-            <PeriodBlock
-              label="Last 24 Hours"
-              snowChange={obs.snow.depth24hrChange}
-              precip={obs.snow.precip24hr}
-              tempHigh={obs.temperature.high24hr}
-              tempLow={obs.temperature.low24hr}
-              hourly={obs.temperature.hourly24hr}
-              hours={24}
-              wind={
-                hasWind
-                  ? {
-                      direction: obs.wind!.direction24hr,
-                      avg: obs.wind!.speedAvg24hr,
-                      max: obs.wind!.speedMax24hr,
-                    }
-                  : null
-              }
-            />
-
-            {/* 72h block */}
-            <PeriodBlock
-              label="Last 72 Hours"
-              snowChange={obs.snow.depth72hrChange}
-              precip={obs.snow.precip72hr}
-              tempHigh={obs.temperature.high72hr}
-              tempLow={obs.temperature.low72hr}
-              hourly={obs.temperature.hourly72hr}
-              hours={72}
-              wind={
-                hasWind
-                  ? {
-                      direction: obs.wind!.direction72hr,
-                      avg: obs.wind!.speedAvg72hr,
-                      max: obs.wind!.speedMax72hr,
-                    }
-                  : null
-              }
-            />
-          </View>
-        );
-      })}
+function Reading({
+  icon,
+  color,
+  value,
+  suffix,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  value: string;
+  suffix?: string;
+}) {
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <Ionicons name={icon} size={12} color={color} />
+      <Text
+        variant="mono"
+        weight="medium"
+        className="text-ink-100"
+        style={{ fontSize: 13 }}
+      >
+        {value}
+      </Text>
+      {suffix ? (
+        <Text
+          variant="mono"
+          className="text-ink-400"
+          style={{ fontSize: 10, letterSpacing: 0.6 }}
+        >
+          {suffix}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -159,53 +222,109 @@ function PeriodBlock({
   wind,
 }: PeriodBlockProps) {
   return (
-    <View className="mt-3">
-      <Text className="text-xs font-semibold text-foreground border-b border-border pb-1 mb-2">
-        {label}
-      </Text>
-      <View className="flex-row gap-3">
+    <View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingBottom: 6,
+          marginBottom: 8,
+          borderBottomWidth: 0.5,
+          borderColor: palette.ink[700],
+        }}
+      >
+        <Text
+          variant="mono"
+          weight="medium"
+          className="text-frost-400"
+          style={{ fontSize: 9, letterSpacing: 1.6 }}
+        >
+          {label}
+        </Text>
+        <View style={{ flex: 1, height: 0.5, backgroundColor: palette.ink[700] }} />
+      </View>
+
+      <View className="flex-row" style={{ gap: 14 }}>
         {/* Snow */}
         <View className="flex-1">
-          <View className="flex-row items-center gap-1 mb-1">
-            <Ionicons name="snow-outline" size={12} color="#3b82f6" />
-            <Text className="text-xs font-medium text-muted-foreground">Snow</Text>
-          </View>
+          <Text
+            variant="mono"
+            className="text-ink-400 mb-1"
+            style={{ fontSize: 9, letterSpacing: 1.2 }}
+          >
+            SNOW
+          </Text>
           {snowChange !== null ? (
             <Text
-              className={`text-sm font-semibold ${
-                snowChange > 0 ? "text-blue-600" : "text-foreground"
-              }`}
+              variant="mono"
+              weight="bold"
+              style={{
+                fontSize: 16,
+                color: snowChange > 0 ? palette.frost[400] : palette.ink[100],
+              }}
             >
               {snowChange > 0 ? "+" : ""}
-              {snowChange}"
+              {snowChange}″
             </Text>
-          ) : null}
+          ) : (
+            <Text
+              variant="mono"
+              className="text-ink-400"
+              style={{ fontSize: 14 }}
+            >
+              —
+            </Text>
+          )}
           {precip !== null ? (
-            <Text className="text-sm font-semibold text-foreground">
-              {precip.toFixed(1)}" SWE
+            <Text
+              variant="mono"
+              className="text-ink-300"
+              style={{ fontSize: 11, marginTop: 1 }}
+            >
+              {precip.toFixed(1)}″ SWE
             </Text>
           ) : null}
         </View>
 
         {/* Temp */}
         <View className="flex-1">
-          <View className="flex-row items-center gap-1 mb-1">
-            <Ionicons name="thermometer-outline" size={12} color="#f87171" />
-            <Text className="text-xs font-medium text-muted-foreground">Temp</Text>
-          </View>
+          <Text
+            variant="mono"
+            className="text-ink-400 mb-1"
+            style={{ fontSize: 9, letterSpacing: 1.2 }}
+          >
+            TEMP
+          </Text>
           <View className="flex-row items-start gap-2">
             <View>
               {tempHigh !== null && tempLow !== null ? (
                 <>
-                  <Text className="text-sm font-semibold text-foreground">
-                    H: {tempHigh}°
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-ink-100"
+                    style={{ fontSize: 13 }}
+                  >
+                    H {tempHigh}°
                   </Text>
-                  <Text className="text-sm font-semibold text-foreground">
-                    L: {tempLow}°
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-ink-300"
+                    style={{ fontSize: 13 }}
+                  >
+                    L {tempLow}°
                   </Text>
                 </>
               ) : (
-                <Text className="text-sm text-muted-foreground">N/A</Text>
+                <Text
+                  variant="mono"
+                  className="text-ink-400"
+                  style={{ fontSize: 14 }}
+                >
+                  —
+                </Text>
               )}
             </View>
             {hourly && hourly.length >= 2 ? (
@@ -222,21 +341,40 @@ function PeriodBlock({
         {/* Wind */}
         {wind ? (
           <View className="flex-1">
-            <View className="flex-row items-center gap-1 mb-1">
-              <Ionicons name="navigate-outline" size={12} color="#14b8a6" />
-              <Text className="text-xs font-medium text-muted-foreground">Wind</Text>
-            </View>
+            <Text
+              variant="mono"
+              className="text-ink-400 mb-1"
+              style={{ fontSize: 9, letterSpacing: 1.2 }}
+            >
+              WIND
+            </Text>
             {wind.direction ? (
-              <Text className="text-sm font-semibold text-foreground">
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-ink-100"
+                style={{ fontSize: 13 }}
+              >
                 {wind.direction}
               </Text>
             ) : null}
             {wind.avg !== null ? (
-              <Text className="text-sm text-foreground">avg {wind.avg} mph</Text>
+              <Text
+                variant="mono"
+                className="text-ink-300"
+                style={{ fontSize: 11, marginTop: 1 }}
+              >
+                avg {wind.avg}
+              </Text>
             ) : null}
             {wind.max !== null ? (
-              <Text className="text-sm text-foreground">
-                gusts <Text className="font-semibold">{wind.max} mph</Text>
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-ink-100"
+                style={{ fontSize: 11 }}
+              >
+                gust {wind.max}
               </Text>
             ) : null}
           </View>

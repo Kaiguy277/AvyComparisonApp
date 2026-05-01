@@ -1,6 +1,7 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/Text";
+import { dangerColors } from "@/constants/design";
 import type { DangerRating } from "@/lib/api/avalanche";
-import { dangerColors } from "./dangerColors";
 
 interface ElevationPyramidProps {
   danger: {
@@ -11,15 +12,20 @@ interface ElevationPyramidProps {
   size?: "small" | "normal";
 }
 
-export function ElevationPyramid({ danger, size = "normal" }: ElevationPyramidProps) {
+export function ElevationPyramid({
+  danger,
+  size = "normal",
+}: ElevationPyramidProps) {
   const isSmall = size === "small";
-  const alpineWidth = isSmall ? 24 : 32;
-  const treelineWidth = isSmall ? 36 : 48;
-  const belowWidth = isSmall ? 48 : 64;
-  const height = isSmall ? 12 : 16;
-  const fontSize = isSmall ? 7 : 9;
+  const dimensions = {
+    alpine: isSmall ? 28 : 38,
+    treeline: isSmall ? 44 : 58,
+    below: isSmall ? 60 : 78,
+    height: isSmall ? 12 : 16,
+    fontSize: isSmall ? 7 : 9,
+  };
 
-  const Stripe = ({
+  const Slab = ({
     width,
     rating,
     label,
@@ -30,26 +36,30 @@ export function ElevationPyramid({ danger, size = "normal" }: ElevationPyramidPr
     label: string;
     radius?: { top?: boolean; bottom?: boolean };
   }) => {
-    const c = dangerColors[rating] ?? dangerColors.NO_RATING;
+    const c = dangerColors[rating];
     return (
       <View
         style={{
           width,
-          height,
-          backgroundColor: c.hex,
-          borderTopLeftRadius: radius?.top ? 4 : 0,
-          borderTopRightRadius: radius?.top ? 4 : 0,
-          borderBottomLeftRadius: radius?.bottom ? 4 : 0,
-          borderBottomRightRadius: radius?.bottom ? 4 : 0,
+          height: dimensions.height,
+          backgroundColor: c.fill,
+          borderTopLeftRadius: radius?.top ? 3 : 0,
+          borderTopRightRadius: radius?.top ? 3 : 0,
+          borderBottomLeftRadius: radius?.bottom ? 3 : 0,
+          borderBottomRightRadius: radius?.bottom ? 3 : 0,
           alignItems: "center",
           justifyContent: "center",
+          borderWidth: rating === "EXTREME" ? 0.5 : 0,
+          borderColor: "#ED1C24",
         }}
       >
         <Text
+          variant="mono"
+          weight="bold"
           style={{
-            fontSize,
-            fontWeight: "700",
-            color: rating === "MODERATE" || rating === "NO_RATING" ? "#000" : "#fff",
+            fontSize: dimensions.fontSize,
+            color: c.ink,
+            letterSpacing: 0.6,
           }}
         >
           {label}
@@ -60,12 +70,21 @@ export function ElevationPyramid({ danger, size = "normal" }: ElevationPyramidPr
 
   return (
     <View style={{ alignItems: "center", gap: 2 }}>
-      <Stripe width={alpineWidth} rating={danger.alpine} label="A" radius={{ top: true }} />
-      <Stripe width={treelineWidth} rating={danger.treeline} label="TL" />
-      <Stripe
-        width={belowWidth}
+      <Slab
+        width={dimensions.alpine}
+        rating={danger.alpine}
+        label="A"
+        radius={{ top: true }}
+      />
+      <Slab
+        width={dimensions.treeline}
+        rating={danger.treeline}
+        label="TL"
+      />
+      <Slab
+        width={dimensions.below}
         rating={danger.belowTreeline}
-        label="BTL"
+        label="B"
         radius={{ bottom: true }}
       />
     </View>
