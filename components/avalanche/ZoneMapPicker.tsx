@@ -257,7 +257,13 @@ const HTML = String.raw`<!DOCTYPE html>
     var z = map.getZoom();
     if (z < POLY_MIN_ZOOM) {
       polyLayer.clearLayers();
-      pinLayer.eachLayer(function(l) { l.setOpacity(1); });
+      // Restore every pin so they're clickable again at low zoom.
+      Object.keys(pins).forEach(function(cid) {
+        var p = pins[cid];
+        if (p && p.marker && !pinLayer.hasLayer(p.marker)) {
+          pinLayer.addLayer(p.marker);
+        }
+      });
       return;
     }
     var bounds = map.getBounds();
@@ -269,13 +275,18 @@ const HTML = String.raw`<!DOCTYPE html>
         }
       });
     });
-    pinLayer.eachLayer(function(l) {
-      var cid = l._avyCenterId;
+    // For each center: if its polygons are on the map, REMOVE the pin so
+    // taps land on the polygon. Otherwise restore the pin so the user can
+    // still pick that center via the sheet.
+    Object.keys(pins).forEach(function(cid) {
+      var p = pins[cid];
+      if (!p || !p.marker) return;
       var slot = centerPolys[cid];
-      if (slot && slot.layer && polyLayer.hasLayer(slot.layer)) {
-        l.setOpacity(0);
+      var polysVisible = slot && slot.layer && polyLayer.hasLayer(slot.layer);
+      if (polysVisible) {
+        if (pinLayer.hasLayer(p.marker)) pinLayer.removeLayer(p.marker);
       } else {
-        l.setOpacity(1);
+        if (!pinLayer.hasLayer(p.marker)) pinLayer.addLayer(p.marker);
       }
     });
   }
