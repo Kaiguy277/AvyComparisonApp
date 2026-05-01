@@ -953,14 +953,14 @@ export default function Index() {
       <Modal
         visible={mapModalOpen}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="fullScreen"
         onRequestClose={() => setMapModalOpen(false)}
       >
         <View style={{ flex: 1, backgroundColor: palette.ink[950] }}>
           <View
             style={{
               paddingHorizontal: 20,
-              paddingTop: 18,
+              paddingTop: insets.top + 12,
               paddingBottom: 14,
               flexDirection: "row",
               alignItems: "center",
