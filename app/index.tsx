@@ -5,6 +5,7 @@ import {
   Animated,
   Image,
   Linking,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -76,7 +77,7 @@ export default function Index() {
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>(DEFAULT_ZONE_IDS);
   const [quickTakeEnabled, setQuickTakeEnabled] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
-  const [pickerMode, setPickerMode] = useState<"list" | "map">("list");
+  const [mapModalOpen, setMapModalOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSnotelLoading, setIsSnotelLoading] = useState(false);
@@ -485,27 +486,55 @@ export default function Index() {
               </View>
             </CardHeader>
             <CardContent>
-              <SegmentedToggle
-                value={pickerMode}
-                onChange={setPickerMode}
-                options={[
-                  { value: "list", label: "LIST" },
-                  { value: "map", label: "MAP" },
-                ]}
+              <Pressable
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setMapModalOpen(true);
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  borderWidth: 0.5,
+                  borderColor: palette.frost[600],
+                  backgroundColor: palette.frost[400] + "12",
+                  marginBottom: 14,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <Ionicons name="map-outline" size={18} color={palette.frost[400]} />
+                  <View>
+                    <Text
+                      variant="mono"
+                      weight="medium"
+                      className="text-frost-400"
+                      style={{ fontSize: 11, letterSpacing: 1.6 }}
+                    >
+                      OPEN MAP
+                    </Text>
+                    <Text
+                      className="text-ink-300"
+                      style={{ fontSize: 12, marginTop: 2 }}
+                    >
+                      Tap zones colored by today's danger.
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name="arrow-forward"
+                  size={16}
+                  color={palette.frost[400]}
+                  style={{ transform: [{ rotate: "-45deg" }] }}
+                />
+              </Pressable>
+
+              <HierarchicalZoneSelector
+                selectedZoneIds={selectedZoneIds}
+                onSelectionChange={updateSelectedZones}
               />
-              <View style={{ marginTop: 14 }}>
-                {pickerMode === "list" ? (
-                  <HierarchicalZoneSelector
-                    selectedZoneIds={selectedZoneIds}
-                    onSelectionChange={updateSelectedZones}
-                  />
-                ) : (
-                  <ZoneMapPicker
-                    selectedZoneIds={selectedZoneIds}
-                    onSelectionChange={updateSelectedZones}
-                  />
-                )}
-              </View>
               <View
                 className="flex-row gap-2 mt-4"
                 style={{ justifyContent: "flex-end" }}
@@ -920,6 +949,76 @@ export default function Index() {
           </View>
         ) : null}
       </ScrollView>
+
+      <Modal
+        visible={mapModalOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setMapModalOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: palette.ink[950] }}>
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingTop: 18,
+              paddingBottom: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderBottomWidth: 0.5,
+              borderColor: palette.ink[700],
+            }}
+          >
+            <View>
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-frost-400"
+                style={{ fontSize: 10, letterSpacing: 2 }}
+              >
+                MAP · ZONES
+              </Text>
+              <Text
+                variant="display"
+                className="text-ink-50"
+                style={{ fontSize: 26, lineHeight: 30, marginTop: 2 }}
+              >
+                Pick on map
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setMapModalOpen(false);
+              }}
+              hitSlop={10}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 9,
+                borderRadius: 999,
+                backgroundColor: palette.ink[50],
+              }}
+            >
+              <Text
+                variant="mono"
+                weight="medium"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 1.6,
+                  color: palette.ink[950],
+                }}
+              >
+                DONE
+              </Text>
+            </Pressable>
+          </View>
+
+          <ZoneMapPicker
+            selectedZoneIds={selectedZoneIds}
+            onSelectionChange={updateSelectedZones}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -961,57 +1060,3 @@ function SourceLink({
   );
 }
 
-function SegmentedToggle<V extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: V;
-  onChange: (v: V) => void;
-  options: { value: V; label: string }[];
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        padding: 3,
-        borderRadius: 999,
-        backgroundColor: palette.ink[800],
-        borderWidth: 0.5,
-        borderColor: palette.ink[700],
-      }}
-    >
-      {options.map((opt) => {
-        const active = value === opt.value;
-        return (
-          <Pressable
-            key={opt.value}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onChange(opt.value);
-            }}
-            style={{
-              flex: 1,
-              paddingVertical: 9,
-              borderRadius: 999,
-              backgroundColor: active ? palette.ink[50] : "transparent",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              variant="mono"
-              weight="medium"
-              style={{
-                fontSize: 11,
-                letterSpacing: 1.6,
-                color: active ? palette.ink[950] : palette.ink[300],
-              }}
-            >
-              {opt.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}

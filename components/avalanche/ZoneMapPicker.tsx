@@ -30,9 +30,11 @@ interface CenterMeta {
 interface Props {
   selectedZoneIds: string[];
   onSelectionChange: (zoneIds: string[]) => void;
+  // Optional fixed height. Omit (or pass undefined) to let the picker
+  // fill its parent container (used for the full-screen variant).
+  height?: number;
 }
 
-const MAP_HEIGHT = 380;
 const ZONE_POLY_MIN_ZOOM = 5;
 
 const FLAT_CENTERS: CenterMeta[] = REGION_STRUCTURE.flatMap((r) =>
@@ -158,13 +160,14 @@ const HTML = String.raw`<!DOCTYPE html>
     }
   }
 
-  // Style policy:
-  // - Polygon FILL color reflects the zone's CURRENT ALPINE danger
-  //   (above-treeline rating). Sourced from the app's forecast layer
-  //   when available; falls back to NAC's overall danger color (worst
-  //   of three) until that resolves so polygons paint instantly.
-  // - Polygon STROKE color reflects selection state (frost = selected,
-  //   ink = not selected). Both signals stay legible on the topo bg.
+  // Style policy
+  // - Polygon FILL is the zone's CURRENT ALPINE danger color; falls back
+  //   to NAC's overall (worst-of-three) color until alpine fetch arrives.
+  // - Polygon STROKE is the SAME danger color but pushed to full saturation
+  //   and full opacity at 3px weight, so the outline pops off the topo
+  //   basemap regardless of zoom or background terrain.
+  // - Selected zones override stroke with a 4px frost-cyan ring and a
+  //   black halo underneath for extra contrast.
   var alpineByZone = {}; // zoneId -> hex
   function styleForFeature(feature, zoneId) {
     var sel = !!currentSelected[zoneId];
@@ -172,11 +175,11 @@ const HTML = String.raw`<!DOCTYPE html>
     var alpine = zoneId ? alpineByZone[zoneId] : null;
     var fill = alpine || props.color || '#5A6B8C';
     return {
-      color: sel ? '#67D5F0' : '#070A14',
-      weight: sel ? 3 : 1.5,
-      opacity: sel ? 1 : 0.85,
+      color: sel ? '#67D5F0' : fill,
+      weight: sel ? 4 : 3,
+      opacity: 1,
       fillColor: fill,
-      fillOpacity: sel ? 0.55 : 0.40,
+      fillOpacity: sel ? 0.55 : 0.45,
       dashArray: null,
     };
   }
@@ -224,7 +227,10 @@ const HTML = String.raw`<!DOCTYPE html>
               if (zoneId) {
                 post({ type: 'zoneTap', id: zoneId, name: nm });
               } else {
-                post({ type: 'pin', id: centerId });
+                // Polygon doesn't map to one of our zones (e.g. CAIC's
+                // aggregate features). Treat the tap as toggling the
+                // whole center — direct selection, no extra UI step.
+                post({ type: 'centerToggleAll', id: centerId });
               }
               if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             });
@@ -343,7 +349,11 @@ const HTML = String.raw`<!DOCTYPE html>
 </script>
 </body></html>`.replace("__POLY_MIN_ZOOM__", String(ZONE_POLY_MIN_ZOOM));
 
-export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
+export function ZoneMapPicker({
+  selectedZoneIds,
+  onSelectionChange,
+  height,
+}: Props) {
   const webRef = useRef<WebView>(null);
   const [activeCenterId, setActiveCenterId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -443,6 +453,20 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
       } else {
         onSelectionChange([...selectedZoneIds, zoneId]);
       }
+    } else if (msg.type === "centerToggleAll" && typeof msg.id === "string") {
+      // Polygon doesn't disambiguate (e.g. CAIC aggregate features) —
+      // toggle every zone in that center as a single action.
+      Haptics.selectionAsync().catch(() => {});
+      const centerId = msg.id;
+      const zoneIds = AVAILABLE_ZONES.filter((z) => z.center === centerId).map(
+        (z) => z.id,
+      );
+      const allOn = zoneIds.every((id) => selectedZoneIds.includes(id));
+      if (allOn) {
+        onSelectionChange(selectedZoneIds.filter((id) => !zoneIds.includes(id)));
+      } else {
+        onSelectionChange([...new Set([...selectedZoneIds, ...zoneIds])]);
+      }
     }
   };
 
@@ -451,14 +475,17 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
     [activeCenterId],
   );
 
+  const fixed = typeof height === "number";
   return (
-    <View>
+    <View style={fixed ? undefined : { flex: 1 }}>
       <View
         style={{
-          height: MAP_HEIGHT,
-          borderRadius: 14,
+          ...(fixed
+            ? { height }
+            : { flex: 1 }),
+          borderRadius: fixed ? 14 : 0,
           overflow: "hidden",
-          borderWidth: 0.5,
+          borderWidth: fixed ? 0.5 : 0,
           borderColor: palette.ink[700],
           backgroundColor: palette.ink[900],
         }}
