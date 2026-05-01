@@ -7,13 +7,16 @@ import * as Haptics from "expo-haptics";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Text } from "@/components/ui/Text";
-import { palette } from "@/constants/design";
+import { dangerColors, palette } from "@/constants/design";
+import { avalancheApi } from "@/lib/api/avalanche";
 import {
+  AVAILABLE_ZONES,
   CENTER_COORDS,
   NAC_ZONE_ALIASES,
   REGION_STRUCTURE,
   type AvalancheCenter,
 } from "@/lib/zones";
+import type { DangerRating } from "@/lib/api/avalanche";
 
 interface CenterMeta {
   id: string;
@@ -155,12 +158,34 @@ const HTML = String.raw`<!DOCTYPE html>
     }
   }
 
-  function styleForZone(zoneId) {
+  // Style policy:
+  // - Polygon FILL color reflects the zone's CURRENT ALPINE danger
+  //   (above-treeline rating). Sourced from the app's forecast layer
+  //   when available; falls back to NAC's overall danger color (worst
+  //   of three) until that resolves so polygons paint instantly.
+  // - Polygon STROKE color reflects selection state (frost = selected,
+  //   ink = not selected). Both signals stay legible on the topo bg.
+  var alpineByZone = {}; // zoneId -> hex
+  function styleForFeature(feature, zoneId) {
     var sel = !!currentSelected[zoneId];
-    if (sel) {
-      return { color: '#67D5F0', weight: 1.5, opacity: 1, fillColor: '#67D5F0', fillOpacity: 0.28 };
-    }
-    return { color: '#B8C2D6', weight: 1, opacity: 0.7, fillColor: '#B8C2D6', fillOpacity: 0.06 };
+    var props = (feature && feature.properties) || {};
+    var alpine = zoneId ? alpineByZone[zoneId] : null;
+    var fill = alpine || props.color || '#5A6B8C';
+    return {
+      color: sel ? '#67D5F0' : '#070A14',
+      weight: sel ? 3 : 1.5,
+      opacity: sel ? 1 : 0.85,
+      fillColor: fill,
+      fillOpacity: sel ? 0.55 : 0.40,
+      dashArray: null,
+    };
+  }
+
+  function hoverStyleFor(feature, zoneId) {
+    var s = styleForFeature(feature, zoneId);
+    s.weight = (s.weight || 1) + 1;
+    s.fillOpacity = Math.min((s.fillOpacity || 0) + 0.15, 0.7);
+    return s;
   }
 
   function normName(s) {
@@ -184,12 +209,17 @@ const HTML = String.raw`<!DOCTYPE html>
         var layer = L.geoJSON(geo, {
           style: function(f) {
             var nm = (f.properties && f.properties.name) || '';
-            return styleForZone(byNorm[normName(nm)] || '');
+            return styleForFeature(f, byNorm[normName(nm)] || '');
           },
           onEachFeature: function(feature, layer) {
             var nm = (feature.properties && feature.properties.name) || '';
+            var dangerLabel = (feature.properties && feature.properties.danger) || '';
             var zoneId = byNorm[normName(nm)];
-            if (nm) layer.bindTooltip(nm, { className: 'zone-tooltip', sticky: true, direction: 'top' });
+            // Tooltip shows zone name + current danger rating
+            var tipParts = [];
+            if (nm && nm.toLowerCase() !== 'caic zone') tipParts.push(nm);
+            if (dangerLabel) tipParts.push(String(dangerLabel).toUpperCase());
+            if (tipParts.length) layer.bindTooltip(tipParts.join(' · '), { className: 'zone-tooltip', sticky: true, direction: 'top' });
             layer.on('click', function(e) {
               if (zoneId) {
                 post({ type: 'zoneTap', id: zoneId, name: nm });
@@ -199,11 +229,10 @@ const HTML = String.raw`<!DOCTYPE html>
               if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             });
             layer.on('mouseover', function() {
-              var s = styleForZone(zoneId || '');
-              layer.setStyle({ weight: s.weight + 1, opacity: 1, fillOpacity: Math.min((s.fillOpacity || 0) + 0.1, 0.5) });
+              layer.setStyle(hoverStyleFor(feature, zoneId || ''));
             });
             layer.on('mouseout', function() {
-              layer.setStyle(styleForZone(zoneId || ''));
+              layer.setStyle(styleForFeature(feature, zoneId || ''));
             });
           },
         });
@@ -250,9 +279,10 @@ const HTML = String.raw`<!DOCTYPE html>
       var slot = centerPolys[cid];
       if (slot && slot.layer) {
         slot.layer.eachLayer(function(featureLayer) {
-          var nm = featureLayer.feature && featureLayer.feature.properties && featureLayer.feature.properties.name;
+          var feature = featureLayer.feature;
+          var nm = feature && feature.properties && feature.properties.name;
           var zoneId = slot.zoneIdByName[normName(nm)];
-          featureLayer.setStyle(styleForZone(zoneId || ''));
+          featureLayer.setStyle(styleForFeature(feature, zoneId || ''));
         });
       }
     });
@@ -300,6 +330,11 @@ const HTML = String.raw`<!DOCTYPE html>
       (selectedZoneIds || []).forEach(function(id) { currentSelected[id] = true; });
       restyleAllPolys();
     },
+
+    setAlpineDanger: function(map) {
+      alpineByZone = map || {};
+      restyleAllPolys();
+    },
   };
 
   map.on('zoomend moveend', function() { refreshPolyVisibility(); });
@@ -312,6 +347,7 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
   const webRef = useRef<WebView>(null);
   const [activeCenterId, setActiveCenterId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [alpineByZone, setAlpineByZone] = useState<Record<string, string>>({});
 
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
@@ -321,6 +357,44 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
     }
     return out;
   }, [selectedZoneIds]);
+
+  // Fetch all zones' alpine danger via the cached endpoint. Colors polygons
+  // by current above-treeline rating; falls back to NAC's overall color
+  // until this resolves, so polygons paint instantly either way.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const allZoneIds = AVAILABLE_ZONES.map((z) => z.id);
+        const r = await avalancheApi.getCachedForecasts(allZoneIds);
+        if (cancelled || !r.success || !r.zones) return;
+        const map: Record<string, string> = {};
+        for (const z of r.zones) {
+          const alpine = z.forecast?.[0]?.danger?.alpine as DangerRating | undefined;
+          if (alpine) {
+            const c = dangerColors[alpine];
+            if (c) map[z.id] = c.fill;
+          }
+        }
+        setAlpineByZone(map);
+      } catch (err) {
+        console.warn("alpine fetch failed", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Push alpine map into the WebView once both are ready
+  useEffect(() => {
+    if (!mapReady) return;
+    if (Object.keys(alpineByZone).length === 0) return;
+    const js = `window.AVY && window.AVY.setAlpineDanger(${JSON.stringify(
+      alpineByZone,
+    )}); true;`;
+    webRef.current?.injectJavaScript(js);
+  }, [alpineByZone, mapReady]);
 
   // Push selection updates to the map after it's ready
   useEffect(() => {
@@ -426,7 +500,7 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
             className="text-ink-300"
             style={{ fontSize: 9, letterSpacing: 1.4 }}
           >
-            ZOOM IN FOR ZONE POLYGONS · TAP TO TOGGLE
+            ZONES COLORED BY ALPINE DANGER · TAP TO TOGGLE
           </Text>
           <Text
             variant="mono"
