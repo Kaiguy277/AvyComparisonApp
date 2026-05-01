@@ -22,7 +22,6 @@ import {
   CardContent,
   CardEyebrow,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/Card";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Collapsible } from "@/components/ui/Collapsible";
@@ -459,34 +458,14 @@ export default function Index() {
           >
             Conditions
           </Text>
-          <Text
-            variant="display-italic"
-            className="text-ink-300"
-            style={{
-              fontSize: 24,
-              lineHeight: 32,
-              marginTop: 4,
-            }}
-          >
-            before you head out.
-          </Text>
 
           <View
             style={{
               height: 0.5,
               backgroundColor: palette.ink[700],
-              marginTop: 22,
-              marginBottom: 14,
+              marginTop: 18,
             }}
           />
-
-          <Text
-            className="text-ink-300"
-            style={{ fontSize: 14, lineHeight: 21 }}
-          >
-            Side-by-side avalanche forecasts, mountain weather outlooks, and live SNOTEL
-            stations across the United States.
-          </Text>
         </View>
 
         {/* ZONE PICKER */}
@@ -494,17 +473,16 @@ export default function Index() {
           <Card>
             <CardHeader>
               <View className="flex-row items-baseline justify-between">
-                <CardEyebrow>01 · ZONES</CardEyebrow>
+                <CardEyebrow>ZONES</CardEyebrow>
                 <Text
                   variant="mono"
                   weight="medium"
                   className="text-ink-100"
-                  style={{ fontSize: 11, letterSpacing: 1.4 }}
+                  style={{ fontSize: 12, letterSpacing: 1.4 }}
                 >
                   {selectedZoneIds.length} / {AVAILABLE_ZONES.length}
                 </Text>
               </View>
-              <CardTitle className="mt-2">Pick the zones you ride.</CardTitle>
             </CardHeader>
             <CardContent>
               <SegmentedToggle
