@@ -580,8 +580,8 @@ export default function Index() {
             style={{
               marginTop: 24,
               marginHorizontal: 16,
-              paddingVertical: 12,
-              paddingHorizontal: 16,
+              paddingVertical: 14,
+              paddingHorizontal: 18,
               borderRadius: 14,
               backgroundColor: palette.ink[900],
               borderWidth: 0.5,
@@ -589,19 +589,20 @@ export default function Index() {
             }}
             className="flex-row items-center justify-between flex-wrap gap-2"
           >
-            <View className="flex-row items-center gap-2">
+            <View className="flex-row items-center gap-2.5">
               <View
                 style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
                   backgroundColor: palette.frost[400],
                 }}
               />
               <Text
                 variant="mono"
-                className="text-ink-200"
-                style={{ fontSize: 11, letterSpacing: 1.2 }}
+                weight="medium"
+                className="text-ink-100"
+                style={{ fontSize: 13, letterSpacing: 1.2 }}
               >
                 {new Date(scrapedAt)
                   .toLocaleString("en-US", {
@@ -684,7 +685,7 @@ export default function Index() {
                     <Text
                       variant="display"
                       className="text-ink-50 mt-3"
-                      style={{ fontSize: 22, lineHeight: 30 }}
+                      style={{ fontSize: 26, lineHeight: 34 }}
                     >
                       {summary.quickTake}
                     </Text>
@@ -709,20 +710,21 @@ export default function Index() {
                     flexDirection: "row",
                     alignItems: "baseline",
                     justifyContent: "space-between",
-                    marginBottom: 12,
+                    marginBottom: 14,
                   }}
                 >
                   <Text
                     variant="display"
                     className="text-ink-50"
-                    style={{ fontSize: 32, lineHeight: 36 }}
+                    style={{ fontSize: 38, lineHeight: 42 }}
                   >
                     Zones
                   </Text>
                   <Text
                     variant="mono"
-                    className="text-ink-400"
-                    style={{ fontSize: 11, letterSpacing: 1.4 }}
+                    weight="medium"
+                    className="text-ink-300"
+                    style={{ fontSize: 13, letterSpacing: 1.4 }}
                   >
                     {summary.zones.length}
                   </Text>

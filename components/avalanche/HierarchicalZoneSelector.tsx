@@ -135,15 +135,16 @@ export function HierarchicalZoneSelector({
                 <Text
                   variant="display"
                   className="text-ink-50"
-                  style={{ fontSize: 18, lineHeight: 22 }}
+                  style={{ fontSize: 22, lineHeight: 26 }}
                 >
                   {region.name}
                 </Text>
               </View>
               <Text
                 variant="mono"
-                className="text-ink-400"
-                style={{ fontSize: 11, letterSpacing: 1 }}
+                weight="medium"
+                className="text-ink-300"
+                style={{ fontSize: 13, letterSpacing: 1 }}
               >
                 {regionSelected}/{regionZones.length}
               </Text>
@@ -195,13 +196,13 @@ export function HierarchicalZoneSelector({
                             variant="mono"
                             weight="medium"
                             className="text-frost-400"
-                            style={{ fontSize: 10, letterSpacing: 1 }}
+                            style={{ fontSize: 11, letterSpacing: 1 }}
                           >
                             {center.id}
                           </Text>
                           <Text
-                            className="text-ink-200 flex-1"
-                            style={{ fontSize: 13 }}
+                            className="text-ink-100 flex-1"
+                            style={{ fontSize: 15 }}
                             numberOfLines={1}
                           >
                             {center.name}
@@ -209,8 +210,8 @@ export function HierarchicalZoneSelector({
                         </View>
                         <Text
                           variant="mono"
-                          className="text-ink-400"
-                          style={{ fontSize: 10, letterSpacing: 1 }}
+                          className="text-ink-300"
+                          style={{ fontSize: 12, letterSpacing: 1 }}
                         >
                           {cSelected}/{cZones.length}
                         </Text>
@@ -229,18 +230,19 @@ export function HierarchicalZoneSelector({
                               <Pressable
                                 key={zone.id}
                                 onPress={() => handleZoneToggle(zone.id)}
-                                className="flex-row items-center py-1.5"
+                                className="flex-row items-center"
+                                style={{ paddingVertical: 10 }}
                               >
-                                <View style={{ marginRight: 10 }}>
+                                <View style={{ marginRight: 12 }}>
                                   <Checkbox
                                     checked={sel}
                                     onChange={() => handleZoneToggle(zone.id)}
-                                    size="sm"
                                   />
                                 </View>
                                 <Text
-                                  className={sel ? "text-ink-100" : "text-ink-300"}
-                                  style={{ fontSize: 13 }}
+                                  weight={sel ? "medium" : "regular"}
+                                  className={sel ? "text-ink-50" : "text-ink-200"}
+                                  style={{ fontSize: 16 }}
                                 >
                                   {zone.name}
                                 </Text>

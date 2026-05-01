@@ -26,10 +26,10 @@ export function DangerStack({
 }: DangerStackProps) {
   const dim =
     size === "compact"
-      ? { rowH: 22, gap: 2, fontSize: 9, codeW: 32, fontLevel: 9, ratingW: 84 }
+      ? { rowH: 28, gap: 3, fontSize: 11, codeW: 40, fontLevel: 11, ratingW: 110 }
       : size === "large"
-        ? { rowH: 44, gap: 3, fontSize: 12, codeW: 48, fontLevel: 16, ratingW: 130 }
-        : { rowH: 32, gap: 3, fontSize: 11, codeW: 40, fontLevel: 12, ratingW: 110 };
+        ? { rowH: 52, gap: 4, fontSize: 14, codeW: 56, fontLevel: 18, ratingW: 130 }
+        : { rowH: 40, gap: 3, fontSize: 13, codeW: 48, fontLevel: 14, ratingW: 110 };
 
   return (
     <View>

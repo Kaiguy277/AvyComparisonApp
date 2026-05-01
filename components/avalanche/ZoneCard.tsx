@@ -39,6 +39,35 @@ function highest(d: ElevationDanger): DangerRating {
   );
 }
 
+const WEEKDAY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const MONTH = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
+
+function formatRelativeDate(iso: string | undefined, offsetDays: number): string {
+  // Prefer the date the forecast says it's for; fall back to today + offset.
+  let d: Date;
+  if (iso) {
+    const parsed = new Date(iso);
+    d = isNaN(parsed.getTime()) ? new Date() : parsed;
+  } else {
+    d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+  }
+  return `${WEEKDAY[d.getDay()]} · ${MONTH[d.getMonth()]} ${d.getDate()}`;
+}
+
 export function ZoneCard({
   zone,
   isSnotelLoading,
@@ -69,15 +98,15 @@ export function ZoneCard({
             <Text
               variant="mono"
               weight="medium"
-              className="text-ink-400"
-              style={{ fontSize: 10, letterSpacing: 1.6 }}
+              className="text-ink-300"
+              style={{ fontSize: 12, letterSpacing: 1.8 }}
             >
               ZONE
             </Text>
             <Text
               variant="display"
               className="text-ink-50"
-              style={{ fontSize: 28, lineHeight: 32, marginTop: 2 }}
+              style={{ fontSize: 36, lineHeight: 40, marginTop: 4 }}
             >
               {zone.name}
             </Text>
@@ -156,57 +185,93 @@ export function ZoneCard({
         ) : null}
       </View>
 
-      {/* Headline danger panel */}
+      {/* Headline danger panel — both days full breakdown */}
       {today ? (
         <View
           style={{
             marginTop: 18,
             marginHorizontal: 20,
-            paddingTop: 16,
-            paddingBottom: 18,
+            paddingTop: 18,
+            paddingBottom: 20,
             borderTopWidth: 0.5,
             borderColor: palette.ink[700],
+            gap: 18,
           }}
         >
-          <View className="flex-row gap-6">
-            <View className="flex-1">
+          <View>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                marginBottom: 10,
+              }}
+            >
               <HeadlineDanger danger={today.danger} label="TODAY" />
+              <Text
+                variant="mono"
+                className="text-ink-400"
+                style={{ fontSize: 11, letterSpacing: 1.6 }}
+              >
+                {formatRelativeDate(today.date, 0)}
+              </Text>
             </View>
-            {tomorrow ? (
-              <View className="flex-1">
-                <HeadlineDanger danger={tomorrow.danger} label="TOMORROW" />
-              </View>
-            ) : null}
+            <DangerStack danger={today.danger} size="default" />
           </View>
 
-          <View style={{ marginTop: 16 }}>
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-ink-400"
-              style={{ fontSize: 10, letterSpacing: 1.4, marginBottom: 8 }}
+          {tomorrow ? (
+            <View
+              style={{
+                paddingTop: 18,
+                borderTopWidth: 0.5,
+                borderColor: palette.ink[700],
+              }}
             >
-              ELEVATION DETAIL · TODAY
-            </Text>
-            <DangerStack danger={today.danger} />
-          </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  marginBottom: 10,
+                }}
+              >
+                <HeadlineDanger danger={tomorrow.danger} label="TOMORROW" />
+                <Text
+                  variant="mono"
+                  className="text-ink-400"
+                  style={{ fontSize: 11, letterSpacing: 1.6 }}
+                >
+                  {formatRelativeDate(tomorrow.date, 1)}
+                </Text>
+              </View>
+              <DangerStack danger={tomorrow.danger} size="default" />
+            </View>
+          ) : null}
         </View>
       ) : null}
 
       <CardContent style={{ paddingTop: 4 }} className="gap-3">
-        {/* Key Message — quoted, large, the human voice */}
+        {/* Key Message — quoted, large, the human voice. Sized to read at arm's length */}
         <View
           style={{
-            paddingLeft: 14,
+            paddingLeft: 16,
             borderLeftWidth: 2,
             borderColor: palette.frost[500],
-            marginVertical: 6,
+            marginVertical: 8,
           }}
         >
           <Text
+            variant="mono"
+            weight="medium"
+            className="text-frost-400"
+            style={{ fontSize: 11, letterSpacing: 1.6, marginBottom: 6 }}
+          >
+            KEY MESSAGE
+          </Text>
+          <Text
             variant="display"
             className="text-ink-50"
-            style={{ fontSize: 18, lineHeight: 26 }}
+            style={{ fontSize: 22, lineHeight: 30 }}
           >
             {zone.keyMessage}
           </Text>

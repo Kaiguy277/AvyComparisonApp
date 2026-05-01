@@ -34,8 +34,8 @@ export function HeadlineDanger({ danger, label }: Props) {
         <Text
           variant="mono"
           weight="medium"
-          className="text-ink-400"
-          style={{ fontSize: 10, letterSpacing: 1.6 }}
+          className="text-ink-300"
+          style={{ fontSize: 12, letterSpacing: 2 }}
         >
           {label}
         </Text>
@@ -44,14 +44,14 @@ export function HeadlineDanger({ danger, label }: Props) {
         style={{
           flexDirection: "row",
           alignItems: "baseline",
-          marginTop: 4,
-          gap: 8,
+          marginTop: 6,
+          gap: 10,
         }}
       >
         <Text
           variant="mono"
           weight="bold"
-          style={{ color: c.fill, fontSize: 36, letterSpacing: -0.5, lineHeight: 38 }}
+          style={{ color: c.fill, fontSize: 52, letterSpacing: -1, lineHeight: 54 }}
         >
           {c.level || "—"}
         </Text>
@@ -59,9 +59,9 @@ export function HeadlineDanger({ danger, label }: Props) {
           variant="display"
           style={{
             color: c.fill,
-            fontSize: 22,
-            letterSpacing: 0.2,
-            lineHeight: 24,
+            fontSize: 28,
+            letterSpacing: 0,
+            lineHeight: 32,
           }}
         >
           {top === "NO_RATING" ? "No rating" : titleCase(c.label)}
