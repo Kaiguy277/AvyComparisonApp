@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
   Linking,
   Pressable,
   RefreshControl,
@@ -27,6 +28,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Collapsible } from "@/components/ui/Collapsible";
 import { Text } from "@/components/ui/Text";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
+import { ZoneMapPicker } from "@/components/avalanche/ZoneMapPicker";
 import { ZoneCard } from "@/components/avalanche/ZoneCard";
 import { ZoneComparisonMatrix } from "@/components/avalanche/ZoneComparisonMatrix";
 import { TopoBackground } from "@/components/visual/TopoBackground";
@@ -75,6 +77,7 @@ export default function Index() {
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>(DEFAULT_ZONE_IDS);
   const [quickTakeEnabled, setQuickTakeEnabled] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [pickerMode, setPickerMode] = useState<"list" | "map">("list");
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSnotelLoading, setIsSnotelLoading] = useState(false);
@@ -392,20 +395,25 @@ export default function Index() {
       >
         {/* HERO */}
         <View style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 28 }}>
-          <View className="flex-row items-baseline gap-2 mb-3">
+          <View className="flex-row items-center gap-2.5 mb-4">
+            <Image
+              source={require("@/assets/images/wordmark.png")}
+              style={{ width: 22, height: 31 }}
+              resizeMode="contain"
+            />
             <Text
               variant="mono"
               weight="medium"
               className="text-frost-400"
-              style={{ fontSize: 10, letterSpacing: 2.4 }}
+              style={{ fontSize: 11, letterSpacing: 2.4 }}
             >
-              ◇ AVY · COMPARISON
+              AVY · COMPARISON
             </Text>
             <View style={{ flex: 1 }} />
             <Text
               variant="mono"
               className="text-ink-400"
-              style={{ fontSize: 10, letterSpacing: 1.6 }}
+              style={{ fontSize: 11, letterSpacing: 1.6 }}
             >
               {today.weekday}
             </Text>
@@ -499,10 +507,27 @@ export default function Index() {
               <CardTitle className="mt-2">Pick the zones you ride.</CardTitle>
             </CardHeader>
             <CardContent>
-              <HierarchicalZoneSelector
-                selectedZoneIds={selectedZoneIds}
-                onSelectionChange={updateSelectedZones}
+              <SegmentedToggle
+                value={pickerMode}
+                onChange={setPickerMode}
+                options={[
+                  { value: "list", label: "LIST" },
+                  { value: "map", label: "MAP" },
+                ]}
               />
+              <View style={{ marginTop: 14 }}>
+                {pickerMode === "list" ? (
+                  <HierarchicalZoneSelector
+                    selectedZoneIds={selectedZoneIds}
+                    onSelectionChange={updateSelectedZones}
+                  />
+                ) : (
+                  <ZoneMapPicker
+                    selectedZoneIds={selectedZoneIds}
+                    onSelectionChange={updateSelectedZones}
+                  />
+                )}
+              </View>
               <View
                 className="flex-row gap-2 mt-4"
                 style={{ justifyContent: "flex-end" }}
@@ -892,24 +917,11 @@ export default function Index() {
               alignItems: "center",
             }}
           >
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                borderWidth: 0.5,
-                borderColor: palette.frost[600],
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 14,
-              }}
-            >
-              <Ionicons
-                name="triangle-outline"
-                size={26}
-                color={palette.frost[400]}
-              />
-            </View>
+            <Image
+              source={require("@/assets/images/wordmark.png")}
+              style={{ width: 64, height: 91, marginBottom: 14, opacity: 0.9 }}
+              resizeMode="contain"
+            />
             <Text
               variant="display"
               className="text-ink-50 text-center"
@@ -968,5 +980,60 @@ function SourceLink({
         />
       </View>
     </Pressable>
+  );
+}
+
+function SegmentedToggle<V extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: V;
+  onChange: (v: V) => void;
+  options: { value: V; label: string }[];
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        padding: 3,
+        borderRadius: 999,
+        backgroundColor: palette.ink[800],
+        borderWidth: 0.5,
+        borderColor: palette.ink[700],
+      }}
+    >
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <Pressable
+            key={opt.value}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(opt.value);
+            }}
+            style={{
+              flex: 1,
+              paddingVertical: 9,
+              borderRadius: 999,
+              backgroundColor: active ? palette.ink[50] : "transparent",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              variant="mono"
+              weight="medium"
+              style={{
+                fontSize: 11,
+                letterSpacing: 1.6,
+                color: active ? palette.ink[950] : palette.ink[300],
+              }}
+            >
+              {opt.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }

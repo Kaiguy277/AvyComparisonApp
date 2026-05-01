@@ -3,8 +3,6 @@ import { Text } from "@/components/ui/Text";
 import { dangerColors } from "@/constants/design";
 import type { DangerRating, ElevationDanger } from "@/lib/api/avalanche";
 
-// The "headline" rating: highest of the three elevation bands.
-// Big, mono, color-flooded — what the user sees first when scanning.
 function highestRating(d: ElevationDanger): DangerRating {
   const order: DangerRating[] = [
     "NO_RATING",
@@ -22,12 +20,18 @@ function highestRating(d: ElevationDanger): DangerRating {
 
 interface Props {
   danger: ElevationDanger;
-  label?: string; // e.g. "TODAY" or "TOMORROW"
+  label?: string;
+  size?: "compact" | "default";
 }
 
-export function HeadlineDanger({ danger, label }: Props) {
+export function HeadlineDanger({ danger, label, size = "compact" }: Props) {
   const top = highestRating(danger);
   const c = dangerColors[top];
+  const dim =
+    size === "default"
+      ? { numeral: 52, label: 28, labelLine: 32, labelGap: 2 }
+      : { numeral: 40, label: 18, labelLine: 22, labelGap: 4 };
+
   return (
     <View>
       {label ? (
@@ -35,7 +39,7 @@ export function HeadlineDanger({ danger, label }: Props) {
           variant="mono"
           weight="medium"
           className="text-ink-300"
-          style={{ fontSize: 12, letterSpacing: 2 }}
+          style={{ fontSize: 11, letterSpacing: 1.8 }}
         >
           {label}
         </Text>
@@ -44,14 +48,19 @@ export function HeadlineDanger({ danger, label }: Props) {
         style={{
           flexDirection: "row",
           alignItems: "baseline",
-          marginTop: 6,
-          gap: 10,
+          marginTop: 4,
+          gap: 8,
         }}
       >
         <Text
           variant="mono"
           weight="bold"
-          style={{ color: c.fill, fontSize: 52, letterSpacing: -1, lineHeight: 54 }}
+          style={{
+            color: c.fill,
+            fontSize: dim.numeral,
+            letterSpacing: -1,
+            lineHeight: dim.numeral + 2,
+          }}
         >
           {c.level || "—"}
         </Text>
@@ -59,9 +68,9 @@ export function HeadlineDanger({ danger, label }: Props) {
           variant="display"
           style={{
             color: c.fill,
-            fontSize: 28,
+            fontSize: dim.label,
             letterSpacing: 0,
-            lineHeight: 32,
+            lineHeight: dim.labelLine,
           }}
         >
           {top === "NO_RATING" ? "No rating" : titleCase(c.label)}

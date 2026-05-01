@@ -13,6 +13,39 @@ export interface Region {
   centers: AvalancheCenter[];
 }
 
+// Approximate coordinates for each avalanche center's forecast area centroid.
+// Used only to pin centers on the map view — not for forecast lookup.
+export const CENTER_COORDS: Record<string, { lat: number; lon: number }> = {
+  CNFAIC: { lat: 60.83, lon: -149.0 },
+  HPAC: { lat: 61.78, lon: -149.3 },
+  VAC: { lat: 61.13, lon: -146.35 },
+  CAC: { lat: 60.55, lon: -145.75 },
+  EARAC: { lat: 63.4, lon: -145.5 },
+  CAAC: { lat: 58.3, lon: -134.42 },
+  HAC: { lat: 59.24, lon: -135.45 },
+  NWAC: { lat: 47.5, lon: -121.4 },
+  COAA: { lat: 44.06, lon: -121.31 },
+  WAC: { lat: 45.32, lon: -117.18 },
+  SOAIX: { lat: 42.33, lon: -122.87 },
+  SAC: { lat: 39.33, lon: -120.18 },
+  ESAC: { lat: 37.65, lon: -119.03 },
+  BAC: { lat: 38.26, lon: -119.23 },
+  MSAC: { lat: 41.41, lon: -122.2 },
+  SNFAC: { lat: 43.68, lon: -114.36 },
+  PAC: { lat: 44.91, lon: -116.1 },
+  IPAC: { lat: 48.27, lon: -116.55 },
+  GNFAC: { lat: 45.68, lon: -111.04 },
+  FAC: { lat: 48.41, lon: -114.34 },
+  WCMAC: { lat: 46.87, lon: -113.99 },
+  BTAC: { lat: 43.48, lon: -110.76 },
+  EWYAIX: { lat: 44.5, lon: -107.4 },
+  UAC: { lat: 40.76, lon: -111.89 },
+  CAIC: { lat: 39.0, lon: -106.5 },
+  TAC: { lat: 36.41, lon: -105.57 },
+  KPAC: { lat: 35.34, lon: -111.68 },
+  MWAC: { lat: 44.27, lon: -71.3 },
+};
+
 export const REGION_STRUCTURE: Region[] = [
   {
     id: "alaska",

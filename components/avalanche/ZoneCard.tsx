@@ -185,7 +185,7 @@ export function ZoneCard({
         ) : null}
       </View>
 
-      {/* Headline danger panel — both days full breakdown */}
+      {/* Headline danger panel — today + tomorrow, side by side */}
       {today ? (
         <View
           style={{
@@ -195,57 +195,30 @@ export function ZoneCard({
             paddingBottom: 20,
             borderTopWidth: 0.5,
             borderColor: palette.ink[700],
-            gap: 18,
+            flexDirection: "row",
+            gap: 12,
           }}
         >
-          <View>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                marginBottom: 10,
-              }}
-            >
-              <HeadlineDanger danger={today.danger} label="TODAY" />
-              <Text
-                variant="mono"
-                className="text-ink-400"
-                style={{ fontSize: 11, letterSpacing: 1.6 }}
-              >
-                {formatRelativeDate(today.date, 0)}
-              </Text>
-            </View>
-            <DangerStack danger={today.danger} size="default" />
-          </View>
-
+          <DayColumn
+            danger={today.danger}
+            label="TODAY"
+            date={formatRelativeDate(today.date, 0)}
+          />
           {tomorrow ? (
-            <View
-              style={{
-                paddingTop: 18,
-                borderTopWidth: 0.5,
-                borderColor: palette.ink[700],
-              }}
-            >
+            <>
               <View
                 style={{
-                  flexDirection: "row",
-                  alignItems: "baseline",
-                  justifyContent: "space-between",
-                  marginBottom: 10,
+                  width: 0.5,
+                  backgroundColor: palette.ink[700],
+                  marginVertical: 4,
                 }}
-              >
-                <HeadlineDanger danger={tomorrow.danger} label="TOMORROW" />
-                <Text
-                  variant="mono"
-                  className="text-ink-400"
-                  style={{ fontSize: 11, letterSpacing: 1.6 }}
-                >
-                  {formatRelativeDate(tomorrow.date, 1)}
-                </Text>
-              </View>
-              <DangerStack danger={tomorrow.danger} size="default" />
-            </View>
+              />
+              <DayColumn
+                danger={tomorrow.danger}
+                label="TOMORROW"
+                date={formatRelativeDate(tomorrow.date, 1)}
+              />
+            </>
           ) : null}
         </View>
       ) : null}
@@ -447,5 +420,31 @@ export function ZoneCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function DayColumn({
+  danger,
+  label,
+  date,
+}: {
+  danger: ElevationDanger;
+  label: string;
+  date: string;
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text
+        variant="mono"
+        className="text-ink-400"
+        style={{ fontSize: 10, letterSpacing: 1.4, marginBottom: 2 }}
+      >
+        {date}
+      </Text>
+      <HeadlineDanger danger={danger} label={label} />
+      <View style={{ marginTop: 12 }}>
+        <DangerStack danger={danger} size="compact" />
+      </View>
+    </View>
   );
 }
