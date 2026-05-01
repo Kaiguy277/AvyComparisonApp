@@ -68,6 +68,8 @@ export interface WeatherObservation {
     swe: number | null;
     snowPercentage24hr: number | null;
     snowPercentage72hr: number | null;
+    hourlyPrecip24hr?: TempDataPoint[];
+    hourlyPrecip72hr?: TempDataPoint[];
   };
   temperature: {
     current: number | null;
@@ -90,6 +92,10 @@ export interface WeatherObservation {
     direction: string | null;
     direction24hr: string | null;
     direction72hr: string | null;
+    hourlySpeed24hr?: TempDataPoint[];
+    hourlySpeed72hr?: TempDataPoint[];
+    hourlyGust24hr?: TempDataPoint[];
+    hourlyGust72hr?: TempDataPoint[];
   } | null;
   dataQuality: "good" | "partial" | "poor";
 }

@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { Alert, Linking, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Text } from "@/components/ui/Text";
-import { TempSparkline } from "./TempSparkline";
+import { MetricChart } from "./MetricChart";
 import { WindCompass } from "./WindCompass";
 import { palette } from "@/constants/design";
-import type { WeatherObservation } from "@/lib/api/avalanche";
+import type { TempDataPoint, WeatherObservation } from "@/lib/api/avalanche";
+
+type Period = 24 | 72;
 
 interface Props {
   observations: WeatherObservation[];
@@ -33,6 +37,7 @@ export function WeatherStationCard({ observations, note }: Props) {
 }
 
 function Station({ obs, divider }: { obs: WeatherObservation; divider: boolean }) {
+  const [period, setPeriod] = useState<Period>(24);
   const lastUpdated = obs.timestamp ? new Date(obs.timestamp).toLocaleString() : null;
   const stationUrl = `https://mesowest.utah.edu/cgi-bin/droman/meso_base_dyn.cgi?stn=${obs.stationTriplet}`;
 
@@ -44,13 +49,14 @@ function Station({ obs, divider }: { obs: WeatherObservation; divider: boolean }
         borderColor: palette.ink[700],
       }}
     >
-      {/* Station header */}
+      {/* Station header + period toggle */}
       <View
         style={{
           flexDirection: "row",
-          alignItems: "baseline",
+          alignItems: "center",
           justifyContent: "space-between",
           marginBottom: 14,
+          gap: 12,
         }}
       >
         <Pressable
@@ -72,12 +78,18 @@ function Station({ obs, divider }: { obs: WeatherObservation; divider: boolean }
             )
           }
           hitSlop={6}
-          style={{ flex: 1, flexDirection: "row", alignItems: "baseline", gap: 6 }}
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "baseline",
+            gap: 6,
+            minWidth: 0,
+          }}
         >
           <Text
             variant="display"
             className="text-ink-50"
-            style={{ fontSize: 17, lineHeight: 21 }}
+            style={{ fontSize: 17, lineHeight: 21, flexShrink: 1 }}
             numberOfLines={1}
           >
             {obs.stationName}
@@ -88,25 +100,23 @@ function Station({ obs, divider }: { obs: WeatherObservation; divider: boolean }
             color={palette.ink[400]}
           />
         </Pressable>
-        <Text
-          variant="mono"
-          weight="medium"
-          className="text-ink-300"
-          style={{ fontSize: 12 }}
-        >
-          {obs.elevation.toLocaleString()}′
-        </Text>
+        <PeriodToggle period={period} onChange={setPeriod} />
       </View>
 
-      <TempBlock obs={obs} />
+      <Text
+        variant="mono"
+        weight="medium"
+        className="text-ink-300"
+        style={{ fontSize: 11, marginBottom: 14 }}
+      >
+        {obs.elevation.toLocaleString()}′ ELEV
+      </Text>
+
+      <TempBlock obs={obs} period={period} />
       <Divider />
-      <SnowBlock obs={obs} />
-      {obs.wind ? (
-        <>
-          <Divider />
-          <WindBlock obs={obs} />
-        </>
-      ) : null}
+      <WindBlock obs={obs} period={period} />
+      <Divider />
+      <PrecipBlock obs={obs} period={period} />
     </View>
   );
 }
@@ -136,20 +146,73 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
+function PeriodToggle({
+  period,
+  onChange,
+}: {
+  period: Period;
+  onChange: (p: Period) => void;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        padding: 2,
+        borderRadius: 999,
+        backgroundColor: palette.ink[800],
+        borderWidth: 0.5,
+        borderColor: palette.ink[700],
+      }}
+    >
+      {([24, 72] as Period[]).map((p) => {
+        const active = period === p;
+        return (
+          <Pressable
+            key={p}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(p);
+            }}
+            hitSlop={4}
+            style={{
+              paddingVertical: 6,
+              paddingHorizontal: 12,
+              borderRadius: 999,
+              backgroundColor: active ? palette.ink[50] : "transparent",
+            }}
+          >
+            <Text
+              variant="mono"
+              weight="medium"
+              style={{
+                fontSize: 11,
+                letterSpacing: 1.2,
+                color: active ? palette.ink[950] : palette.ink[300],
+              }}
+            >
+              {p}H
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // TEMPERATURE
-// Big current value + trend + 72h sparkline + 24/72h H/L readouts
 // ─────────────────────────────────────────────────────────────────────────
-function TempBlock({ obs }: { obs: WeatherObservation }) {
+function TempBlock({ obs, period }: { obs: WeatherObservation; period: Period }) {
   const t = obs.temperature;
-  const has72hChart = t.hourly72hr && t.hourly72hr.length >= 2;
+  const series = period === 24 ? t.hourly24hr : t.hourly72hr;
+  const high = period === 24 ? t.high24hr : t.high72hr;
+  const low = period === 24 ? t.low24hr : t.low72hr;
   const trendCfg = trendStyle(t.trend, t.current);
 
   return (
     <View>
       <SectionLabel>TEMP</SectionLabel>
 
-      {/* Current + trend */}
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: 14 }}>
         <Text
           variant="mono"
@@ -193,277 +256,26 @@ function TempBlock({ obs }: { obs: WeatherObservation }) {
         ) : null}
       </View>
 
-      {/* 72h sparkline */}
-      {has72hChart ? (
-        <View style={{ marginTop: 12 }}>
-          <TempSparkline
-            data={t.hourly72hr!}
-            high={t.high72hr}
-            low={t.low72hr}
-            hours={72}
-            height={88}
-            expand
+      {series && series.length >= 2 ? (
+        <View style={{ marginTop: 14 }}>
+          <MetricChart
+            hours={period}
+            height={104}
+            unit="°"
+            refValue={32}
+            refLabel="32°"
+            series={[
+              { data: series, stroke: palette.ink[100], fill: palette.ink[100] },
+            ]}
           />
         </View>
-      ) : null}
+      ) : (
+        <DataNote>Not enough hourly data for this period.</DataNote>
+      )}
 
-      {/* H/L readouts */}
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 16,
-          marginTop: 12,
-        }}
-      >
-        <RangeStat label="24H" high={t.high24hr} low={t.low24hr} />
-        <RangeStat label="72H" high={t.high72hr} low={t.low72hr} />
-      </View>
-    </View>
-  );
-}
-
-function RangeStat({
-  label,
-  high,
-  low,
-}: {
-  label: string;
-  high: number | null;
-  low: number | null;
-}) {
-  return (
-    <View style={{ flex: 1 }}>
-      <Text
-        variant="mono"
-        className="text-ink-400"
-        style={{ fontSize: 10, letterSpacing: 1.4 }}
-      >
-        {label}
-      </Text>
-      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 2 }}>
-        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 3 }}>
-          <Text
-            variant="mono"
-            className="text-ink-400"
-            style={{ fontSize: 10 }}
-          >
-            H
-          </Text>
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-ink-100"
-            style={{ fontSize: 14 }}
-          >
-            {high !== null ? `${high}°` : "—"}
-          </Text>
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 3 }}>
-          <Text
-            variant="mono"
-            className="text-ink-400"
-            style={{ fontSize: 10 }}
-          >
-            L
-          </Text>
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-ink-100"
-            style={{ fontSize: 14 }}
-          >
-            {low !== null ? `${low}°` : "—"}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function trendStyle(
-  trend: "warming" | "cooling" | "stable" | null,
-  current: number | null,
-):
-  | {
-      icon: keyof typeof Ionicons.glyphMap;
-      label: string;
-      fg: string;
-      bg: string;
-      border: string;
-    }
-  | null {
-  if (!trend) return null;
-  if (trend === "warming") {
-    // Warming above freezing is a meaningful avy signal — tint aspen/orange.
-    const hot = current !== null && current > 32;
-    return {
-      icon: "trending-up",
-      label: "WARMING",
-      fg: hot ? palette.aspen[400] : palette.ink[100],
-      bg: hot ? palette.aspen[500] + "20" : palette.ink[700] + "80",
-      border: hot ? palette.aspen[500] + "60" : palette.ink[600],
-    };
-  }
-  if (trend === "cooling") {
-    return {
-      icon: "trending-down",
-      label: "COOLING",
-      fg: palette.frost[400],
-      bg: palette.frost[400] + "1A",
-      border: palette.frost[600],
-    };
-  }
-  return {
-    icon: "remove-outline",
-    label: "STABLE",
-    fg: palette.ink[300],
-    bg: palette.ink[700] + "80",
-    border: palette.ink[600],
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// SNOW
-// Two horizontal bars (24h, 72h). Each shows new-snow inches, SWE,
-// and storm density when both numbers are available.
-// ─────────────────────────────────────────────────────────────────────────
-function SnowBlock({ obs }: { obs: WeatherObservation }) {
-  const s = obs.snow;
-  return (
-    <View>
-      <SectionLabel>NEW SNOW</SectionLabel>
-      <View style={{ gap: 14 }}>
-        <SnowBar
-          label="24H"
-          newSnow={s.depth24hrChange}
-          swe={s.precip24hr}
-        />
-        <SnowBar
-          label="72H"
-          newSnow={s.depth72hrChange}
-          swe={s.precip72hr}
-        />
-      </View>
-      {s.depth !== null ? (
-        <View
-          style={{
-            marginTop: 14,
-            flexDirection: "row",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text
-            variant="mono"
-            className="text-ink-400"
-            style={{ fontSize: 10, letterSpacing: 1.4 }}
-          >
-            BASE DEPTH
-          </Text>
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-ink-100"
-            style={{ fontSize: 14 }}
-          >
-            {s.depth}″
-          </Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-const SNOW_BAR_FULL_INCHES = 18;
-
-function SnowBar({
-  label,
-  newSnow,
-  swe,
-}: {
-  label: string;
-  newSnow: number | null;
-  swe: number | null;
-}) {
-  const inches = newSnow ?? 0;
-  const pct = Math.max(0, Math.min(1, inches / SNOW_BAR_FULL_INCHES));
-  const sweOK = swe !== null && swe > 0;
-  const density =
-    newSnow !== null && newSnow > 0 && sweOK
-      ? Math.round((swe! / newSnow!) * 100)
-      : null;
-
-  const isAccum = newSnow !== null && newSnow > 0;
-  const color = isAccum ? palette.frost[400] : palette.ink[600];
-
-  return (
-    <View>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          marginBottom: 6,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-ink-300"
-            style={{ fontSize: 11, letterSpacing: 1.4 }}
-          >
-            {label}
-          </Text>
-          <Text
-            variant="mono"
-            weight="bold"
-            style={{
-              fontSize: 22,
-              color: isAccum ? palette.frost[400] : palette.ink[200],
-              letterSpacing: -0.5,
-            }}
-          >
-            {newSnow !== null ? (newSnow > 0 ? `+${newSnow}″` : `${newSnow}″`) : "—"}
-          </Text>
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10 }}>
-          {sweOK ? (
-            <Text
-              variant="mono"
-              className="text-ink-300"
-              style={{ fontSize: 11 }}
-            >
-              {swe!.toFixed(1)}″ SWE
-            </Text>
-          ) : null}
-          {density !== null ? (
-            <Text
-              variant="mono"
-              className="text-ink-400"
-              style={{ fontSize: 11 }}
-            >
-              {density}%
-            </Text>
-          ) : null}
-        </View>
-      </View>
-      <View
-        style={{
-          height: 6,
-          borderRadius: 3,
-          backgroundColor: palette.ink[800],
-          overflow: "hidden",
-        }}
-      >
-        <View
-          style={{
-            height: "100%",
-            width: `${pct * 100}%`,
-            backgroundColor: color,
-            borderRadius: 3,
-          }}
-        />
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 14 }}>
+        <RangeStat label={`${period}H HIGH`} value={high} unit="°" />
+        <RangeStat label={`${period}H LOW`} value={low} unit="°" />
       </View>
     </View>
   );
@@ -471,10 +283,24 @@ function SnowBar({
 
 // ─────────────────────────────────────────────────────────────────────────
 // WIND
-// Compass + current speed/direction, then 24h and 72h breakdowns.
 // ─────────────────────────────────────────────────────────────────────────
-function WindBlock({ obs }: { obs: WeatherObservation }) {
-  const w = obs.wind!;
+function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period }) {
+  const w = obs.wind;
+  if (!w) {
+    return (
+      <View>
+        <SectionLabel>WIND</SectionLabel>
+        <DataNote>This station doesn&apos;t have wind sensors.</DataNote>
+      </View>
+    );
+  }
+
+  const speedSeries = period === 24 ? w.hourlySpeed24hr : w.hourlySpeed72hr;
+  const gustSeries = period === 24 ? w.hourlyGust24hr : w.hourlyGust72hr;
+  const avg = period === 24 ? w.speedAvg24hr : w.speedAvg72hr;
+  const max = period === 24 ? w.speedMax24hr : w.speedMax72hr;
+  const dir = period === 24 ? w.direction24hr : w.direction72hr;
+
   return (
     <View>
       <SectionLabel>WIND</SectionLabel>
@@ -509,118 +335,312 @@ function WindBlock({ obs }: { obs: WeatherObservation }) {
               </Text>
             ) : null}
           </View>
-          {w.speedMax24hr !== null ? (
+          {max !== null ? (
             <Text
               variant="mono"
               className="text-ink-300"
               style={{ fontSize: 12, marginTop: 2 }}
             >
-              gusts to{" "}
+              {period}H gusts to{" "}
               <Text
                 variant="mono"
                 weight="bold"
                 className="text-ink-50"
                 style={{ fontSize: 14 }}
               >
-                {w.speedMax24hr}
+                {max}
               </Text>
             </Text>
           ) : null}
         </View>
       </View>
 
-      <View style={{ marginTop: 14, gap: 8 }}>
-        <WindRow
-          label="24H"
-          avg={w.speedAvg24hr}
-          max={w.speedMax24hr}
-          dir={w.direction24hr}
-        />
-        <WindRow
-          label="72H"
-          avg={w.speedAvg72hr}
-          max={w.speedMax72hr}
-          dir={w.direction72hr}
-        />
+      {speedSeries && speedSeries.length >= 2 ? (
+        <View style={{ marginTop: 14 }}>
+          <MetricChart
+            hours={period}
+            height={104}
+            unit=""
+            yMin={0}
+            series={[
+              ...(gustSeries && gustSeries.length >= 2
+                ? [
+                    {
+                      data: gustSeries,
+                      stroke: palette.aspen[400],
+                      fill: palette.aspen[400],
+                      background: true,
+                    },
+                  ]
+                : []),
+              { data: speedSeries, stroke: palette.ink[100] },
+            ]}
+          />
+          <View style={{ flexDirection: "row", gap: 14, marginTop: 8 }}>
+            <LegendDot color={palette.ink[100]} label="speed" />
+            {gustSeries && gustSeries.length >= 2 ? (
+              <LegendDot color={palette.aspen[400]} label="gusts" />
+            ) : null}
+          </View>
+        </View>
+      ) : (
+        <DataNote>Not enough hourly wind data for this period.</DataNote>
+      )}
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 14 }}>
+        <RangeStat label={`${period}H AVG`} value={avg} unit=" mph" />
+        <RangeStat label={`${period}H MAX`} value={max} unit=" mph" />
+        <RangeStat label={`${period}H DIR`} value={dir} mono />
       </View>
     </View>
   );
 }
 
-function WindRow({
-  label,
-  avg,
-  max,
-  dir,
-}: {
-  label: string;
-  avg: number | null;
-  max: number | null;
-  dir: string | null;
-}) {
+// ─────────────────────────────────────────────────────────────────────────
+// PRECIP
+// ─────────────────────────────────────────────────────────────────────────
+function PrecipBlock({ obs, period }: { obs: WeatherObservation; period: Period }) {
+  const s = obs.snow;
+  const series = period === 24 ? s.hourlyPrecip24hr : s.hourlyPrecip72hr;
+  const total = period === 24 ? s.precip24hr : s.precip72hr;
+  const newSnow = period === 24 ? s.depth24hrChange : s.depth72hrChange;
+  const density =
+    newSnow !== null && newSnow > 0 && total !== null && total > 0
+      ? Math.round((total / newSnow) * 100)
+      : null;
+
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "baseline",
-        justifyContent: "space-between",
-      }}
-    >
-      <Text
-        variant="mono"
-        weight="medium"
-        className="text-ink-400"
-        style={{ fontSize: 10, letterSpacing: 1.4, width: 36 }}
-      >
-        {label}
-      </Text>
-      <View
-        style={{
-          flex: 1,
-          flexDirection: "row",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <NumStat label="avg" value={avg !== null ? `${avg}` : "—"} />
-        <NumStat label="max" value={max !== null ? `${max}` : "—"} />
-        <Text
-          variant="mono"
-          weight="medium"
+    <View>
+      <SectionLabel>PRECIP</SectionLabel>
+
+      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 16 }}>
+        <View>
+          <Text
+            variant="mono"
+            className="text-ink-400"
+            style={{ fontSize: 10, letterSpacing: 1.4 }}
+          >
+            {period}H NEW SNOW
+          </Text>
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{
+              fontSize: 36,
+              color: newSnow !== null && newSnow > 0
+                ? palette.frost[400]
+                : palette.ink[200],
+              letterSpacing: -0.5,
+              lineHeight: 38,
+            }}
+          >
+            {newSnow !== null
+              ? newSnow > 0
+                ? `+${newSnow}″`
+                : `${newSnow}″`
+              : "—"}
+          </Text>
+        </View>
+        <View>
+          <Text
+            variant="mono"
+            className="text-ink-400"
+            style={{ fontSize: 10, letterSpacing: 1.4 }}
+          >
+            {period}H SWE
+          </Text>
+          <Text
+            variant="mono"
+            weight="bold"
+            className="text-ink-50"
+            style={{ fontSize: 22, letterSpacing: -0.3, lineHeight: 26 }}
+          >
+            {total !== null ? `${total.toFixed(1)}″` : "—"}
+          </Text>
+          {density !== null ? (
+            <Text
+              variant="mono"
+              className="text-ink-400"
+              style={{ fontSize: 11 }}
+            >
+              {density}% density
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {series && series.length >= 2 ? (
+        <View style={{ marginTop: 14 }}>
+          <MetricChart
+            hours={period}
+            height={88}
+            unit=""
+            yMin={0}
+            mode="bar"
+            series={[
+              {
+                data: series,
+                stroke: palette.frost[400],
+                fill: palette.frost[400],
+              },
+            ]}
+          />
+          <View style={{ flexDirection: "row", gap: 14, marginTop: 8 }}>
+            <LegendDot color={palette.frost[400]} label="hourly SWE (in)" />
+          </View>
+        </View>
+      ) : (
+        <DataNote>Not enough hourly precip data for this period.</DataNote>
+      )}
+
+      {s.depth !== null ? (
+        <View
           style={{
-            fontSize: 13,
-            color: dir ? palette.frost[400] : palette.ink[400],
-            letterSpacing: 1.4,
-            minWidth: 36,
-            textAlign: "right",
+            marginTop: 14,
+            flexDirection: "row",
+            alignItems: "baseline",
+            justifyContent: "space-between",
           }}
         >
-          {dir || "—"}
-        </Text>
-      </View>
+          <Text
+            variant="mono"
+            className="text-ink-400"
+            style={{ fontSize: 10, letterSpacing: 1.4 }}
+          >
+            BASE DEPTH
+          </Text>
+          <Text
+            variant="mono"
+            weight="medium"
+            className="text-ink-100"
+            style={{ fontSize: 14 }}
+          >
+            {s.depth}″
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function NumStat({ label, value }: { label: string; value: string }) {
+// ─────────────────────────────────────────────────────────────────────────
+// helpers
+// ─────────────────────────────────────────────────────────────────────────
+function RangeStat({
+  label,
+  value,
+  unit,
+  mono,
+}: {
+  label: string;
+  value: number | string | null;
+  unit?: string;
+  mono?: boolean;
+}) {
+  const display =
+    value === null || value === undefined
+      ? "—"
+      : typeof value === "number"
+        ? `${value}${unit ?? ""}`
+        : value;
   return (
-    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+    <View>
       <Text
         variant="mono"
         className="text-ink-400"
-        style={{ fontSize: 10 }}
+        style={{ fontSize: 10, letterSpacing: 1.4 }}
       >
         {label}
       </Text>
       <Text
         variant="mono"
         weight="medium"
-        className="text-ink-100"
-        style={{ fontSize: 14 }}
+        style={{
+          fontSize: 16,
+          color: mono ? palette.frost[400] : palette.ink[100],
+          marginTop: 2,
+        }}
       >
-        {value}
+        {display}
       </Text>
     </View>
   );
 }
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+      <View
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 2,
+          backgroundColor: color,
+        }}
+      />
+      <Text
+        variant="mono"
+        className="text-ink-400"
+        style={{ fontSize: 10, letterSpacing: 1.2 }}
+      >
+        {label.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
+function DataNote({ children }: { children: string }) {
+  return (
+    <Text
+      variant="mono"
+      className="text-ink-400 italic"
+      style={{ fontSize: 11, letterSpacing: 0.6, marginTop: 8 }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function trendStyle(
+  trend: "warming" | "cooling" | "stable" | null,
+  current: number | null,
+):
+  | {
+      icon: keyof typeof import("@expo/vector-icons").Ionicons.glyphMap;
+      label: string;
+      fg: string;
+      bg: string;
+      border: string;
+    }
+  | null {
+  if (!trend) return null;
+  if (trend === "warming") {
+    const hot = current !== null && current > 32;
+    return {
+      icon: "trending-up",
+      label: "WARMING",
+      fg: hot ? palette.aspen[400] : palette.ink[100],
+      bg: hot ? palette.aspen[500] + "20" : palette.ink[700] + "80",
+      border: hot ? palette.aspen[500] + "60" : palette.ink[600],
+    };
+  }
+  if (trend === "cooling") {
+    return {
+      icon: "trending-down",
+      label: "COOLING",
+      fg: palette.frost[400],
+      bg: palette.frost[400] + "1A",
+      border: palette.frost[600],
+    };
+  }
+  return {
+    icon: "remove-outline",
+    label: "STABLE",
+    fg: palette.ink[300],
+    bg: palette.ink[700] + "80",
+    border: palette.ink[600],
+  };
+}
+
+// Suppress unused-var: TempDataPoint kept for type clarity above
+type _TempDataPoint = TempDataPoint;
