@@ -1,19 +1,6 @@
-import { useMemo, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  View,
-  Dimensions,
-} from "react-native";
-import Svg, {
-  Circle,
-  Defs,
-  LinearGradient,
-  Path,
-  Rect,
-  Stop,
-} from "react-native-svg";
+import { useMemo, useRef, useState } from "react";
+import { Modal, Pressable, ScrollView, View } from "react-native";
+import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
@@ -27,123 +14,253 @@ import {
   type AvalancheCenter,
 } from "@/lib/zones";
 
-// Lat/lon bounds covering the contiguous US + the Alaska tile we render
-// as an inset (Alaska is too far north to plot natively without distortion).
-const MAIN_BOUNDS = {
-  minLat: 24,
-  maxLat: 51,
-  minLon: -126,
-  maxLon: -66,
-};
-
-// Alaska zones are treated separately and rendered in a small inset frame.
-const ALASKA_CENTER_IDS = new Set([
-  "CNFAIC",
-  "HPAC",
-  "VAC",
-  "CAC",
-  "EARAC",
-  "CAAC",
-  "HAC",
-]);
-
-const ALASKA_BOUNDS = {
-  minLat: 55,
-  maxLat: 67,
-  minLon: -158,
-  maxLon: -130,
-};
-
-interface PinSpec {
-  centerId: string;
+interface CenterMeta {
+  id: string;
+  name: string;
   region: string;
   center: AvalancheCenter;
-  x: number;
-  y: number;
-  inAlaska: boolean;
+  lat: number;
+  lon: number;
 }
-
-const screenW = Dimensions.get("window").width;
-const MAP_W = screenW - 64; // matches CardContent padding (5+padding)
-const MAP_H = 280;
-const ALASKA_W = 96;
-const ALASKA_H = 76;
-const ALASKA_PAD = 8;
-
-function project(
-  lat: number,
-  lon: number,
-  bounds: typeof MAIN_BOUNDS,
-  width: number,
-  height: number,
-): { x: number; y: number } {
-  const x =
-    ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * width;
-  const y =
-    ((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat)) * height;
-  return { x, y };
-}
-
-// Stylized geography — broad-stroke contour bands that reference the western
-// mountain spines without claiming cartographic accuracy. Decorative.
-const TERRAIN_PATHS = [
-  // Cascades + Sierra spine (rough)
-  "M 200 50 C 220 80, 230 130, 250 170 S 280 240, 290 280",
-  // Rockies
-  "M 380 60 C 400 100, 410 160, 420 210 S 430 270, 440 280",
-  // Appalachians
-  "M 700 110 C 720 150, 740 190, 760 230",
-];
 
 interface Props {
   selectedZoneIds: string[];
   onSelectionChange: (zoneIds: string[]) => void;
 }
 
-export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
-  const [activeCenterId, setActiveCenterId] = useState<string | null>(null);
+const MAP_HEIGHT = 380;
 
-  const pins: PinSpec[] = useMemo(() => {
-    const result: PinSpec[] = [];
-    for (const region of REGION_STRUCTURE) {
-      for (const center of region.centers) {
-        const coords = CENTER_COORDS[center.id];
-        if (!coords) continue;
-        const inAlaska = ALASKA_CENTER_IDS.has(center.id);
-        const bounds = inAlaska ? ALASKA_BOUNDS : MAIN_BOUNDS;
-        const w = inAlaska ? ALASKA_W : MAP_W;
-        const h = inAlaska ? ALASKA_H : MAP_H;
-        const { x, y } = project(coords.lat, coords.lon, bounds, w, h);
-        result.push({
-          centerId: center.id,
-          region: region.name,
-          center,
-          x,
-          y,
-          inAlaska,
-        });
-      }
+const FLAT_CENTERS: CenterMeta[] = REGION_STRUCTURE.flatMap((r) =>
+  r.centers
+    .filter((c) => CENTER_COORDS[c.id])
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      region: r.name,
+      center: c,
+      lat: CENTER_COORDS[c.id].lat,
+      lon: CENTER_COORDS[c.id].lon,
+    })),
+);
+
+function buildHtml(): string {
+  // Inline Leaflet from CDN. OpenTopoMap gives free terrain + contour
+  // tiles — exactly what a backcountry user wants. Dark UI chrome
+  // around it via Leaflet's container background.
+  return `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no, width=device-width" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #070A14; }
+  .leaflet-container { background: #070A14; outline: none; }
+  .leaflet-control-attribution {
+    background: rgba(7, 10, 20, 0.65) !important;
+    color: #8794AE !important;
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+  }
+  .leaflet-control-attribution a { color: #67D5F0 !important; }
+  .leaflet-control-zoom {
+    border: 0.5px solid #2A3550 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+  }
+  .leaflet-control-zoom a {
+    background: rgba(7, 10, 20, 0.85) !important;
+    color: #E1E7F0 !important;
+    border-bottom: 0.5px solid #2A3550 !important;
+    font-weight: 300 !important;
+  }
+  .leaflet-control-zoom a:hover { background: rgba(20, 28, 46, 0.95) !important; color: #67D5F0 !important; }
+  .center-pin {
+    background: transparent;
+    border: 0;
+    width: auto !important;
+    height: auto !important;
+  }
+  .pin-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid #3B4A6B;
+    background: rgba(7, 10, 20, 0.92);
+    color: #E1E7F0;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+  }
+  .pin-pill.some {
+    background: #E8B765;
+    color: #1F0F00;
+    border-color: #E8B765;
+  }
+  .pin-pill.all {
+    background: #67D5F0;
+    color: #070A14;
+    border-color: #67D5F0;
+  }
+  .pin-count {
+    background: rgba(7, 10, 20, 0.25);
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 9px;
+  }
+  .pin-pill.none .pin-count { background: rgba(255, 255, 255, 0.1); }
+</style>
+</head><body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // Disable rebound on bounce so the basemap stays stable inside a scroll view.
+  var map = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+    bounceAtZoomLimits: false,
+  }).setView([44, -113], 4);
+
+  // OpenTopoMap — free terrain + topo. Slightly heavier tiles but loads fast.
+  L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 14,
+    attribution: '© OpenTopoMap (CC-BY-SA), © OSM',
+    crossOrigin: true,
+  }).addTo(map);
+
+  var pins = {};
+
+  function buildPinHtml(id, state, count, total) {
+    var cls = 'pin-pill ' + state;
+    var countHtml = count > 0 ? '<span class="pin-count">' + count + '/' + total + '</span>' : '';
+    return '<div class="' + cls + '">' + id + countHtml + '</div>';
+  }
+
+  function pinState(count, total) {
+    if (count === 0) return 'none';
+    if (count === total) return 'all';
+    return 'some';
+  }
+
+  function post(payload) {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(payload));
     }
-    return result;
-  }, []);
+  }
 
-  const activePin = useMemo(
-    () => pins.find((p) => p.centerId === activeCenterId) || null,
-    [pins, activeCenterId],
-  );
+  window.AVY = {
+    addCenters: function(centers) {
+      centers.forEach(function(c) {
+        var state = pinState(c.selectedCount, c.totalZones);
+        var icon = L.divIcon({
+          className: 'center-pin',
+          html: buildPinHtml(c.id, state, c.selectedCount, c.totalZones),
+          iconAnchor: [0, 0],
+        });
+        var marker = L.marker([c.lat, c.lon], { icon: icon, riseOnHover: true });
+        marker.on('click', function() { post({ type: 'pin', id: c.id }); });
+        marker.addTo(map);
+        pins[c.id] = { marker: marker, totalZones: c.totalZones };
+      });
+      post({ type: 'ready' });
+    },
 
-  const handlePinPress = (centerId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setActiveCenterId(centerId);
+    updateSelection: function(counts) {
+      Object.keys(pins).forEach(function(id) {
+        var p = pins[id];
+        var sel = counts[id] || 0;
+        var state = pinState(sel, p.totalZones);
+        p.marker.setIcon(L.divIcon({
+          className: 'center-pin',
+          html: buildPinHtml(id, state, sel, p.totalZones),
+          iconAnchor: [0, 0],
+        }));
+      });
+    },
+
+    fitBounds: function(bounds) {
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 6 });
+    },
   };
+
+  // Tell RN we're alive — it will send the centers payload back.
+  post({ type: 'init' });
+</script>
+</body></html>`;
+}
+
+export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
+  const webRef = useRef<WebView>(null);
+  const [activeCenterId, setActiveCenterId] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+
+  const html = useMemo(buildHtml, []);
+
+  const counts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const c of FLAT_CENTERS) {
+      out[c.id] = c.center.zones.filter((z) => selectedZoneIds.includes(z.id))
+        .length;
+    }
+    return out;
+  }, [selectedZoneIds]);
+
+  const handleMessage = (event: WebViewMessageEvent) => {
+    let msg: any;
+    try {
+      msg = JSON.parse(event.nativeEvent.data);
+    } catch {
+      return;
+    }
+    if (msg.type === "init") {
+      // Push the centers + initial counts
+      const payload = FLAT_CENTERS.map((c) => ({
+        id: c.id,
+        name: c.name,
+        lat: c.lat,
+        lon: c.lon,
+        totalZones: c.center.zones.length,
+        selectedCount: c.center.zones.filter((z) =>
+          selectedZoneIds.includes(z.id),
+        ).length,
+      }));
+      const js = `window.AVY.addCenters(${JSON.stringify(payload)}); true;`;
+      webRef.current?.injectJavaScript(js);
+    } else if (msg.type === "ready") {
+      setMapReady(true);
+    } else if (msg.type === "pin" && typeof msg.id === "string") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setActiveCenterId(msg.id);
+    }
+  };
+
+  // Push count updates whenever selection changes (after map is ready)
+  useMemo(() => {
+    if (!mapReady) return;
+    const js = `window.AVY && window.AVY.updateSelection(${JSON.stringify(
+      counts,
+    )}); true;`;
+    webRef.current?.injectJavaScript(js);
+  }, [counts, mapReady]);
+
+  const activeCenter = useMemo(
+    () => FLAT_CENTERS.find((c) => c.id === activeCenterId) || null,
+    [activeCenterId],
+  );
 
   return (
     <View>
       <View
         style={{
-          height: MAP_H,
-          width: MAP_W,
-          alignSelf: "center",
+          height: MAP_HEIGHT,
           borderRadius: 14,
           overflow: "hidden",
           borderWidth: 0.5,
@@ -151,127 +268,19 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
           backgroundColor: palette.ink[900],
         }}
       >
-        {/* Terrain backdrop */}
-        <Svg
-          width={MAP_W}
-          height={MAP_H}
-          style={{ position: "absolute", top: 0, left: 0 }}
-        >
-          <Defs>
-            <LinearGradient id="bgFade" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={palette.ink[900]} />
-              <Stop offset="1" stopColor={palette.ink[950]} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width={MAP_W} height={MAP_H} fill="url(#bgFade)" />
-          {TERRAIN_PATHS.map((d, i) => (
-            <Path
-              key={i}
-              d={d}
-              stroke={palette.frost[400]}
-              strokeOpacity={0.08}
-              strokeWidth={1}
-              fill="none"
-              transform={`scale(${MAP_W / 880}, ${MAP_H / 320})`}
-            />
-          ))}
-          {/* Soft contour grid */}
-          {[0.25, 0.5, 0.75].map((t) => (
-            <Path
-              key={`v-${t}`}
-              d={`M ${MAP_W * t} 0 L ${MAP_W * t} ${MAP_H}`}
-              stroke={palette.ink[700]}
-              strokeOpacity={0.5}
-              strokeWidth={0.5}
-              strokeDasharray="2,4"
-            />
-          ))}
-          {[0.33, 0.66].map((t) => (
-            <Path
-              key={`h-${t}`}
-              d={`M 0 ${MAP_H * t} L ${MAP_W} ${MAP_H * t}`}
-              stroke={palette.ink[700]}
-              strokeOpacity={0.5}
-              strokeWidth={0.5}
-              strokeDasharray="2,4"
-            />
-          ))}
-        </Svg>
+        <WebView
+          ref={webRef}
+          source={{ html }}
+          originWhitelist={["*"]}
+          javaScriptEnabled
+          domStorageEnabled
+          scrollEnabled={false}
+          nestedScrollEnabled
+          androidLayerType="hardware"
+          onMessage={handleMessage}
+          style={{ backgroundColor: palette.ink[950] }}
+        />
 
-        {/* Alaska inset frame */}
-        <View
-          style={{
-            position: "absolute",
-            top: ALASKA_PAD,
-            left: ALASKA_PAD,
-            width: ALASKA_W,
-            height: ALASKA_H,
-            backgroundColor: palette.ink[800],
-            borderRadius: 6,
-            borderWidth: 0.5,
-            borderColor: palette.ink[700],
-            overflow: "hidden",
-          }}
-        >
-          <Svg width={ALASKA_W} height={ALASKA_H}>
-            <Path
-              d="M 4 14 C 18 8, 38 18, 60 14 S 90 22, 92 26"
-              stroke={palette.frost[400]}
-              strokeOpacity={0.12}
-              strokeWidth={0.8}
-              fill="none"
-            />
-            <Path
-              d="M 4 30 C 22 24, 50 36, 80 30 S 92 38, 92 40"
-              stroke={palette.frost[400]}
-              strokeOpacity={0.08}
-              strokeWidth={0.6}
-              fill="none"
-            />
-          </Svg>
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-ink-400"
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 6,
-              fontSize: 8,
-              letterSpacing: 1.2,
-            }}
-          >
-            AK
-          </Text>
-        </View>
-
-        {/* Pins for non-Alaska centers */}
-        {pins
-          .filter((p) => !p.inAlaska)
-          .map((p) => (
-            <PinMarker
-              key={p.centerId}
-              pin={p}
-              selectedZoneIds={selectedZoneIds}
-              onPress={() => handlePinPress(p.centerId)}
-            />
-          ))}
-
-        {/* Pins inside Alaska inset */}
-        {pins
-          .filter((p) => p.inAlaska)
-          .map((p) => (
-            <PinMarker
-              key={p.centerId}
-              pin={p}
-              selectedZoneIds={selectedZoneIds}
-              onPress={() => handlePinPress(p.centerId)}
-              offsetX={ALASKA_PAD}
-              offsetY={ALASKA_PAD}
-            />
-          ))}
-
-        {/* Legend */}
         <View
           pointerEvents="none"
           style={{
@@ -296,7 +305,7 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
             className="text-ink-300"
             style={{ fontSize: 9, letterSpacing: 1.4 }}
           >
-            TAP A CENTER
+            TAP A CENTER · DRAG TO PAN · PINCH TO ZOOM
           </Text>
           <Text
             variant="mono"
@@ -310,7 +319,7 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
 
       {/* Center sheet */}
       <Modal
-        visible={!!activePin}
+        visible={!!activeCenter}
         transparent
         animationType="fade"
         onRequestClose={() => setActiveCenterId(null)}
@@ -346,10 +355,10 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
                 }}
               />
             </View>
-            {activePin ? (
+            {activeCenter ? (
               <SheetContent
-                center={activePin.center}
-                region={activePin.region}
+                center={activeCenter.center}
+                region={activeCenter.region}
                 selectedZoneIds={selectedZoneIds}
                 onSelectionChange={onSelectionChange}
                 onClose={() => setActiveCenterId(null)}
@@ -359,90 +368,6 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
         </Pressable>
       </Modal>
     </View>
-  );
-}
-
-function PinMarker({
-  pin,
-  selectedZoneIds,
-  onPress,
-  offsetX = 0,
-  offsetY = 0,
-}: {
-  pin: PinSpec;
-  selectedZoneIds: string[];
-  onPress: () => void;
-  offsetX?: number;
-  offsetY?: number;
-}) {
-  const totalZones = pin.center.zones.length;
-  const selectedCount = pin.center.zones.filter((z) =>
-    selectedZoneIds.includes(z.id),
-  ).length;
-  const allSelected = selectedCount === totalZones;
-  const someSelected = selectedCount > 0;
-
-  const fill = allSelected
-    ? palette.frost[400]
-    : someSelected
-      ? palette.aspen[500]
-      : palette.ink[800];
-  const ink = allSelected || someSelected ? palette.ink[950] : palette.ink[100];
-  const border = allSelected
-    ? palette.frost[400]
-    : someSelected
-      ? palette.aspen[500]
-      : palette.ink[500];
-
-  const fontSize = pin.inAlaska ? 7 : 9;
-  const padH = pin.inAlaska ? 4 : 7;
-  const padV = pin.inAlaska ? 1 : 3;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      style={{
-        position: "absolute",
-        left: offsetX + pin.x,
-        top: offsetY + pin.y,
-        transform: [{ translateX: -22 }, { translateY: -10 }],
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 3,
-        paddingVertical: padV,
-        paddingHorizontal: padH,
-        borderRadius: 999,
-        backgroundColor: fill,
-        borderWidth: 1,
-        borderColor: border,
-        shadowColor: "#000",
-        shadowOpacity: 0.35,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-      }}
-    >
-      <Text
-        variant="mono"
-        weight="bold"
-        style={{
-          color: ink,
-          fontSize,
-          letterSpacing: 0.4,
-        }}
-      >
-        {pin.centerId}
-      </Text>
-      {someSelected && !pin.inAlaska ? (
-        <Text
-          variant="mono"
-          weight="bold"
-          style={{ color: ink, fontSize: 8, opacity: 0.75 }}
-        >
-          {selectedCount}
-        </Text>
-      ) : null}
-    </Pressable>
   );
 }
 
