@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,6 +29,7 @@ interface Props {
 }
 
 const MAP_HEIGHT = 380;
+const ZONE_POLY_MIN_ZOOM = 7;
 
 const FLAT_CENTERS: CenterMeta[] = REGION_STRUCTURE.flatMap((r) =>
   r.centers
@@ -43,11 +44,9 @@ const FLAT_CENTERS: CenterMeta[] = REGION_STRUCTURE.flatMap((r) =>
     })),
 );
 
-function buildHtml(): string {
-  // Inline Leaflet from CDN. OpenTopoMap gives free terrain + contour
-  // tiles — exactly what a backcountry user wants. Dark UI chrome
-  // around it via Leaflet's container background.
-  return `<!DOCTYPE html>
+// Built once. Leaflet via CDN, OpenTopoMap basemap, custom pins, plus
+// lazy-loaded zone polygons fetched from NAC's public map-layer API.
+const HTML = String.raw`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8" />
 <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no, width=device-width" />
@@ -76,12 +75,7 @@ function buildHtml(): string {
     font-weight: 300 !important;
   }
   .leaflet-control-zoom a:hover { background: rgba(20, 28, 46, 0.95) !important; color: #67D5F0 !important; }
-  .center-pin {
-    background: transparent;
-    border: 0;
-    width: auto !important;
-    height: auto !important;
-  }
+  .center-pin { background: transparent; border: 0; width: auto !important; height: auto !important; }
   .pin-pill {
     display: inline-flex;
     align-items: center;
@@ -100,43 +94,47 @@ function buildHtml(): string {
     transform: translate(-50%, -50%);
     pointer-events: auto;
   }
-  .pin-pill.some {
-    background: #E8B765;
-    color: #1F0F00;
-    border-color: #E8B765;
-  }
-  .pin-pill.all {
-    background: #67D5F0;
-    color: #070A14;
-    border-color: #67D5F0;
-  }
-  .pin-count {
-    background: rgba(7, 10, 20, 0.25);
-    padding: 0 4px;
-    border-radius: 3px;
-    font-size: 9px;
-  }
+  .pin-pill.some { background: #E8B765; color: #1F0F00; border-color: #E8B765; }
+  .pin-pill.all  { background: #67D5F0; color: #070A14; border-color: #67D5F0; }
+  .pin-count { background: rgba(7, 10, 20, 0.25); padding: 0 4px; border-radius: 3px; font-size: 9px; }
   .pin-pill.none .pin-count { background: rgba(255, 255, 255, 0.1); }
+  .zone-tooltip {
+    background: rgba(7, 10, 20, 0.92) !important;
+    border: 0.5px solid #2A3550 !important;
+    color: #E1E7F0 !important;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace !important;
+    font-size: 10px !important;
+    letter-spacing: 0.6px !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+  }
+  .zone-tooltip::before { display: none !important; }
 </style>
 </head><body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  // Disable rebound on bounce so the basemap stays stable inside a scroll view.
+  var POLY_MIN_ZOOM = __POLY_MIN_ZOOM__;
+
   var map = L.map('map', {
     zoomControl: true,
     attributionControl: true,
     bounceAtZoomLimits: false,
   }).setView([44, -113], 4);
 
-  // OpenTopoMap — free terrain + topo. Slightly heavier tiles but loads fast.
   L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom: 14,
     attribution: '© OpenTopoMap (CC-BY-SA), © OSM',
     crossOrigin: true,
   }).addTo(map);
 
-  var pins = {};
+  var pins = {};                 // centerId -> { marker, totalZones }
+  var centerPolys = {};          // centerId -> { fetched, layer, zoneIdByName }
+  var pinLayer = L.layerGroup().addTo(map);
+  var polyLayer = L.layerGroup().addTo(map);
+  var currentSelected = {};
+  var centersList = [];
 
   function buildPinHtml(id, state, count, total) {
     var cls = 'pin-pill ' + state;
@@ -156,8 +154,112 @@ function buildHtml(): string {
     }
   }
 
+  function styleForZone(zoneId) {
+    var sel = !!currentSelected[zoneId];
+    if (sel) {
+      return { color: '#67D5F0', weight: 1.5, opacity: 1, fillColor: '#67D5F0', fillOpacity: 0.28 };
+    }
+    return { color: '#B8C2D6', weight: 1, opacity: 0.7, fillColor: '#B8C2D6', fillOpacity: 0.06 };
+  }
+
+  function normName(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  function fetchCenterPolys(centerId) {
+    var slot = centerPolys[centerId];
+    if (slot && slot.fetched) return Promise.resolve(slot);
+    if (!slot) { centerPolys[centerId] = { fetched: false, layer: null, zoneIdByName: {} }; slot = centerPolys[centerId]; }
+    if (slot.fetching) return slot.fetching;
+
+    var url = 'https://api.avalanche.org/v2/public/products/map-layer/' + centerId;
+    slot.fetching = fetch(url, { mode: 'cors' })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(geo) {
+        slot.fetched = true;
+        slot.fetching = null;
+        if (!geo || !geo.features) return slot;
+        var byNorm = slot.zoneIdByName;
+        var layer = L.geoJSON(geo, {
+          style: function(f) {
+            var nm = (f.properties && f.properties.name) || '';
+            return styleForZone(byNorm[normName(nm)] || '');
+          },
+          onEachFeature: function(feature, layer) {
+            var nm = (feature.properties && feature.properties.name) || '';
+            var zoneId = byNorm[normName(nm)];
+            if (nm) layer.bindTooltip(nm, { className: 'zone-tooltip', sticky: true, direction: 'top' });
+            layer.on('click', function(e) {
+              if (zoneId) {
+                post({ type: 'zoneTap', id: zoneId, name: nm });
+              } else {
+                post({ type: 'pin', id: centerId });
+              }
+              if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+            });
+            layer.on('mouseover', function() {
+              var s = styleForZone(zoneId || '');
+              layer.setStyle({ weight: s.weight + 1, opacity: 1, fillOpacity: Math.min((s.fillOpacity || 0) + 0.1, 0.5) });
+            });
+            layer.on('mouseout', function() {
+              layer.setStyle(styleForZone(zoneId || ''));
+            });
+          },
+        });
+        slot.layer = layer;
+        return slot;
+      })
+      .catch(function(err) {
+        slot.fetched = true;
+        slot.fetching = null;
+        return slot;
+      });
+    return slot.fetching;
+  }
+
+  function refreshPolyVisibility() {
+    var z = map.getZoom();
+    if (z < POLY_MIN_ZOOM) {
+      polyLayer.clearLayers();
+      pinLayer.eachLayer(function(l) { l.setOpacity(1); });
+      return;
+    }
+    var bounds = map.getBounds();
+    centersList.forEach(function(c) {
+      if (!bounds.contains([c.lat, c.lon])) return;
+      fetchCenterPolys(c.id).then(function(slot) {
+        if (slot && slot.layer && !polyLayer.hasLayer(slot.layer)) {
+          polyLayer.addLayer(slot.layer);
+        }
+      });
+    });
+    pinLayer.eachLayer(function(l) {
+      var cid = l._avyCenterId;
+      var slot = centerPolys[cid];
+      if (slot && slot.layer && polyLayer.hasLayer(slot.layer)) {
+        l.setOpacity(0);
+      } else {
+        l.setOpacity(1);
+      }
+    });
+  }
+
+  function restyleAllPolys() {
+    Object.keys(centerPolys).forEach(function(cid) {
+      var slot = centerPolys[cid];
+      if (slot && slot.layer) {
+        slot.layer.eachLayer(function(featureLayer) {
+          var nm = featureLayer.feature && featureLayer.feature.properties && featureLayer.feature.properties.name;
+          var zoneId = slot.zoneIdByName[normName(nm)];
+          featureLayer.setStyle(styleForZone(zoneId || ''));
+        });
+      }
+    });
+  }
+
   window.AVY = {
     addCenters: function(centers) {
+      centersList = centers;
       centers.forEach(function(c) {
         var state = pinState(c.selectedCount, c.totalZones);
         var icon = L.divIcon({
@@ -166,14 +268,20 @@ function buildHtml(): string {
           iconAnchor: [0, 0],
         });
         var marker = L.marker([c.lat, c.lon], { icon: icon, riseOnHover: true });
+        marker._avyCenterId = c.id;
         marker.on('click', function() { post({ type: 'pin', id: c.id }); });
-        marker.addTo(map);
+        pinLayer.addLayer(marker);
         pins[c.id] = { marker: marker, totalZones: c.totalZones };
+        var slot = centerPolys[c.id] || { fetched: false, layer: null, zoneIdByName: {} };
+        (c.zones || []).forEach(function(z) {
+          slot.zoneIdByName[normName(z.name)] = z.id;
+        });
+        centerPolys[c.id] = slot;
       });
       post({ type: 'ready' });
     },
 
-    updateSelection: function(counts) {
+    updateSelection: function(counts, selectedZoneIds) {
       Object.keys(pins).forEach(function(id) {
         var p = pins[id];
         var sel = counts[id] || 0;
@@ -184,25 +292,22 @@ function buildHtml(): string {
           iconAnchor: [0, 0],
         }));
       });
-    },
-
-    fitBounds: function(bounds) {
-      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 6 });
+      currentSelected = {};
+      (selectedZoneIds || []).forEach(function(id) { currentSelected[id] = true; });
+      restyleAllPolys();
     },
   };
 
-  // Tell RN we're alive — it will send the centers payload back.
+  map.on('zoomend moveend', function() { refreshPolyVisibility(); });
+
   post({ type: 'init' });
 </script>
-</body></html>`;
-}
+</body></html>`.replace("__POLY_MIN_ZOOM__", String(ZONE_POLY_MIN_ZOOM));
 
 export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
   const webRef = useRef<WebView>(null);
   const [activeCenterId, setActiveCenterId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-
-  const html = useMemo(buildHtml, []);
 
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
@@ -213,6 +318,15 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
     return out;
   }, [selectedZoneIds]);
 
+  // Push selection updates to the map after it's ready
+  useEffect(() => {
+    if (!mapReady) return;
+    const js = `window.AVY && window.AVY.updateSelection(${JSON.stringify(
+      counts,
+    )}, ${JSON.stringify(selectedZoneIds)}); true;`;
+    webRef.current?.injectJavaScript(js);
+  }, [counts, mapReady, selectedZoneIds]);
+
   const handleMessage = (event: WebViewMessageEvent) => {
     let msg: any;
     try {
@@ -221,7 +335,6 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
       return;
     }
     if (msg.type === "init") {
-      // Push the centers + initial counts
       const payload = FLAT_CENTERS.map((c) => ({
         id: c.id,
         name: c.name,
@@ -231,6 +344,7 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
         selectedCount: c.center.zones.filter((z) =>
           selectedZoneIds.includes(z.id),
         ).length,
+        zones: c.center.zones.map((z) => ({ id: z.id, name: z.name })),
       }));
       const js = `window.AVY.addCenters(${JSON.stringify(payload)}); true;`;
       webRef.current?.injectJavaScript(js);
@@ -239,17 +353,16 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
     } else if (msg.type === "pin" && typeof msg.id === "string") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       setActiveCenterId(msg.id);
+    } else if (msg.type === "zoneTap" && typeof msg.id === "string") {
+      Haptics.selectionAsync().catch(() => {});
+      const zoneId = msg.id;
+      if (selectedZoneIds.includes(zoneId)) {
+        onSelectionChange(selectedZoneIds.filter((id) => id !== zoneId));
+      } else {
+        onSelectionChange([...selectedZoneIds, zoneId]);
+      }
     }
   };
-
-  // Push count updates whenever selection changes (after map is ready)
-  useMemo(() => {
-    if (!mapReady) return;
-    const js = `window.AVY && window.AVY.updateSelection(${JSON.stringify(
-      counts,
-    )}); true;`;
-    webRef.current?.injectJavaScript(js);
-  }, [counts, mapReady]);
 
   const activeCenter = useMemo(
     () => FLAT_CENTERS.find((c) => c.id === activeCenterId) || null,
@@ -270,7 +383,7 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
       >
         <WebView
           ref={webRef}
-          source={{ html }}
+          source={{ html: HTML }}
           originWhitelist={["*"]}
           javaScriptEnabled
           domStorageEnabled
@@ -305,7 +418,7 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
             className="text-ink-300"
             style={{ fontSize: 9, letterSpacing: 1.4 }}
           >
-            TAP A CENTER · DRAG TO PAN · PINCH TO ZOOM
+            ZOOM IN FOR ZONE POLYGONS · TAP TO TOGGLE
           </Text>
           <Text
             variant="mono"
@@ -317,7 +430,6 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
         </View>
       </View>
 
-      {/* Center sheet */}
       <Modal
         visible={!!activeCenter}
         transparent
