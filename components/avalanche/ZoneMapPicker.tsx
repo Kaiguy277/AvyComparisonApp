@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import {
   CENTER_COORDS,
+  NAC_ZONE_ALIASES,
   REGION_STRUCTURE,
   type AvalancheCenter,
 } from "@/lib/zones";
@@ -29,7 +30,7 @@ interface Props {
 }
 
 const MAP_HEIGHT = 380;
-const ZONE_POLY_MIN_ZOOM = 7;
+const ZONE_POLY_MIN_ZOOM = 5;
 
 const FLAT_CENTERS: CenterMeta[] = REGION_STRUCTURE.flatMap((r) =>
   r.centers
@@ -275,6 +276,9 @@ const HTML = String.raw`<!DOCTYPE html>
         var slot = centerPolys[c.id] || { fetched: false, layer: null, zoneIdByName: {} };
         (c.zones || []).forEach(function(z) {
           slot.zoneIdByName[normName(z.name)] = z.id;
+          (z.aliases || []).forEach(function(alias) {
+            slot.zoneIdByName[normName(alias)] = z.id;
+          });
         });
         centerPolys[c.id] = slot;
       });
@@ -344,7 +348,11 @@ export function ZoneMapPicker({ selectedZoneIds, onSelectionChange }: Props) {
         selectedCount: c.center.zones.filter((z) =>
           selectedZoneIds.includes(z.id),
         ).length,
-        zones: c.center.zones.map((z) => ({ id: z.id, name: z.name })),
+        zones: c.center.zones.map((z) => ({
+          id: z.id,
+          name: z.name,
+          aliases: NAC_ZONE_ALIASES[z.id] || [],
+        })),
       }));
       const js = `window.AVY.addCenters(${JSON.stringify(payload)}); true;`;
       webRef.current?.injectJavaScript(js);

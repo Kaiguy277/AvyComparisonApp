@@ -13,6 +13,23 @@ export interface Region {
   centers: AvalancheCenter[];
 }
 
+// Extra zone-name strings used by the National Avalanche Center's
+// public map-layer polygons that don't match our canonical zone names.
+// Keyed by our internal zone id → NAC name(s) seen in the GeoJSON.
+// Used by the map view to pair polygons back to the right zone.
+export const NAC_ZONE_ALIASES: Record<string, string[]> = {
+  "turnagain-girdwood": ["Turnagain Pass and Girdwood"],
+  seward: ["Seward and Lost Lake"],
+  "earac-north": ["North (Castner-Canwell) Eastern Alaska Range"],
+  "earac-south": ["South (Summit) Eastern Alaska Range"],
+  "juneau-mainland": ["Juneau"],
+  bridgeport: ["Bridgeport Avalanche Center"],
+  "san-francisco-peaks": [
+    "San Francisco Peaks / Kachina Peaks Wilderness",
+    "Kachina Peaks",
+  ],
+};
+
 // Approximate coordinates for each avalanche center's forecast area centroid.
 // Used only to pin centers on the map view — not for forecast lookup.
 export const CENTER_COORDS: Record<string, { lat: number; lon: number }> = {
