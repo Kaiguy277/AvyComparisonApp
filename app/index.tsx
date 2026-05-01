@@ -47,7 +47,6 @@ import {
 import { AVAILABLE_ZONES, DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
 
 const ZONE_PREFS_KEY = "avalanche-zone-selection";
-const QUICK_TAKE_KEY = "avalanche-quick-take-enabled";
 
 interface WeatherForecastBundle {
   centerWeather: Record<string, NacWeatherProduct>;
@@ -75,13 +74,11 @@ export default function Index() {
   const insets = useSafeAreaInsets();
 
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>(DEFAULT_ZONE_IDS);
-  const [quickTakeEnabled, setQuickTakeEnabled] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSnotelLoading, setIsSnotelLoading] = useState(false);
-  const [isQuickTakeLoading, setIsQuickTakeLoading] = useState(false);
   const [isWeatherForecastLoading, setIsWeatherForecastLoading] = useState(false);
 
   const [summary, setSummary] = useState<AvalancheSummary | null>(null);
@@ -90,9 +87,6 @@ export default function Index() {
   const [loadSource, setLoadSource] = useState<"cached" | "live" | null>(null);
   const [weatherForecastData, setWeatherForecastData] =
     useState<WeatherForecastBundle | null>(null);
-
-  const quickTakeEnabledRef = useRef(quickTakeEnabled);
-  quickTakeEnabledRef.current = quickTakeEnabled;
 
   // Subtle reveal anim when results arrive
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -124,10 +118,7 @@ export default function Index() {
   useEffect(() => {
     (async () => {
       try {
-        const [savedZones, savedQuickTake] = await Promise.all([
-          AsyncStorage.getItem(ZONE_PREFS_KEY),
-          AsyncStorage.getItem(QUICK_TAKE_KEY),
-        ]);
+        const savedZones = await AsyncStorage.getItem(ZONE_PREFS_KEY);
         if (savedZones) {
           const parsed = JSON.parse(savedZones);
           if (Array.isArray(parsed)) {
@@ -136,9 +127,6 @@ export default function Index() {
             );
             setSelectedZoneIds(valid);
           }
-        }
-        if (savedQuickTake !== null) {
-          setQuickTakeEnabled(savedQuickTake === "true");
         }
       } catch (err) {
         console.warn("Failed to load preferences", err);
@@ -151,12 +139,6 @@ export default function Index() {
   const updateSelectedZones = useCallback((zoneIds: string[]) => {
     setSelectedZoneIds(zoneIds);
     AsyncStorage.setItem(ZONE_PREFS_KEY, JSON.stringify(zoneIds)).catch(() => {});
-  }, []);
-
-  const toggleQuickTake = useCallback((enabled: boolean) => {
-    Haptics.selectionAsync().catch(() => {});
-    setQuickTakeEnabled(enabled);
-    AsyncStorage.setItem(QUICK_TAKE_KEY, String(enabled)).catch(() => {});
   }, []);
 
   const fetchSnotel = useCallback(async (zoneIds: string[]) => {
@@ -200,33 +182,6 @@ export default function Index() {
       console.error("Weather forecast fetch error", err);
     } finally {
       setIsWeatherForecastLoading(false);
-    }
-  }, []);
-
-  const generateQuickTake = useCallback(async (zones: AvalancheZone[]) => {
-    if (!quickTakeEnabledRef.current || zones.length === 0) return;
-    setIsQuickTakeLoading(true);
-    try {
-      const enriched = zones.map((z) => ({
-        ...z,
-        centerId: ZONE_TO_CENTER[z.id] || "unknown",
-      }));
-      const r = await avalancheApi.generateQuickTake(enriched);
-      if (r.success && r.quickTake) {
-        setSummary((prev) =>
-          prev
-            ? {
-                ...prev,
-                quickTake: r.quickTake || prev.quickTake,
-                weatherHighlights: r.weatherHighlights || prev.weatherHighlights,
-              }
-            : prev,
-        );
-      }
-    } catch (err) {
-      console.error("Quick Take error", err);
-    } finally {
-      setIsQuickTakeLoading(false);
     }
   }, []);
 
@@ -284,7 +239,6 @@ export default function Index() {
         setIsLoading(false);
         fetchSnotel(selectedZoneIds);
         fetchWeatherForecast(selectedZoneIds);
-        generateQuickTake(cached.zones);
         return;
       }
 
@@ -335,7 +289,6 @@ export default function Index() {
         setLoadSource("live");
         fetchSnotel(selectedZoneIds);
         fetchWeatherForecast(selectedZoneIds);
-        generateQuickTake(allZones);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         Alert.alert("Error", "Failed to fetch avalanche conditions.");
@@ -347,12 +300,7 @@ export default function Index() {
     } finally {
       setIsLoading(false);
     }
-  }, [
-    selectedZoneIds,
-    fetchSnotel,
-    fetchWeatherForecast,
-    generateQuickTake,
-  ]);
+  }, [selectedZoneIds, fetchSnotel, fetchWeatherForecast]);
 
   if (!prefsLoaded) {
     return (
@@ -585,25 +533,6 @@ export default function Index() {
           >
             {isLoading ? "Loading…" : "Get current conditions"}
           </Button>
-          <Pressable
-            onPress={() => toggleQuickTake(!quickTakeEnabled)}
-            className="flex-row items-center gap-2.5"
-            hitSlop={6}
-          >
-            <Checkbox
-              checked={quickTakeEnabled}
-              onChange={() => toggleQuickTake(!quickTakeEnabled)}
-              size="sm"
-            />
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-ink-300"
-              style={{ fontSize: 11, letterSpacing: 1.4 }}
-            >
-              INCLUDE AI QUICK TAKE
-            </Text>
-          </Pressable>
         </View>
 
         {/* STATUS BAR */}
@@ -661,71 +590,6 @@ export default function Index() {
         {/* RESULTS */}
         {summary ? (
           <Animated.View style={{ opacity: fadeAnim }}>
-            {/* QUICK TAKE — full-bleed editorial moment */}
-            {quickTakeEnabled && (isQuickTakeLoading || summary.quickTake) ? (
-              <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
-                <View
-                  style={{
-                    borderRadius: 18,
-                    backgroundColor: palette.ink[900],
-                    paddingHorizontal: 22,
-                    paddingTop: 22,
-                    paddingBottom: 22,
-                    borderWidth: 0.5,
-                    borderColor: palette.frost[600],
-                    overflow: "hidden",
-                  }}
-                >
-                  <View className="flex-row items-baseline justify-between">
-                    <View className="flex-row items-baseline gap-2">
-                      <Text
-                        variant="mono"
-                        weight="medium"
-                        className="text-frost-400"
-                        style={{ fontSize: 10, letterSpacing: 2.4 }}
-                      >
-                        QUICK TAKE
-                      </Text>
-                      <Text
-                        variant="mono"
-                        className="text-ink-400"
-                        style={{ fontSize: 9, letterSpacing: 1.4 }}
-                      >
-                        AI
-                      </Text>
-                    </View>
-                    <Text
-                      variant="mono"
-                      className="text-ink-400"
-                      style={{ fontSize: 9, letterSpacing: 1.4 }}
-                    >
-                      {summary.zones.length} ZONE{summary.zones.length !== 1 ? "S" : ""}
-                    </Text>
-                  </View>
-                  {isQuickTakeLoading ? (
-                    <View className="flex-row items-center gap-2 mt-3">
-                      <ActivityIndicator size="small" color={palette.ink[300]} />
-                      <Text
-                        variant="mono"
-                        className="text-ink-300"
-                        style={{ fontSize: 11, letterSpacing: 1.2 }}
-                      >
-                        SYNTHESIZING…
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text
-                      variant="display"
-                      className="text-ink-50 mt-3"
-                      style={{ fontSize: 26, lineHeight: 34 }}
-                    >
-                      {summary.quickTake}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            ) : null}
-
             {/* MATRIX */}
             {summary.zones.length > 0 ? (
               <View style={{ paddingHorizontal: 16, marginTop: 28 }}>
@@ -898,14 +762,6 @@ export default function Index() {
                 before making travel decisions. This app summarizes — it does not
                 replace.
               </Text>
-              {quickTakeEnabled && summary.quickTake ? (
-                <Text
-                  className="text-ink-400 mt-2"
-                  style={{ fontSize: 11, lineHeight: 17 }}
-                >
-                  Quick Take is generated by AI from the forecasts above.
-                </Text>
-              ) : null}
             </View>
           </Animated.View>
         ) : null}

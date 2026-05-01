@@ -258,19 +258,6 @@ export const avalancheApi = {
     return data;
   },
 
-  async generateQuickTake(
-    zones: Array<{ id: string; centerId: string; [key: string]: any }>,
-  ): Promise<QuickTakeResponse> {
-    const { data, error } = await supabase.functions.invoke("generate-quick-take", {
-      body: { zones },
-    });
-    if (error) {
-      console.error("Error calling generate-quick-take:", error);
-      return { success: false, error: error.message };
-    }
-    return data;
-  },
-
   async getWeatherForecast(zoneIds: string[]): Promise<WeatherForecastResponse> {
     const { data, error } = await supabase.functions.invoke("get-weather-forecast", {
       body: { zoneIds },
