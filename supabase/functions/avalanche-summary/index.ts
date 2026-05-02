@@ -1270,6 +1270,8 @@ function extractProblems(forecast: any): Array<{
   size: { min: number; max: number } | null;
   aspects: Array<{ elevation: string; aspects: string[] }>;
   discussion: string | null;
+  problemDescription: string | null;
+  iconUrl: string | null;
 }> {
   const problems = forecast?.forecast_avalanche_problems || [];
   return problems.slice(0, 4).map((p: any) => {
@@ -1327,6 +1329,8 @@ function extractProblems(forecast: any): Array<{
       size,
       aspects,
       discussion: stripHtml(p.discussion),
+      problemDescription: stripHtml(p.problem_description),
+      iconUrl: typeof p.icon === 'string' ? p.icon : null,
     };
   });
 }
@@ -1412,16 +1416,21 @@ interface ZoneData {
   center: string;
   forecastUrl: string;
   forecast: Array<{ date: string; danger: { alpine: string; treeline: string; belowTreeline: string } }>;
-  problems: Array<{ 
-    name: string; 
-    likelihood: string | null; 
-    size: { min: number; max: number } | null; 
+  problems: Array<{
+    name: string;
+    likelihood: string | null;
+    size: { min: number; max: number } | null;
     aspects: Array<{ elevation: string; aspects: string[] }>;
     discussion: string | null;
+    problemDescription: string | null;
+    iconUrl: string | null;
   }>;
   weather: { snow: string; wind: string; temps: string; discussion: string | null };
   bottomLine: string;
   hazardDiscussion: string;
+  weatherDiscussion: string | null;
+  announcement: string | null;
+  author: string | null;
   freshness: {
     issueDate: string | null;
     expiresDate: string | null;
@@ -1631,7 +1640,10 @@ serve(async (req) => {
         const weather = extractWeather(forecast);
         const bottomLine = forecast.bottom_line || '';
         const hazardDiscussion = forecast.hazard_discussion || '';
-        
+        const weatherDiscussion = forecast.weather_discussion || null;
+        const announcement = forecast.announcement || null;
+        const author = forecast.author || null;
+
         if (dangerRatings) {
           console.log(`API success for ${config.name}: ${problems.length} problems, freshness=${freshness.status}`);
           const zoneData: ZoneData = {
@@ -1648,6 +1660,9 @@ serve(async (req) => {
             weather,
             bottomLine,
             hazardDiscussion,
+            weatherDiscussion: stripHtml(weatherDiscussion),
+            announcement: stripHtml(announcement),
+            author,
             freshness,
             dataSource: 'api',
             scrapedContent: null,
@@ -1676,10 +1691,17 @@ serve(async (req) => {
             center: config.centerId,
             forecastUrl: config.forecastUrl,
             forecast: uacResult.zoneData.forecast,
-            problems: uacResult.zoneData.problems,
+            problems: uacResult.zoneData.problems.map((p) => ({
+              ...p,
+              problemDescription: null,
+              iconUrl: null,
+            })),
             weather: uacResult.zoneData.weather,
             bottomLine: uacResult.zoneData.bottomLine,
             hazardDiscussion: uacResult.zoneData.hazardDiscussion,
+            weatherDiscussion: null,
+            announcement: null,
+            author: null,
             freshness: uacFreshness,
             dataSource: 'api',
             scrapedContent: null,
@@ -1718,6 +1740,9 @@ serve(async (req) => {
           weather: { snow: 'N/A', wind: 'N/A', temps: 'N/A', discussion: null },
           bottomLine: '',
           hazardDiscussion: '',
+          weatherDiscussion: null,
+          announcement: null,
+          author: null,
           freshness,
           dataSource: 'scrape',
           scrapedContent: scrapeResult.markdown.slice(0, 8000), // Limit context size
@@ -1751,6 +1776,9 @@ serve(async (req) => {
         weather: { snow: 'N/A', wind: 'N/A', temps: 'N/A', discussion: null },
         bottomLine: '',
         hazardDiscussion: '',
+        weatherDiscussion: null,
+        announcement: null,
+        author: null,
         freshness,
         dataSource: 'map-layer',
         scrapedContent: null,
@@ -2196,11 +2224,14 @@ Return valid JSON with this structure:
 
       return {
         ...zone,
-        // Override AI-generated structured fields with directly-extracted API data
-        // AI should only generate: keyMessage, travelAdvice, weatherValidation, weather narrative
+        // Structured fields come straight from the API extraction, not from
+        // any synthesis layer. We carry through every text field NAC ships.
         forecast: sourceData?.forecast || zone.forecast,
         problems: sourceData?.problems || zone.problems,
         hazardDiscussion: stripHtml(sourceData?.hazardDiscussion) || undefined,
+        weatherDiscussion: sourceData?.weatherDiscussion || undefined,
+        announcement: sourceData?.announcement || undefined,
+        author: sourceData?.author || undefined,
         forecastUrl: sourceData?.forecastUrl || zone.forecastUrl || '',
         freshness: sourceData?.freshness || {
           issueDate: null,

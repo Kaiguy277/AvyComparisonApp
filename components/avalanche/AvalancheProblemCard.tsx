@@ -99,7 +99,7 @@ export function AvalancheProblemCard({ problem }: Props) {
         </View>
       ) : null}
 
-      {problem.discussion ? (
+      {problem.problemDescription ? (
         <View
           style={{
             marginTop: 12,
@@ -114,10 +114,37 @@ export function AvalancheProblemCard({ problem }: Props) {
             className="text-ink-400"
             style={{ fontSize: 9, letterSpacing: 1.4, marginBottom: 6 }}
           >
-            DISCUSSION
+            ABOUT THIS PROBLEM
           </Text>
           <Text
-            className="text-ink-200"
+            variant="display-italic"
+            className="text-ink-300"
+            style={{ fontSize: 13, lineHeight: 19 }}
+          >
+            {problem.problemDescription}
+          </Text>
+        </View>
+      ) : null}
+
+      {problem.discussion ? (
+        <View
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTopWidth: 0.5,
+            borderColor: palette.ink[700],
+          }}
+        >
+          <Text
+            variant="mono"
+            weight="medium"
+            className="text-aspen-400"
+            style={{ fontSize: 9, letterSpacing: 1.4, marginBottom: 6 }}
+          >
+            FORECASTER NOTES · THIS ZONE
+          </Text>
+          <Text
+            className="text-ink-100"
             style={{ fontSize: 13, lineHeight: 20 }}
           >
             {problem.discussion}

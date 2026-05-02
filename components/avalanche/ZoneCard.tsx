@@ -161,27 +161,77 @@ export function ZoneCard({
           </Badge>
         </View>
 
-        {zone.forecastUrl ? (
-          <Pressable
-            onPress={() => Linking.openURL(zone.forecastUrl)}
-            className="flex-row items-center gap-1.5 mt-3"
-            hitSlop={8}
-          >
+        <View className="flex-row items-center gap-3 mt-3 flex-wrap">
+          {zone.forecastUrl ? (
+            <Pressable
+              onPress={() => Linking.openURL(zone.forecastUrl)}
+              className="flex-row items-center gap-1.5"
+              hitSlop={8}
+            >
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-frost-400"
+                style={{ fontSize: 10, letterSpacing: 1.4 }}
+              >
+                OFFICIAL FORECAST
+              </Text>
+              <Ionicons
+                name="arrow-forward-outline"
+                size={11}
+                color={palette.frost[400]}
+                style={{ transform: [{ rotate: "-45deg" }] }}
+              />
+            </Pressable>
+          ) : null}
+          {zone.author ? (
             <Text
               variant="mono"
-              weight="medium"
-              className="text-frost-400"
-              style={{ fontSize: 10, letterSpacing: 1.4 }}
+              className="text-ink-400"
+              style={{ fontSize: 10, letterSpacing: 1.2 }}
             >
-              OFFICIAL FORECAST
+              · BY {zone.author.toUpperCase()}
             </Text>
+          ) : null}
+        </View>
+
+        {/* Announcement / advisory banner — when NAC ships an alert */}
+        {zone.announcement ? (
+          <View
+            style={{
+              marginTop: 14,
+              padding: 12,
+              borderRadius: 10,
+              borderWidth: 0.5,
+              borderColor: palette.aspen[500],
+              backgroundColor: palette.aspen[500] + "1A",
+              flexDirection: "row",
+              gap: 10,
+            }}
+          >
             <Ionicons
-              name="arrow-forward-outline"
-              size={11}
-              color={palette.frost[400]}
-              style={{ transform: [{ rotate: "-45deg" }] }}
+              name="warning"
+              size={14}
+              color={palette.aspen[400]}
+              style={{ marginTop: 2 }}
             />
-          </Pressable>
+            <View style={{ flex: 1 }}>
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-aspen-400"
+                style={{ fontSize: 10, letterSpacing: 1.4, marginBottom: 4 }}
+              >
+                ANNOUNCEMENT
+              </Text>
+              <Text
+                className="text-ink-100"
+                style={{ fontSize: 13, lineHeight: 19 }}
+              >
+                {zone.announcement}
+              </Text>
+            </View>
+          </View>
         ) : null}
       </View>
 
@@ -436,18 +486,19 @@ function DayColumn({
 }
 
 // Returns true if the zone has any forecaster-level narrative worth
-// surfacing in the rollup (bottom line / snowpack). Per-problem
+// surfacing in the rollup (bottom line / snowpack / weather). Per-problem
 // discussion lives with the problem itself, not here.
 function hasForecasterDiscussion(zone: AvalancheZone): boolean {
   if (zone.travelAdvice && zone.travelAdvice.trim().length > 0) return true;
   if (zone.hazardDiscussion && zone.hazardDiscussion.trim().length > 0) return true;
+  if (zone.weatherDiscussion && zone.weatherDiscussion.trim().length > 0) return true;
   return false;
 }
 
 // The forecaster's higher-level narrative: bottom-line synthesis +
-// snowpack/conditions discussion. Per-problem prose is co-located with
-// each problem card up above, so this section stays focused on the
-// big-picture text the forecaster wrote about the zone overall.
+// snowpack discussion + weather discussion. Per-problem prose is
+// co-located with each problem card up above, so this section stays
+// focused on the big-picture text the forecaster wrote about the zone.
 function ForecasterDiscussion({ zone }: { zone: AvalancheZone }) {
   const sections: { label: string; body: string }[] = [];
   if (zone.travelAdvice && zone.travelAdvice.trim()) {
@@ -455,6 +506,9 @@ function ForecasterDiscussion({ zone }: { zone: AvalancheZone }) {
   }
   if (zone.hazardDiscussion && zone.hazardDiscussion.trim()) {
     sections.push({ label: "SNOWPACK & CONDITIONS", body: zone.hazardDiscussion.trim() });
+  }
+  if (zone.weatherDiscussion && zone.weatherDiscussion.trim()) {
+    sections.push({ label: "WEATHER DISCUSSION", body: zone.weatherDiscussion.trim() });
   }
   return (
     <View style={{ gap: 16 }}>

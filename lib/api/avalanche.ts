@@ -49,6 +49,11 @@ export interface AvalancheProblem {
   size: { min: number; max: number } | null;
   aspects: AspectElevation[];
   discussion: string | null;
+  // Generic explainer of what THIS problem TYPE is (NAC's problem_description).
+  // Same text every time you see "Storm Slab" — useful for new users.
+  problemDescription?: string | null;
+  // NAC ships an icon URL per problem. Optional — UAC/scrape paths don't have it.
+  iconUrl?: string | null;
 }
 
 export interface WeatherObservation {
@@ -111,6 +116,14 @@ export interface AvalancheZone {
   travelAdvice: string;
   freshness: ZoneFreshness;
   hazardDiscussion?: string;
+  // Per-zone weather discussion paragraph (NAC's weather_discussion).
+  // Often null on individual centers but populated on others.
+  weatherDiscussion?: string;
+  // Free-text announcement / advisory (NAC's announcement field). Rendered
+  // as an alert banner at the top of the zone card when present.
+  announcement?: string;
+  // Forecaster name (NAC's author field).
+  author?: string;
   weatherObservations?: WeatherObservation[];
   weatherValidation?: "confirmed" | "partial" | "discrepancy" | "no_data";
 }
