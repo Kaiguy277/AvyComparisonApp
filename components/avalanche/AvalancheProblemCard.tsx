@@ -2,6 +2,7 @@ import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import { Badge } from "@/components/ui/Badge";
+import { ProblemRose } from "./ProblemRose";
 import { palette } from "@/constants/design";
 import type { AvalancheProblem } from "@/lib/api/avalanche";
 
@@ -76,25 +77,54 @@ export function AvalancheProblemCard({ problem }: Props) {
               ASPECT · ELEVATION
             </Text>
           </View>
-          <View className="gap-1">
-            {problem.aspects.map((a, i) => (
-              <View key={i} className="flex-row items-baseline gap-2">
-                <Text
-                  variant="mono"
-                  weight="medium"
-                  className="text-ink-200"
-                  style={{ fontSize: 11, width: 70 }}
-                >
-                  {a.elevation.toUpperCase()}
-                </Text>
-                <Text
-                  className="text-ink-300 flex-1"
-                  style={{ fontSize: 12, lineHeight: 17 }}
-                >
-                  {a.aspects.length === 8 ? "All aspects" : a.aspects.join(" · ")}
-                </Text>
-              </View>
-            ))}
+          {/* Visual rose on the left, the same data as text on the right.
+              Rose is at-a-glance; text is for accessibility + when the rose
+              is hard to read at small sizes. */}
+          <View className="flex-row gap-3 items-start">
+            <ProblemRose aspects={problem.aspects} size={104} />
+            <View className="flex-1 gap-1.5" style={{ paddingTop: 4 }}>
+              {[
+                { key: "Alpine", label: "ABV" },
+                { key: "Treeline", label: "TL" },
+                { key: "Below Treeline", label: "BLW" },
+              ].map(({ key, label }) => {
+                const match = problem.aspects.find((a) =>
+                  a.elevation.toLowerCase().includes(key.toLowerCase().split(" ")[0]),
+                );
+                const aspectStr = match
+                  ? match.aspects.length === 8
+                    ? "All aspects"
+                    : match.aspects.join(" · ")
+                  : "—";
+                const isActive = !!match;
+                return (
+                  <View key={key} className="flex-row items-baseline gap-2">
+                    <Text
+                      variant="mono"
+                      weight="medium"
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        width: 36,
+                        color: isActive ? palette.aspen[400] : palette.ink[500],
+                      }}
+                    >
+                      {label}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        lineHeight: 17,
+                        color: isActive ? palette.ink[200] : palette.ink[500],
+                        flex: 1,
+                      }}
+                    >
+                      {aspectStr}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         </View>
       ) : null}
