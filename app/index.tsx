@@ -88,6 +88,7 @@ export default function Index() {
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>(DEFAULT_ZONE_IDS);
   const [favoriteZoneIds, setFavoriteZoneIds] = useState<string[]>([]);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const autoLoadedRef = useRef(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
   // The Compare list is collapsed by default — most users tap Favorites
   // and never need the manual selector. Open it on demand.
@@ -274,6 +275,23 @@ export default function Index() {
           ? prev.filter((id) => id !== zoneId)
           : [...prev, zoneId];
         saveFavorites(next).catch(() => {});
+        return next;
+      });
+    },
+    [],
+  );
+
+  const moveFavorite = useCallback(
+    (zoneId: string, direction: -1 | 1) => {
+      setFavoriteZoneIds((prev) => {
+        const idx = prev.indexOf(zoneId);
+        if (idx < 0) return prev;
+        const swap = idx + direction;
+        if (swap < 0 || swap >= prev.length) return prev;
+        const next = [...prev];
+        [next[idx], next[swap]] = [next[swap], next[idx]];
+        saveFavorites(next).catch(() => {});
+        Haptics.selectionAsync().catch(() => {});
         return next;
       });
     },
@@ -484,6 +502,29 @@ export default function Index() {
     }
   }, [selectedZoneIds, fetchSnotel, fetchWeatherForecast]);
 
+  // Auto-load favorites on first launch when prefs are ready and the user
+  // has any starred zones. The cache read takes ~200ms so this is invisible.
+  // Only fires once per session — pull-to-refresh / explicit fetches still work.
+  useEffect(() => {
+    if (!prefsLoaded || autoLoadedRef.current) return;
+    if (favoriteZoneIds.length === 0) return;
+    autoLoadedRef.current = true;
+    fetchSummary(favoriteZoneIds);
+  }, [prefsLoaded, favoriteZoneIds, fetchSummary]);
+
+  // Sort the displayed zones to match the favorite order so the user's
+  // chosen ordering carries through to the forecast view. Non-favorite
+  // zones (rare — only when viewing via Compare) keep their natural order.
+  const orderedZones = useMemo(() => {
+    if (!summary?.zones) return [];
+    const favIdx = new Map(favoriteZoneIds.map((id, i) => [id, i]));
+    return [...summary.zones].sort((a, b) => {
+      const ai = favIdx.has(a.id) ? favIdx.get(a.id)! : Number.MAX_SAFE_INTEGER;
+      const bi = favIdx.has(b.id) ? favIdx.get(b.id)! : Number.MAX_SAFE_INTEGER;
+      return ai - bi;
+    });
+  }, [summary, favoriteZoneIds]);
+
   if (!prefsLoaded) {
     return (
       <View
@@ -658,94 +699,119 @@ export default function Index() {
               </View>
             </CardHeader>
             <CardContent>
-              {/* PRIMARY ACTION — Favorites. One tap, fetches favorite zones,
-                  jumps straight to the forecast view. */}
-              <Pressable
-                onPress={() => {
-                  if (favoriteZoneIds.length === 0) {
-                    Alert.alert(
-                      "No favorites yet",
-                      "Tap Compare zones, expand a center, and tap the star next to a zone to favorite it.",
+              {/* Favorites list — auto-loaded on app open. Drag-style reorder
+                  via up/down arrows; tap the X to unstar.
+                  When empty, show a hint. */}
+              {favoriteZoneIds.length > 0 ? (
+                <View
+                  style={{
+                    borderRadius: 14,
+                    borderWidth: 0.5,
+                    borderColor: palette.ink[700],
+                    backgroundColor: palette.ink[900],
+                    paddingVertical: 6,
+                    marginBottom: 12,
+                  }}
+                >
+                  {favoriteZoneIds.map((id, i) => {
+                    const z = AVAILABLE_ZONES.find((x) => x.id === id);
+                    const isFirst = i === 0;
+                    const isLast = i === favoriteZoneIds.length - 1;
+                    return (
+                      <View
+                        key={id}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderTopWidth: i === 0 ? 0 : 0.5,
+                          borderColor: palette.ink[700] + "80",
+                        }}
+                      >
+                        <Ionicons name="star" size={13} color={palette.aspen[400]} />
+                        <Text
+                          className="text-ink-100 flex-1"
+                          style={{ fontSize: 14, marginLeft: 10 }}
+                          numberOfLines={1}
+                        >
+                          {z?.name || id}
+                        </Text>
+                        <Pressable
+                          onPress={() => moveFavorite(id, -1)}
+                          disabled={isFirst}
+                          hitSlop={6}
+                          style={{ paddingHorizontal: 6, opacity: isFirst ? 0.25 : 1 }}
+                        >
+                          <Ionicons
+                            name="chevron-up"
+                            size={16}
+                            color={palette.ink[200]}
+                          />
+                        </Pressable>
+                        <Pressable
+                          onPress={() => moveFavorite(id, 1)}
+                          disabled={isLast}
+                          hitSlop={6}
+                          style={{ paddingHorizontal: 6, opacity: isLast ? 0.25 : 1 }}
+                        >
+                          <Ionicons
+                            name="chevron-down"
+                            size={16}
+                            color={palette.ink[200]}
+                          />
+                        </Pressable>
+                        <Pressable
+                          onPress={() => toggleFavorite(id)}
+                          hitSlop={6}
+                          style={{ paddingLeft: 8, paddingRight: 4 }}
+                        >
+                          <Ionicons
+                            name="close"
+                            size={16}
+                            color={palette.ink[400]}
+                          />
+                        </Pressable>
+                      </View>
                     );
-                    return;
-                  }
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                  fetchSummary(favoriteZoneIds);
-                }}
-                disabled={isLoading}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  paddingVertical: 18,
-                  paddingHorizontal: 18,
-                  borderRadius: 16,
-                  backgroundColor:
-                    favoriteZoneIds.length > 0
-                      ? palette.aspen[500]
-                      : palette.ink[800],
-                  borderWidth: 0.5,
-                  borderColor:
-                    favoriteZoneIds.length > 0
-                      ? palette.aspen[500]
-                      : palette.ink[600],
-                  opacity: isLoading ? 0.5 : 1,
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-                  <Ionicons
-                    name="star"
-                    size={20}
-                    color={
-                      favoriteZoneIds.length > 0
-                        ? palette.ink[950]
-                        : palette.ink[400]
-                    }
-                  />
-                  <View>
-                    <Text
-                      variant="mono"
-                      weight="bold"
-                      style={{
-                        fontSize: 13,
-                        letterSpacing: 1.6,
-                        color:
-                          favoriteZoneIds.length > 0
-                            ? palette.ink[950]
-                            : palette.ink[200],
-                      }}
-                    >
-                      MY FAVORITES
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        marginTop: 2,
-                        color:
-                          favoriteZoneIds.length > 0
-                            ? "rgba(31, 15, 0, 0.7)"
-                            : palette.ink[400],
-                      }}
-                    >
-                      {favoriteZoneIds.length > 0
-                        ? `${favoriteZoneIds.length} zone${favoriteZoneIds.length === 1 ? "" : "s"} · tap to view`
-                        : "No zones starred yet"}
-                    </Text>
-                  </View>
+                  })}
                 </View>
-                <Ionicons
-                  name="arrow-forward"
-                  size={18}
-                  color={
-                    favoriteZoneIds.length > 0
-                      ? palette.ink[950]
-                      : palette.ink[400]
-                  }
-                />
-              </Pressable>
+              ) : (
+                <View
+                  style={{
+                    paddingVertical: 14,
+                    paddingHorizontal: 14,
+                    borderRadius: 14,
+                    borderWidth: 0.5,
+                    borderColor: palette.ink[700],
+                    backgroundColor: palette.ink[900],
+                    marginBottom: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <Ionicons name="star-outline" size={16} color={palette.ink[400]} />
+                  <Text
+                    className="text-ink-300 flex-1"
+                    style={{ fontSize: 13, lineHeight: 18 }}
+                  >
+                    Star zones below to keep them on this screen and cached for
+                    offline use.
+                  </Text>
+                </View>
+              )}
 
-              {/* SECONDARY ACTIONS — Compare + Map */}
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+              {/* Browse zones outside your favorites — by list or by map. */}
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-ink-400"
+                style={{ fontSize: 10, letterSpacing: 1.6, marginBottom: 8 }}
+              >
+                BROWSE OTHER ZONES
+              </Text>
+              <View style={{ flexDirection: "row", gap: 10 }}>
                 <Pressable
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {});
@@ -753,11 +819,8 @@ export default function Index() {
                   }}
                   style={{
                     flex: 1,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    paddingVertical: 13,
+                    paddingVertical: 12,
+                    paddingHorizontal: 12,
                     borderRadius: 12,
                     borderWidth: 0.5,
                     borderColor: compareOpen ? palette.frost[400] : palette.ink[600],
@@ -766,21 +829,29 @@ export default function Index() {
                       : "transparent",
                   }}
                 >
-                  <Ionicons
-                    name="list-outline"
-                    size={14}
-                    color={compareOpen ? palette.frost[400] : palette.ink[200]}
-                  />
+                  <View className="flex-row items-center gap-2">
+                    <Ionicons
+                      name="list-outline"
+                      size={14}
+                      color={compareOpen ? palette.frost[400] : palette.ink[200]}
+                    />
+                    <Text
+                      variant="mono"
+                      weight="medium"
+                      style={{
+                        fontSize: 11,
+                        letterSpacing: 1.4,
+                        color: compareOpen ? palette.frost[400] : palette.ink[200],
+                      }}
+                    >
+                      PICK FROM LIST
+                    </Text>
+                  </View>
                   <Text
-                    variant="mono"
-                    weight="medium"
-                    style={{
-                      fontSize: 11,
-                      letterSpacing: 1.4,
-                      color: compareOpen ? palette.frost[400] : palette.ink[200],
-                    }}
+                    className="text-ink-400"
+                    style={{ fontSize: 11, marginTop: 3 }}
                   >
-                    COMPARE
+                    Compare zones from any center
                   </Text>
                 </Pressable>
                 <Pressable
@@ -790,24 +861,33 @@ export default function Index() {
                   }}
                   style={{
                     flex: 1,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    paddingVertical: 13,
+                    paddingVertical: 12,
+                    paddingHorizontal: 12,
                     borderRadius: 12,
                     borderWidth: 0.5,
                     borderColor: palette.ink[600],
                   }}
                 >
-                  <Ionicons name="map-outline" size={14} color={palette.ink[200]} />
+                  <View className="flex-row items-center gap-2">
+                    <Ionicons
+                      name="map-outline"
+                      size={14}
+                      color={palette.ink[200]}
+                    />
+                    <Text
+                      variant="mono"
+                      weight="medium"
+                      className="text-ink-200"
+                      style={{ fontSize: 11, letterSpacing: 1.4 }}
+                    >
+                      PICK ON MAP
+                    </Text>
+                  </View>
                   <Text
-                    variant="mono"
-                    weight="medium"
-                    className="text-ink-200"
-                    style={{ fontSize: 11, letterSpacing: 1.4 }}
+                    className="text-ink-400"
+                    style={{ fontSize: 11, marginTop: 3 }}
                   >
-                    OPEN MAP
+                    Find by location
                   </Text>
                 </Pressable>
               </View>
@@ -946,7 +1026,7 @@ export default function Index() {
             {/* MATRIX */}
             {summary.zones.length > 0 ? (
               <View style={{ paddingHorizontal: 16, marginTop: 28 }}>
-                <ZoneComparisonMatrix zones={summary.zones} />
+                <ZoneComparisonMatrix zones={orderedZones} />
               </View>
             ) : null}
 
@@ -979,7 +1059,7 @@ export default function Index() {
                   </Text>
                 </View>
                 <View style={{ paddingHorizontal: 16, gap: 14 }}>
-                  {summary.zones.map((zone) => (
+                  {orderedZones.map((zone) => (
                     <ZoneCard
                       key={zone.id}
                       zone={zone}
