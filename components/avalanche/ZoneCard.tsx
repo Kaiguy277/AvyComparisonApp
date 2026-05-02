@@ -276,14 +276,15 @@ export function ZoneCard({
           >
             <View className="gap-2">
               {zone.problems.map((p, i) => (
-                <AvalancheProblemCard key={i} problem={p} hideDiscussion />
+                <AvalancheProblemCard key={i} problem={p} />
               ))}
             </View>
           </Collapsible>
         ) : null}
 
-        {/* Forecaster's full narrative — bottom line + per-problem prose +
-            snowpack discussion all in one place. The "dig deeper" section. */}
+        {/* Forecaster's higher-level narrative — bottom line + snowpack
+            discussion. The per-problem narratives live with each problem
+            up above, so this rollup stays focused on the bigger picture. */}
         {hasForecasterDiscussion(zone) ? (
           <Collapsible
             leadingAccent={palette.frost[500]}
@@ -434,18 +435,19 @@ function DayColumn({
   );
 }
 
-// Returns true if there's any text-heavy field worth surfacing in the
-// "Forecaster Discussion" rollup. Keeps the section hidden for sparse zones.
+// Returns true if the zone has any forecaster-level narrative worth
+// surfacing in the rollup (bottom line / snowpack). Per-problem
+// discussion lives with the problem itself, not here.
 function hasForecasterDiscussion(zone: AvalancheZone): boolean {
   if (zone.travelAdvice && zone.travelAdvice.trim().length > 0) return true;
   if (zone.hazardDiscussion && zone.hazardDiscussion.trim().length > 0) return true;
-  return (zone.problems || []).some(
-    (p) => p.discussion && p.discussion.trim().length > 0,
-  );
+  return false;
 }
 
-// Concatenates everything text-heavy in the order a forecaster would
-// typically write it — bottom line → snowpack → per-problem narratives.
+// The forecaster's higher-level narrative: bottom-line synthesis +
+// snowpack/conditions discussion. Per-problem prose is co-located with
+// each problem card up above, so this section stays focused on the
+// big-picture text the forecaster wrote about the zone overall.
 function ForecasterDiscussion({ zone }: { zone: AvalancheZone }) {
   const sections: { label: string; body: string }[] = [];
   if (zone.travelAdvice && zone.travelAdvice.trim()) {
@@ -453,14 +455,6 @@ function ForecasterDiscussion({ zone }: { zone: AvalancheZone }) {
   }
   if (zone.hazardDiscussion && zone.hazardDiscussion.trim()) {
     sections.push({ label: "SNOWPACK & CONDITIONS", body: zone.hazardDiscussion.trim() });
-  }
-  for (const p of zone.problems || []) {
-    if (p.discussion && p.discussion.trim()) {
-      sections.push({
-        label: p.name.toUpperCase(),
-        body: p.discussion.trim(),
-      });
-    }
   }
   return (
     <View style={{ gap: 16 }}>
