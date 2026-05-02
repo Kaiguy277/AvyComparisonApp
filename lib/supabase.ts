@@ -5,6 +5,11 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
+// Diagnostic — confirms which project the running bundle is pointed at.
+// If this logs the old Lovable URL after we've migrated, the bundle is
+// stale; restart metro with --clear and force-quit Expo Go.
+console.log(`[supabase] using URL ${SUPABASE_URL}`);
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: AsyncStorage,

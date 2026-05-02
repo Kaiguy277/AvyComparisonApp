@@ -231,6 +231,16 @@ export const avalancheApi = {
     });
     if (error) {
       console.error("Error calling avalanche-summary:", error);
+      // FunctionsHttpError stashes the raw Response on .context — log
+      // status + body so we can see what the function actually returned.
+      try {
+        const ctx = (error as any)?.context;
+        if (ctx instanceof Response) {
+          const status = ctx.status;
+          const text = await ctx.clone().text();
+          console.error(`avalanche-summary HTTP ${status}: ${text.slice(0, 500)}`);
+        }
+      } catch {}
       return { success: false, error: error.message };
     }
     return data;
