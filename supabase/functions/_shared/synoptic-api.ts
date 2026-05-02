@@ -422,13 +422,113 @@ function predominantWindDir(vals: (number | null)[], hours: number): string | nu
 }
 
 /**
- * Fetch observations for multiple stations
+ * Fetch observations for multiple stations in a SINGLE Synoptic API call.
+ *
+ * Synoptic's /stations/timeseries endpoint accepts a comma-separated `stid`
+ * list and returns one STATION entry per station — letting us pull every
+ * SNOTEL the app cares about with one HTTP request instead of N. This is
+ * essential for staying under the free-tier 5K calls/day limit (~6,600
+ * calls/day at the previous one-call-per-station rate vs ~24/day batched).
+ *
+ * Cache hits short-circuit individual stations; only cache misses hit the
+ * network. The batched fetch is split into chunks of 50 stids to stay well
+ * under any URL-length / payload-size practical bounds.
  */
 export async function fetchMultipleStations(
   stations: Array<{ triplet: string; name: string; elevation: number }>
 ): Promise<StationObservation[]> {
-  const results = await Promise.all(
-    stations.map(s => fetchStationObservations(s.triplet, s.name, s.elevation))
-  );
-  return results.filter((r): r is StationObservation => r !== null);
+  if (stations.length === 0) return [];
+
+  const token = Deno.env.get("SYNOPTIC_API_TOKEN");
+  if (!token) {
+    console.error("SYNOPTIC_API_TOKEN not configured");
+    return [];
+  }
+
+  // Pull a metadata map once so we can rebuild StationObservation in order.
+  const meta = new Map(stations.map((s) => [s.triplet, s]));
+  const cached: StationObservation[] = [];
+  const toFetch: string[] = [];
+  for (const s of stations) {
+    const c = WEATHER_CACHE.get(s.triplet);
+    if (c && Date.now() - c.fetchedAt.getTime() < CACHE_TTL_MS) {
+      if (c.data) cached.push(c.data);
+    } else {
+      toFetch.push(s.triplet);
+    }
+  }
+  if (toFetch.length === 0) return cached;
+
+  const end = new Date();
+  const start = new Date(end.getTime() - 168 * 60 * 60 * 1000);
+  const startStr = formatDateParam(start);
+  const endStr = formatDateParam(end);
+
+  const fieldMap: Record<string, string> = {
+    air_temp_set_1: "TOBS",
+    snow_depth_set_1: "SNWD",
+    precip_accum_set_1: "PREC",
+    snow_water_equiv_set_1: "WTEQ",
+    wind_speed_set_1: "WSPD",
+    wind_direction_set_1: "WDIR",
+    wind_gust_set_1: "WSPDX",
+  };
+
+  const fetched: StationObservation[] = [];
+  const CHUNK = 50;
+  for (let i = 0; i < toFetch.length; i += CHUNK) {
+    const chunk = toFetch.slice(i, i + CHUNK);
+    const url =
+      `${SYNOPTIC_BASE}/stations/timeseries?token=${token}` +
+      `&stid=${chunk.join(",")}` +
+      `&vars=${SYNOPTIC_VARS}&units=english` +
+      `&start=${startStr}&end=${endStr}&obtimezone=utc`;
+
+    let res: Response;
+    try {
+      res = await fetch(url);
+    } catch (err) {
+      console.error(`Synoptic batch fetch failed (${chunk.length} stids):`, err);
+      continue;
+    }
+    if (!res.ok) {
+      console.error(`Synoptic batch HTTP ${res.status} (${chunk.length} stids)`);
+      continue;
+    }
+    let data: any;
+    try {
+      data = await res.json();
+    } catch (err) {
+      console.error("Synoptic batch JSON parse failed:", err);
+      continue;
+    }
+    if (data.SUMMARY?.RESPONSE_CODE !== 1) {
+      console.error(`Synoptic batch error: ${data.SUMMARY?.RESPONSE_MESSAGE}`);
+      continue;
+    }
+    const stationsArr: any[] = data.STATION || [];
+    console.log(
+      `Synoptic batch: requested ${chunk.length}, returned ${stationsArr.length}`,
+    );
+
+    // Synoptic returns stations in arbitrary order — match by STID.
+    for (const st of stationsArr) {
+      const stid: string = st.STID || st.stid;
+      if (!stid) continue;
+      const m = meta.get(stid);
+      if (!m) continue;
+
+      const obs = st.OBSERVATIONS || {};
+      const timestamps: string[] = obs.date_time || [];
+      const tsData: TimeseriesData = { timestamps, values: new Map() };
+      for (const [synField, code] of Object.entries(fieldMap)) {
+        if (obs[synField]) tsData.values.set(code, obs[synField]);
+      }
+      const observation = buildObservation(tsData, stid, m.name, m.elevation);
+      WEATHER_CACHE.set(stid, { data: observation, fetchedAt: new Date() });
+      fetched.push(observation);
+    }
+  }
+
+  return [...cached, ...fetched];
 }

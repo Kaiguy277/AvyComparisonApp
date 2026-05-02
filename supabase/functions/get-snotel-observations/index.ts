@@ -1,14 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { fetchMultipleStations } from '../_shared/synoptic-api.ts';
-import { getStationsForZone } from '../_shared/weather-station-config.ts';
+import { fetchMultipleStations } from "../_shared/synoptic-api.ts";
+import { getStationsForZone } from "../_shared/weather-station-config.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -18,46 +18,77 @@ serve(async (req) => {
 
     if (zoneIds.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'No zone IDs provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: "No zone IDs provided" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     console.log(`Fetching SNOTEL observations for ${zoneIds.length} zones`);
 
-    const results: Record<string, any[]> = {};
+    // Build the union of every station across all requested zones, plus a
+    // back-reference so we can redistribute observations to zones afterward.
+    // This lets us fire ONE batched Synoptic call even when many zones share
+    // stations or when 92 zones each have a few — instead of 92 parallel
+    // requests that Synoptic throttles, we get one (or a small handful at
+    // 50-stid chunks) call total.
+    const stationMeta = new Map<
+      string,
+      { triplet: string; name: string; elevation: number }
+    >();
+    const zoneStations = new Map<string, string[]>(); // zoneId -> [triplet]
 
-    const fetchPromises = zoneIds.map(async (zoneId) => {
+    for (const zoneId of zoneIds) {
       const stations = getStationsForZone(zoneId);
-      if (stations.length === 0) {
-        console.log(`No weather stations configured for ${zoneId}`);
-        results[zoneId] = [];
-        return;
+      const triplets: string[] = [];
+      for (const s of stations) {
+        triplets.push(s.triplet);
+        if (!stationMeta.has(s.triplet)) {
+          stationMeta.set(s.triplet, {
+            triplet: s.triplet,
+            name: s.name,
+            elevation: s.elevation,
+          });
+        }
       }
+      zoneStations.set(zoneId, triplets);
+    }
 
-      console.log(`Fetching ${stations.length} stations for ${zoneId}`);
-      const observations = await fetchMultipleStations(
-        stations.map(s => ({ triplet: s.triplet, name: s.name, elevation: s.elevation }))
-      );
-      results[zoneId] = observations;
-    });
+    // One batched fetch for every unique station across the request.
+    const allStations = Array.from(stationMeta.values());
+    console.log(
+      `Batched Synoptic request: ${allStations.length} unique stations across ${zoneIds.length} zones`,
+    );
+    const observations = await fetchMultipleStations(allStations);
+    const obsByTriplet = new Map(
+      observations.map((o) => [o.stationTriplet, o]),
+    );
 
-    await Promise.all(fetchPromises);
+    // Redistribute results back to zones (a station can serve multiple zones).
+    const results: Record<string, any[]> = {};
+    for (const zoneId of zoneIds) {
+      const triplets = zoneStations.get(zoneId) || [];
+      results[zoneId] = triplets
+        .map((t) => obsByTriplet.get(t))
+        .filter((o): o is NonNullable<typeof o> => o !== undefined);
+    }
 
-    console.log(`SNOTEL fetch complete. Zones with data: ${Object.keys(results).filter(k => results[k].length > 0).length}`);
+    const populated = Object.values(results).filter((v) => v.length > 0).length;
+    console.log(
+      `SNOTEL fetch complete. Zones with data: ${populated}/${zoneIds.length}`,
+    );
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        observations: results,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, observations: results }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error('Error in get-snotel-observations:', error);
+    console.error("Error in get-snotel-observations:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
