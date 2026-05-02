@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Image,
   Linking,
   Modal,
@@ -15,6 +16,17 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import NetInfo from "@react-native-community/netinfo";
+import {
+  ageHours,
+  formatAge,
+  isStale,
+  loadFavorites,
+  loadSnapshot,
+  saveFavorites,
+  saveSnapshot,
+  type FavoritesSnapshot,
+} from "@/lib/offlineCache";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -74,6 +86,7 @@ export default function Index() {
   const insets = useSafeAreaInsets();
 
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>(DEFAULT_ZONE_IDS);
+  const [favoriteZoneIds, setFavoriteZoneIds] = useState<string[]>([]);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
 
@@ -84,9 +97,15 @@ export default function Index() {
   const [summary, setSummary] = useState<AvalancheSummary | null>(null);
   const [scrapedAt, setScrapedAt] = useState<string | null>(null);
   const [zonesScraped, setZonesScraped] = useState<ScrapedZoneInfo[]>([]);
-  const [loadSource, setLoadSource] = useState<"cached" | "live" | null>(null);
+  const [loadSource, setLoadSource] = useState<"cached" | "live" | "offline" | null>(null);
   const [weatherForecastData, setWeatherForecastData] =
     useState<WeatherForecastBundle | null>(null);
+
+  // Offline cache state — keeps the last-known-good bundle for favorite zones
+  // available even when the phone has no service.
+  const [snapshot, setSnapshot] = useState<FavoritesSnapshot | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+  const lastBgFetchRef = useRef<number>(0);
 
   // Subtle reveal anim when results arrive
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -114,11 +133,15 @@ export default function Index() {
     };
   }, []);
 
-  // Load saved prefs
+  // Load saved prefs + offline snapshot
   useEffect(() => {
     (async () => {
       try {
-        const savedZones = await AsyncStorage.getItem(ZONE_PREFS_KEY);
+        const [savedZones, favs, snap] = await Promise.all([
+          AsyncStorage.getItem(ZONE_PREFS_KEY),
+          loadFavorites(),
+          loadSnapshot(),
+        ]);
         if (savedZones) {
           const parsed = JSON.parse(savedZones);
           if (Array.isArray(parsed)) {
@@ -128,6 +151,8 @@ export default function Index() {
             setSelectedZoneIds(valid);
           }
         }
+        setFavoriteZoneIds(favs);
+        setSnapshot(snap);
       } catch (err) {
         console.warn("Failed to load preferences", err);
       } finally {
@@ -136,10 +161,181 @@ export default function Index() {
     })();
   }, []);
 
+  // Network state — drives the OFFLINE banner and disables the live fetch.
+  useEffect(() => {
+    const sub = NetInfo.addEventListener((state) => {
+      setIsOnline(state.isConnected !== false && state.isInternetReachable !== false);
+    });
+    return () => sub();
+  }, []);
+
+  // Auto-refresh favorites when the app comes back to the foreground. Skips
+  // if we're offline, if there are no favorites, or if we already fetched
+  // within the last 30 minutes. Refresh runs even if the user hasn't tapped
+  // anything — the goal is "the cache is fresh when you drive out of service".
+  const refreshFavoritesInBackground = useCallback(async () => {
+    if (!isOnline || favoriteZoneIds.length === 0) return;
+    const now = Date.now();
+    if (now - lastBgFetchRef.current < 30 * 60 * 1000) return;
+    lastBgFetchRef.current = now;
+    try {
+      const groups = new Map<string, string[]>();
+      for (const id of favoriteZoneIds) {
+        const info = AVAILABLE_ZONES.find((z) => z.id === id);
+        const c = info?.center || "UNKNOWN";
+        if (!groups.has(c)) groups.set(c, []);
+        groups.get(c)!.push(id);
+      }
+      const allZones: AvalancheZone[] = [];
+      for (const [, zoneIds] of groups) {
+        const r = await avalancheApi.getSummary(zoneIds);
+        if (r.success && r.summary) allZones.push(...r.summary.zones);
+      }
+      const [snotelR, weatherR] = await Promise.all([
+        avalancheApi.getSnotelObservations(favoriteZoneIds),
+        avalancheApi.getWeatherForecast(favoriteZoneIds),
+      ]);
+      // Merge SNOTEL into the zone records before persisting.
+      const stationMap = snotelR.observations || {};
+      for (const z of allZones) {
+        if (stationMap[z.id]) z.weatherObservations = stationMap[z.id];
+      }
+      const next: FavoritesSnapshot =
+        (await loadSnapshot()) || { fetchedAt: "", zones: {} };
+      const favSet = new Set(favoriteZoneIds);
+      for (const z of allZones) {
+        if (!favSet.has(z.id)) continue;
+        const cid = ZONE_TO_CENTER[z.id];
+        next.zones[z.id] = {
+          forecast: z,
+          stations: z.weatherObservations,
+          weather: weatherR.success
+            ? {
+                nacWeather: cid ? weatherR.centerWeather?.[cid] : undefined,
+                nwsForecast: weatherR.zoneNwsForecasts?.[z.id],
+                avgDiscussion: cid ? weatherR.centerAvgDiscussions?.[cid] : undefined,
+                avgLocations: weatherR.zoneAvgLocations?.[z.id],
+              }
+            : undefined,
+          cachedAt: new Date().toISOString(),
+        };
+      }
+      next.fetchedAt = new Date().toISOString();
+      await saveSnapshot(next);
+      setSnapshot(next);
+      console.log(`[bg-refresh] cached ${allZones.length} favorite zones`);
+    } catch (err) {
+      console.warn("[bg-refresh] failed", err);
+    }
+  }, [isOnline, favoriteZoneIds]);
+
+  // Trigger background refresh on mount + every time the app becomes active.
+  useEffect(() => {
+    refreshFavoritesInBackground();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshFavoritesInBackground();
+    });
+    return () => sub.remove();
+  }, [refreshFavoritesInBackground]);
+
   const updateSelectedZones = useCallback((zoneIds: string[]) => {
     setSelectedZoneIds(zoneIds);
     AsyncStorage.setItem(ZONE_PREFS_KEY, JSON.stringify(zoneIds)).catch(() => {});
   }, []);
+
+  // Hydrate the screen state from the offline snapshot — used by the
+  // OFFLINE banner's "Load" button so a backcountry user without service
+  // can still see their last-known forecast + station data.
+  const loadFromSnapshot = useCallback(async () => {
+    const snap = await loadSnapshot();
+    if (!snap || Object.keys(snap.zones).length === 0) {
+      Alert.alert(
+        "No cached forecast",
+        "Add favorites and fetch a forecast while online to enable offline mode.",
+      );
+      return;
+    }
+    const zones = Object.values(snap.zones).map((s) => s.forecast);
+    setSummary({
+      quickTake: "",
+      zones,
+      weatherHighlights: "",
+      bottomLine: "",
+    });
+    setScrapedAt(snap.fetchedAt);
+    setLoadSource("offline");
+    // Build the weather forecast bundle from the cached per-zone weather
+    const bundle: WeatherForecastBundle = {
+      centerWeather: {},
+      zoneNwsForecasts: {},
+      centerAvgDiscussions: {},
+      zoneAvgLocations: {},
+    };
+    for (const [zoneId, snapZone] of Object.entries(snap.zones)) {
+      const cid = ZONE_TO_CENTER[zoneId];
+      const w = snapZone.weather;
+      if (!w) continue;
+      if (cid && w.nacWeather) bundle.centerWeather[cid] = w.nacWeather;
+      if (w.nwsForecast) bundle.zoneNwsForecasts[zoneId] = w.nwsForecast;
+      if (cid && w.avgDiscussion) bundle.centerAvgDiscussions[cid] = w.avgDiscussion;
+      if (w.avgLocations) bundle.zoneAvgLocations[zoneId] = w.avgLocations;
+    }
+    setWeatherForecastData(bundle);
+  }, []);
+
+  const toggleFavorite = useCallback(
+    (zoneId: string) => {
+      setFavoriteZoneIds((prev) => {
+        const next = prev.includes(zoneId)
+          ? prev.filter((id) => id !== zoneId)
+          : [...prev, zoneId];
+        saveFavorites(next).catch(() => {});
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Persist any favorite-zone data into the offline snapshot whenever the
+  // in-memory summary or weather bundle changes. Only favorites are written
+  // — random one-off selections shouldn't bloat AsyncStorage.
+  useEffect(() => {
+    if (!summary || favoriteZoneIds.length === 0) return;
+    const favSet = new Set(favoriteZoneIds);
+    (async () => {
+      const next: FavoritesSnapshot =
+        (await loadSnapshot()) || { fetchedAt: "", zones: {} };
+      let touched = false;
+      for (const z of summary.zones) {
+        if (!favSet.has(z.id)) continue;
+        const centerId = ZONE_TO_CENTER[z.id];
+        const wf = weatherForecastData
+          ? {
+              nacWeather: centerId
+                ? weatherForecastData.centerWeather[centerId]
+                : undefined,
+              nwsForecast: weatherForecastData.zoneNwsForecasts[z.id],
+              avgDiscussion: centerId
+                ? weatherForecastData.centerAvgDiscussions[centerId]
+                : undefined,
+              avgLocations: weatherForecastData.zoneAvgLocations[z.id],
+            }
+          : undefined;
+        next.zones[z.id] = {
+          forecast: z,
+          stations: z.weatherObservations || next.zones[z.id]?.stations,
+          weather: wf || next.zones[z.id]?.weather,
+          cachedAt: new Date().toISOString(),
+        };
+        touched = true;
+      }
+      if (touched) {
+        next.fetchedAt = new Date().toISOString();
+        await saveSnapshot(next);
+        setSnapshot(next);
+      }
+    })();
+  }, [summary, weatherForecastData, favoriteZoneIds]);
 
   const fetchSnotel = useCallback(async (zoneIds: string[]) => {
     setIsSnotelLoading(true);
@@ -313,6 +509,78 @@ export default function Index() {
           />
         }
       >
+        {/* OFFLINE BANNER — appears the moment the network drops. If we have
+            a cached snapshot for favorites, offer a one-tap load. */}
+        {isOnline === false ? (
+          <View
+            style={{
+              marginTop: 8,
+              marginHorizontal: 16,
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              borderRadius: 12,
+              borderWidth: 0.5,
+              borderColor: snapshot && isStale(snapshot.fetchedAt)
+                ? "#FCA5A5"
+                : palette.aspen[500],
+              backgroundColor: snapshot && isStale(snapshot.fetchedAt)
+                ? "rgba(252, 165, 165, 0.10)"
+                : palette.aspen[500] + "1A",
+            }}
+          >
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-row items-center gap-2 flex-1">
+                <Ionicons
+                  name="cloud-offline-outline"
+                  size={16}
+                  color={
+                    snapshot && isStale(snapshot.fetchedAt)
+                      ? "#FCA5A5"
+                      : palette.aspen[400]
+                  }
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: 1.4,
+                      color:
+                        snapshot && isStale(snapshot.fetchedAt)
+                          ? "#FCA5A5"
+                          : palette.aspen[400],
+                    }}
+                  >
+                    {snapshot && isStale(snapshot.fetchedAt) ? "STALE" : "OFFLINE"}
+                  </Text>
+                  <Text
+                    className="text-ink-200"
+                    style={{ fontSize: 12, marginTop: 2 }}
+                  >
+                    {snapshot
+                      ? `Cached ${formatAge(snapshot.fetchedAt)} · ${
+                          Object.keys(snapshot.zones).length
+                        } favorite${
+                          Object.keys(snapshot.zones).length === 1 ? "" : "s"
+                        }`
+                      : "No cache available. Favorite zones to enable offline mode."}
+                  </Text>
+                </View>
+              </View>
+              {snapshot && Object.keys(snapshot.zones).length > 0 ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onPress={() => loadFromSnapshot()}
+                >
+                  Load
+                </Button>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
         {/* HERO */}
         <View style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 28 }}>
           <View className="flex-row items-center gap-2.5 mb-4">
@@ -454,6 +722,8 @@ export default function Index() {
               <HierarchicalZoneSelector
                 selectedZoneIds={selectedZoneIds}
                 onSelectionChange={updateSelectedZones}
+                favoriteZoneIds={favoriteZoneIds}
+                onFavoriteToggle={toggleFavorite}
               />
               <View
                 className="flex-row gap-2 mt-4"

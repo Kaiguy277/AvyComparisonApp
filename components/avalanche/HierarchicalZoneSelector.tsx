@@ -18,6 +18,11 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 interface Props {
   selectedZoneIds: string[];
   onSelectionChange: (zoneIds: string[]) => void;
+  // Optional favorites integration. When provided, each zone row shows a
+  // star toggle that's independent of the working selection — favorites
+  // get auto-refreshed and cached on-device.
+  favoriteZoneIds?: string[];
+  onFavoriteToggle?: (zoneId: string) => void;
 }
 
 const animateNext = () =>
@@ -30,7 +35,10 @@ const animateNext = () =>
 export function HierarchicalZoneSelector({
   selectedZoneIds,
   onSelectionChange,
+  favoriteZoneIds,
+  onFavoriteToggle,
 }: Props) {
+  const favSet = favoriteZoneIds ? new Set(favoriteZoneIds) : null;
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedCenters, setExpandedCenters] = useState<Set<string>>(
     new Set(REGION_STRUCTURE.flatMap((r) => r.centers.map((c) => `${r.id}-${c.id}`))),
@@ -227,27 +235,49 @@ export function HierarchicalZoneSelector({
                         >
                           {center.zones.map((zone) => {
                             const sel = selectedZoneIds.includes(zone.id);
+                            const isFav = favSet?.has(zone.id) ?? false;
                             return (
-                              <Pressable
+                              <View
                                 key={zone.id}
-                                onPress={() => handleZoneToggle(zone.id)}
                                 className="flex-row items-center"
                                 style={{ paddingVertical: 10 }}
                               >
-                                <View style={{ marginRight: 12 }}>
-                                  <Checkbox
-                                    checked={sel}
-                                    onChange={() => handleZoneToggle(zone.id)}
-                                  />
-                                </View>
-                                <Text
-                                  weight={sel ? "medium" : "regular"}
-                                  className={sel ? "text-ink-50" : "text-ink-200"}
-                                  style={{ fontSize: 16 }}
+                                <Pressable
+                                  onPress={() => handleZoneToggle(zone.id)}
+                                  className="flex-row items-center flex-1"
+                                  hitSlop={4}
                                 >
-                                  {zone.name}
-                                </Text>
-                              </Pressable>
+                                  <View style={{ marginRight: 12 }}>
+                                    <Checkbox
+                                      checked={sel}
+                                      onChange={() => handleZoneToggle(zone.id)}
+                                    />
+                                  </View>
+                                  <Text
+                                    weight={sel ? "medium" : "regular"}
+                                    className={sel ? "text-ink-50" : "text-ink-200"}
+                                    style={{ fontSize: 16 }}
+                                  >
+                                    {zone.name}
+                                  </Text>
+                                </Pressable>
+                                {onFavoriteToggle ? (
+                                  <Pressable
+                                    onPress={() => {
+                                      Haptics.selectionAsync().catch(() => {});
+                                      onFavoriteToggle(zone.id);
+                                    }}
+                                    hitSlop={10}
+                                    style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+                                  >
+                                    <Ionicons
+                                      name={isFav ? "star" : "star-outline"}
+                                      size={18}
+                                      color={isFav ? palette.aspen[400] : palette.ink[500]}
+                                    />
+                                  </Pressable>
+                                ) : null}
+                              </View>
                             );
                           })}
                         </View>

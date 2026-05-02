@@ -10,12 +10,19 @@ import { AvalancheProblemCard } from "./AvalancheProblemCard";
 import { WeatherStationCard } from "./WeatherStationCard";
 import { WeatherForecastCard } from "./WeatherForecastCard";
 import { dangerColors, freshness, palette } from "@/constants/design";
+import { ZONE_TO_CENTER } from "@/lib/zones";
 import type {
   AvalancheZone,
   DangerRating,
   ElevationDanger,
   ZoneWeatherForecast,
 } from "@/lib/api/avalanche";
+
+// Resolve a zone to its avalanche-center ID so we can deep-link to the
+// official observations page (avalanche.org aggregates obs per center).
+function centerIdFor(zone: AvalancheZone): string {
+  return ZONE_TO_CENTER[zone.id] || "";
+}
 
 interface Props {
   zone: AvalancheZone;
@@ -184,6 +191,30 @@ export function ZoneCard({
               />
             </Pressable>
           ) : null}
+          <Pressable
+            onPress={() =>
+              Linking.openURL(
+                `https://avalanche.org/observations/?center_id=${centerIdFor(zone)}`,
+              )
+            }
+            className="flex-row items-center gap-1.5"
+            hitSlop={8}
+          >
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-frost-400"
+              style={{ fontSize: 10, letterSpacing: 1.4 }}
+            >
+              RECENT OBS
+            </Text>
+            <Ionicons
+              name="arrow-forward-outline"
+              size={11}
+              color={palette.frost[400]}
+              style={{ transform: [{ rotate: "-45deg" }] }}
+            />
+          </Pressable>
           {zone.author ? (
             <Text
               variant="mono"
