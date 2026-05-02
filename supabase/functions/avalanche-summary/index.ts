@@ -2110,8 +2110,16 @@ Return valid JSON with this structure:
     // bottomLine + hazardDiscussion + danger ratings + problems. Build
     // keyMessage and travelAdvice from those rather than asking an LLM
     // to rewrite them.
-    function firstSentence(s: string, max = 240): string {
-      const trimmed = stripHtml(s).trim();
+    // Defensive: stripHtml can return null/undefined for null/undefined input.
+    // Coerce every result before string ops.
+    function safeStrip(s: any): string {
+      if (s === null || s === undefined) return '';
+      const stripped = stripHtml(String(s));
+      return typeof stripped === 'string' ? stripped : '';
+    }
+
+    function firstSentence(s: any, max = 240): string {
+      const trimmed = safeStrip(s).trim();
       if (!trimmed) return '';
       const dot = trimmed.search(/[.!?]\s/);
       const cut = dot > 30 && dot < max ? dot + 1 : Math.min(trimmed.length, max);
@@ -2124,7 +2132,7 @@ Return valid JSON with this structure:
       const today = zone.forecast?.[0]?.danger;
       if (today) {
         const ratings = [today.alpine, today.treeline, today.belowTreeline]
-          .filter(r => r && r !== 'NO_RATING');
+          .filter((r) => r && r !== 'NO_RATING');
         const order = ['LOW','MODERATE','CONSIDERABLE','HIGH','EXTREME'];
         const top = ratings.sort(
           (a: string, b: string) => order.indexOf(b) - order.indexOf(a),
@@ -2135,9 +2143,9 @@ Return valid JSON with this structure:
     }
 
     function deriveTravelAdvice(zone: typeof zonesData[number]): string {
-      const bl = stripHtml(zone.bottomLine || '').trim();
+      const bl = safeStrip(zone.bottomLine).trim();
       if (bl) return bl;
-      const hd = stripHtml(zone.hazardDiscussion || '').trim();
+      const hd = safeStrip(zone.hazardDiscussion).trim();
       if (hd) return hd.length > 600 ? hd.slice(0, 600) + '…' : hd;
       return 'Refer to the official forecast for terrain and travel guidance.';
     }
