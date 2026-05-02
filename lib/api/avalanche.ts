@@ -158,6 +158,16 @@ export interface CachedForecastResponse {
   missingSummaryCenterIds?: string[];
   forecastDate?: string;
   cached?: boolean;
+  // Distinct timestamps so the UI can report each layer's freshness
+  // (forecasts update 1–2× per day, stations hourly).
+  forecastFetchedAt?: string;
+  stationsFetchedAt?: string;
+  // Same shape get-weather-forecast returns — bundled into the cache read so
+  // the client doesn't need a second round trip.
+  centerWeather?: Record<string, NacWeatherProduct>;
+  zoneNwsForecasts?: Record<string, NwsForecast>;
+  centerAvgDiscussions?: Record<string, AvgDiscussion>;
+  zoneAvgLocations?: Record<string, AvgLocation[]>;
   quickTake?: string;
   weatherHighlights?: string;
   bottomLine?: string;
@@ -254,6 +264,17 @@ export const avalancheApi = {
           console.error(`avalanche-summary HTTP ${status}: ${text.slice(0, 500)}`);
         }
       } catch {}
+      return { success: false, error: error.message };
+    }
+    return data;
+  },
+
+  async getCachedForecasts(zoneIds: string[]): Promise<CachedForecastResponse> {
+    const { data, error } = await supabase.functions.invoke("get-cached-forecasts", {
+      body: { zoneIds },
+    });
+    if (error) {
+      console.error("Error calling get-cached-forecasts:", error);
       return { success: false, error: error.message };
     }
     return data;

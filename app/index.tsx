@@ -179,51 +179,32 @@ export default function Index() {
     if (now - lastBgFetchRef.current < 30 * 60 * 1000) return;
     lastBgFetchRef.current = now;
     try {
-      const groups = new Map<string, string[]>();
-      for (const id of favoriteZoneIds) {
-        const info = AVAILABLE_ZONES.find((z) => z.id === id);
-        const c = info?.center || "UNKNOWN";
-        if (!groups.has(c)) groups.set(c, []);
-        groups.get(c)!.push(id);
-      }
-      const allZones: AvalancheZone[] = [];
-      for (const [, zoneIds] of groups) {
-        const r = await avalancheApi.getSummary(zoneIds);
-        if (r.success && r.summary) allZones.push(...r.summary.zones);
-      }
-      const [snotelR, weatherR] = await Promise.all([
-        avalancheApi.getSnotelObservations(favoriteZoneIds),
-        avalancheApi.getWeatherForecast(favoriteZoneIds),
-      ]);
-      // Merge SNOTEL into the zone records before persisting.
-      const stationMap = snotelR.observations || {};
-      for (const z of allZones) {
-        if (stationMap[z.id]) z.weatherObservations = stationMap[z.id];
-      }
+      // The server-side cache (refreshed by cron every 1–2h) is fast enough
+      // and complete enough that we don't need separate live calls here.
+      const r = await avalancheApi.getCachedForecasts(favoriteZoneIds);
+      if (!r.success || !r.zones) return;
       const next: FavoritesSnapshot =
         (await loadSnapshot()) || { fetchedAt: "", zones: {} };
       const favSet = new Set(favoriteZoneIds);
-      for (const z of allZones) {
+      for (const z of r.zones) {
         if (!favSet.has(z.id)) continue;
         const cid = ZONE_TO_CENTER[z.id];
         next.zones[z.id] = {
           forecast: z,
           stations: z.weatherObservations,
-          weather: weatherR.success
-            ? {
-                nacWeather: cid ? weatherR.centerWeather?.[cid] : undefined,
-                nwsForecast: weatherR.zoneNwsForecasts?.[z.id],
-                avgDiscussion: cid ? weatherR.centerAvgDiscussions?.[cid] : undefined,
-                avgLocations: weatherR.zoneAvgLocations?.[z.id],
-              }
-            : undefined,
+          weather: {
+            nacWeather: cid ? r.centerWeather?.[cid] : undefined,
+            nwsForecast: r.zoneNwsForecasts?.[z.id],
+            avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
+            avgLocations: r.zoneAvgLocations?.[z.id],
+          },
           cachedAt: new Date().toISOString(),
         };
       }
       next.fetchedAt = new Date().toISOString();
       await saveSnapshot(next);
       setSnapshot(next);
-      console.log(`[bg-refresh] cached ${allZones.length} favorite zones`);
+      console.log(`[bg-refresh] cached ${r.zones.length} favorite zones`);
     } catch (err) {
       console.warn("[bg-refresh] failed", err);
     }
@@ -413,8 +394,37 @@ export default function Index() {
     setLoadSource(null);
 
     try {
-      // Group selected zones by center, then batch the per-center scrapes so
-      // we don't blast a single edge function call with all zones.
+      // 1) Try the server-side cache first — refreshed by cron every 1–2h.
+      // This is the fast path: ~200ms instead of ~40s for live scraping.
+      const cached = await avalancheApi.getCachedForecasts(selectedZoneIds);
+      if (
+        cached.success &&
+        cached.zones &&
+        cached.zones.length > 0 &&
+        (!cached.missingZoneIds || cached.missingZoneIds.length === 0)
+      ) {
+        // Hydrate the same shape we get from live scrape so the UI is identical.
+        setSummary({
+          quickTake: "",
+          zones: cached.zones,
+          weatherHighlights: "",
+          bottomLine: "",
+        });
+        setScrapedAt(cached.forecastFetchedAt || new Date().toISOString());
+        setLoadSource("cached");
+        // Cache also includes the weather bundle — feed it straight in so the
+        // outlook section renders without a second round-trip.
+        setWeatherForecastData({
+          centerWeather: cached.centerWeather || {},
+          zoneNwsForecasts: cached.zoneNwsForecasts || {},
+          centerAvgDiscussions: cached.centerAvgDiscussions || {},
+          zoneAvgLocations: cached.zoneAvgLocations || {},
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // 2) Fallback: live scrape, batched per center.
       const centerGroups = new Map<string, string[]>();
       for (const zoneId of selectedZoneIds) {
         const info = AVAILABLE_ZONES.find((z) => z.id === zoneId);
