@@ -305,31 +305,35 @@ export function ZoneCard({
       ) : null}
 
       <CardContent style={{ paddingTop: 4 }} className="gap-3">
-        {/* Key Message — quoted, large, the human voice. Sized to read at arm's length */}
-        <View
-          style={{
-            paddingLeft: 16,
-            borderLeftWidth: 2,
-            borderColor: palette.frost[500],
-            marginVertical: 8,
-          }}
-        >
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-frost-400"
-            style={{ fontSize: 11, letterSpacing: 1.6, marginBottom: 6 }}
+        {/* Bottom line — the full forecaster narrative, quoted as the
+            headline read. Used to be a synthesized first sentence labeled
+            "KEY MESSAGE"; we now surface the whole thing because it's the
+            primary thing a backcountry user wants to read. */}
+        {zone.travelAdvice && zone.travelAdvice.trim() ? (
+          <View
+            style={{
+              paddingLeft: 16,
+              borderLeftWidth: 2,
+              borderColor: palette.frost[500],
+              marginVertical: 8,
+            }}
           >
-            KEY MESSAGE
-          </Text>
-          <Text
-            variant="display"
-            className="text-ink-50"
-            style={{ fontSize: 22, lineHeight: 30 }}
-          >
-            {zone.keyMessage}
-          </Text>
-        </View>
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-frost-400"
+              style={{ fontSize: 11, letterSpacing: 1.6, marginBottom: 6 }}
+            >
+              BOTTOM LINE
+            </Text>
+            <Text
+              className="text-ink-50"
+              style={{ fontSize: 16, lineHeight: 23 }}
+            >
+              {zone.travelAdvice.trim()}
+            </Text>
+          </View>
+        ) : null}
 
         {/* Problems — structured data only (name, likelihood, size, aspect) */}
         {zone.problems && zone.problems.length > 0 ? (
@@ -516,25 +520,20 @@ function DayColumn({
   );
 }
 
-// Returns true if the zone has any forecaster-level narrative worth
-// surfacing in the rollup (bottom line / snowpack / weather). Per-problem
-// discussion lives with the problem itself, not here.
+// Returns true if the zone has any forecaster-level narrative beyond the
+// bottom-line callout above (the bottom line is shown as the card headline,
+// so this rollup only covers snowpack + weather discussions).
 function hasForecasterDiscussion(zone: AvalancheZone): boolean {
-  if (zone.travelAdvice && zone.travelAdvice.trim().length > 0) return true;
   if (zone.hazardDiscussion && zone.hazardDiscussion.trim().length > 0) return true;
   if (zone.weatherDiscussion && zone.weatherDiscussion.trim().length > 0) return true;
   return false;
 }
 
-// The forecaster's higher-level narrative: bottom-line synthesis +
-// snowpack discussion + weather discussion. Per-problem prose is
-// co-located with each problem card up above, so this section stays
-// focused on the big-picture text the forecaster wrote about the zone.
+// The forecaster's secondary narrative: snowpack discussion + weather
+// discussion (when populated). The bottom line is the card headline above
+// and per-problem prose is co-located with each problem card.
 function ForecasterDiscussion({ zone }: { zone: AvalancheZone }) {
   const sections: { label: string; body: string }[] = [];
-  if (zone.travelAdvice && zone.travelAdvice.trim()) {
-    sections.push({ label: "BOTTOM LINE", body: zone.travelAdvice.trim() });
-  }
   if (zone.hazardDiscussion && zone.hazardDiscussion.trim()) {
     sections.push({ label: "SNOWPACK & CONDITIONS", body: zone.hazardDiscussion.trim() });
   }
