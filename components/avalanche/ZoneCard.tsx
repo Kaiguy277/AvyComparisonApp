@@ -250,6 +250,7 @@ export function ZoneCard({
           </Text>
         </View>
 
+        {/* Problems — structured data only (name, likelihood, size, aspect) */}
         {zone.problems && zone.problems.length > 0 ? (
           <Collapsible
             leadingAccent={palette.aspen[500]}
@@ -275,47 +276,31 @@ export function ZoneCard({
           >
             <View className="gap-2">
               {zone.problems.map((p, i) => (
-                <AvalancheProblemCard key={i} problem={p} />
+                <AvalancheProblemCard key={i} problem={p} hideDiscussion />
               ))}
             </View>
           </Collapsible>
-        ) : zone.hazardDiscussion ? (
+        ) : null}
+
+        {/* Forecaster's full narrative — bottom line + per-problem prose +
+            snowpack discussion all in one place. The "dig deeper" section. */}
+        {hasForecasterDiscussion(zone) ? (
           <Collapsible
-            leadingAccent={palette.aspen[500]}
+            leadingAccent={palette.frost[500]}
             title={
               <Text
                 variant="mono"
                 weight="medium"
-                className="text-aspen-400"
+                className="text-frost-400"
                 style={{ fontSize: 11, letterSpacing: 1.6 }}
               >
-                HAZARD DISCUSSION
+                FORECASTER DISCUSSION
               </Text>
             }
           >
-            <Text className="text-ink-200" style={{ fontSize: 14, lineHeight: 21 }}>
-              {zone.hazardDiscussion}
-            </Text>
+            <ForecasterDiscussion zone={zone} />
           </Collapsible>
         ) : null}
-
-        <Collapsible
-          leadingAccent={palette.frost[500]}
-          title={
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-frost-400"
-              style={{ fontSize: 11, letterSpacing: 1.6 }}
-            >
-              TRAVEL ADVICE
-            </Text>
-          }
-        >
-          <Text className="text-ink-200" style={{ fontSize: 14, lineHeight: 21 }}>
-            {zone.travelAdvice}
-          </Text>
-        </Collapsible>
 
         {weatherForecast?.nacWeather ||
         weatherForecast?.nwsForecast ||
@@ -445,6 +430,58 @@ function DayColumn({
       <View style={{ marginTop: 12 }}>
         <DangerStack danger={danger} size="compact" />
       </View>
+    </View>
+  );
+}
+
+// Returns true if there's any text-heavy field worth surfacing in the
+// "Forecaster Discussion" rollup. Keeps the section hidden for sparse zones.
+function hasForecasterDiscussion(zone: AvalancheZone): boolean {
+  if (zone.travelAdvice && zone.travelAdvice.trim().length > 0) return true;
+  if (zone.hazardDiscussion && zone.hazardDiscussion.trim().length > 0) return true;
+  return (zone.problems || []).some(
+    (p) => p.discussion && p.discussion.trim().length > 0,
+  );
+}
+
+// Concatenates everything text-heavy in the order a forecaster would
+// typically write it — bottom line → snowpack → per-problem narratives.
+function ForecasterDiscussion({ zone }: { zone: AvalancheZone }) {
+  const sections: { label: string; body: string }[] = [];
+  if (zone.travelAdvice && zone.travelAdvice.trim()) {
+    sections.push({ label: "BOTTOM LINE", body: zone.travelAdvice.trim() });
+  }
+  if (zone.hazardDiscussion && zone.hazardDiscussion.trim()) {
+    sections.push({ label: "SNOWPACK & CONDITIONS", body: zone.hazardDiscussion.trim() });
+  }
+  for (const p of zone.problems || []) {
+    if (p.discussion && p.discussion.trim()) {
+      sections.push({
+        label: p.name.toUpperCase(),
+        body: p.discussion.trim(),
+      });
+    }
+  }
+  return (
+    <View style={{ gap: 16 }}>
+      {sections.map((s, i) => (
+        <View key={i}>
+          <Text
+            variant="mono"
+            weight="medium"
+            className="text-frost-400"
+            style={{ fontSize: 10, letterSpacing: 1.6, marginBottom: 6 }}
+          >
+            {s.label}
+          </Text>
+          <Text
+            className="text-ink-100"
+            style={{ fontSize: 14, lineHeight: 22 }}
+          >
+            {s.body}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }

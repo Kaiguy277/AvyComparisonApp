@@ -11,9 +11,13 @@ function formatSize(value: number): string {
 
 interface Props {
   problem: AvalancheProblem;
+  // Suppress the narrative discussion paragraph — used when the parent is
+  // surfacing the same text in a separate "Forecaster Discussion" rollup
+  // and we want the problem card itself to read as structured data only.
+  hideDiscussion?: boolean;
 }
 
-export function AvalancheProblemCard({ problem }: Props) {
+export function AvalancheProblemCard({ problem, hideDiscussion }: Props) {
   const hasAspects = problem.aspects && problem.aspects.length > 0;
   return (
     <View
@@ -99,7 +103,7 @@ export function AvalancheProblemCard({ problem }: Props) {
         </View>
       ) : null}
 
-      {problem.discussion ? (
+      {problem.discussion && !hideDiscussion ? (
         <Text
           className="text-ink-300 mt-3 pt-3"
           style={{
