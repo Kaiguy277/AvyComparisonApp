@@ -1566,14 +1566,9 @@ serve(async (req) => {
   }
 
   try {
-    const lovableKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableKey) {
-      console.error('LOVABLE_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ success: false, error: 'AI service not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // No AI gateway needed — keyMessage and travelAdvice are derived
+    // deterministically from the structured forecast fields NAC already
+    // returns (bottomLine, hazardDiscussion, danger ratings).
 
     // Parse request body to get zone selection
     const body = await req.json().catch(() => ({}));
@@ -2107,82 +2102,62 @@ Return valid JSON with this structure:
       scopeGuidance = `${numZones} zones — use the regional (7+ zone) quickTake style. Write at most 6 synthesized sentences. Do NOT walk through zones individually.`;
     }
 
-    const userPrompt = `SCOPE: ${scopeDescription}
-${scopeGuidance}
+    // Avoid the unused-variable warning while keeping the prompt scaffolding
+    // intact for future use (if we ever wire AI back in).
+    void scopeDescription; void scopeGuidance; void forecastContext; void systemPrompt;
 
-${forecastContext}
+    // Deterministic synthesis: NAC's structured forecast already gives us
+    // bottomLine + hazardDiscussion + danger ratings + problems. Build
+    // keyMessage and travelAdvice from those rather than asking an LLM
+    // to rewrite them.
+    function firstSentence(s: string, max = 240): string {
+      const trimmed = stripHtml(s).trim();
+      if (!trimmed) return '';
+      const dot = trimmed.search(/[.!?]\s/);
+      const cut = dot > 30 && dot < max ? dot + 1 : Math.min(trimmed.length, max);
+      return trimmed.slice(0, cut).trim();
+    }
 
-Synthesize this data following the system instructions. Focus the quickTake and weatherHighlights on the NEXT 2-3 DAYS. Use the WEATHER FORECAST / OUTLOOK sections. Set weatherValidation for every zone. Provide travel advice that respects user autonomy.`;
-
-    console.log('Calling AI for synthesis...');
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI gateway error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Rate limit exceeded. Please try again in a moment.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    function deriveKeyMessage(zone: typeof zonesData[number]): string {
+      const lead = firstSentence(zone.bottomLine || zone.hazardDiscussion || '', 240);
+      if (lead) return lead;
+      const today = zone.forecast?.[0]?.danger;
+      if (today) {
+        const ratings = [today.alpine, today.treeline, today.belowTreeline]
+          .filter(r => r && r !== 'NO_RATING');
+        const order = ['LOW','MODERATE','CONSIDERABLE','HIGH','EXTREME'];
+        const top = ratings.sort(
+          (a: string, b: string) => order.indexOf(b) - order.indexOf(a),
+        )[0];
+        if (top) return `Today's avalanche danger is ${String(top).toLowerCase()}. Read the official forecast before planning your day.`;
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'AI credits exhausted. Please try again later.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to generate summary' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return 'Read the official forecast before planning your day.';
     }
 
-    const aiData = await aiResponse.json();
-    const summaryText = aiData.choices?.[0]?.message?.content;
-
-    if (!summaryText) {
-      console.error('No content in AI response');
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to generate summary' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    function deriveTravelAdvice(zone: typeof zonesData[number]): string {
+      const bl = stripHtml(zone.bottomLine || '').trim();
+      if (bl) return bl;
+      const hd = stripHtml(zone.hazardDiscussion || '').trim();
+      if (hd) return hd.length > 600 ? hd.slice(0, 600) + '…' : hd;
+      return 'Refer to the official forecast for terrain and travel guidance.';
     }
 
-    // Parse the JSON response
-    let summary;
-    try {
-      summary = JSON.parse(summaryText);
-    } catch (e) {
-      console.error('Failed to parse AI response as JSON:', summaryText);
-      summary = { quickTake: summaryText, zones: [], weatherHighlights: '', bottomLine: '' };
-    }
+    const summary = {
+      quickTake: '',
+      weatherHighlights: '',
+      bottomLine: '',
+      zones: zonesData.map((z) => ({
+        id: z.id,
+        name: z.name,
+        keyMessage: deriveKeyMessage(z),
+        travelAdvice: deriveTravelAdvice(z),
+        weatherValidation: 'no_data' as const,
+      })),
+    };
 
-    // Merge AI synthesis with our structured data (freshness, data source, forecastUrl)
-    // IMPORTANT: Only include zones that were actually requested (filter out any AI hallucinations)
-    const validZoneIds = new Set(zonesData.map(z => z.id));
-    const filteredZones = (summary.zones || []).filter((zone: any) => validZoneIds.has(zone.id));
-
-    if (filteredZones.length < summary.zones.length) {
-      console.log(`⚠️ AI returned ${summary.zones.length} zones but only ${filteredZones.length} were requested. Filtering out extras.`);
-    }
+    // Filter would only matter if AI hallucinated zones; deterministic
+    // synthesis can't, but keep the same shape for the merge below.
+    const filteredZones = summary.zones;
 
     const zonesWithMetadata = filteredZones.map((zone: any, index: number) => {
       // Match by exact ID first
