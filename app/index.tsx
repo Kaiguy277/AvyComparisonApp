@@ -89,6 +89,9 @@ export default function Index() {
   const [favoriteZoneIds, setFavoriteZoneIds] = useState<string[]>([]);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
+  // The Compare list is collapsed by default — most users tap Favorites
+  // and never need the manual selector. Open it on demand.
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSnotelLoading, setIsSnotelLoading] = useState(false);
@@ -380,8 +383,9 @@ export default function Index() {
     [weatherForecastData],
   );
 
-  const fetchSummary = useCallback(async () => {
-    if (selectedZoneIds.length === 0) {
+  const fetchSummary = useCallback(async (zoneIdsOverride?: string[]) => {
+    const zoneIds = zoneIdsOverride ?? selectedZoneIds;
+    if (zoneIds.length === 0) {
       Alert.alert(
         "No zones selected",
         "Please select at least one zone to view forecasts.",
@@ -396,7 +400,7 @@ export default function Index() {
     try {
       // 1) Try the server-side cache first — refreshed by cron every 1–2h.
       // This is the fast path: ~200ms instead of ~40s for live scraping.
-      const cached = await avalancheApi.getCachedForecasts(selectedZoneIds);
+      const cached = await avalancheApi.getCachedForecasts(zoneIds);
       if (
         cached.success &&
         cached.zones &&
@@ -426,7 +430,7 @@ export default function Index() {
 
       // 2) Fallback: live scrape, batched per center.
       const centerGroups = new Map<string, string[]>();
-      for (const zoneId of selectedZoneIds) {
+      for (const zoneId of zoneIds) {
         const info = AVAILABLE_ZONES.find((z) => z.id === zoneId);
         const centerId = info?.center || "UNKNOWN";
         if (!centerGroups.has(centerId)) centerGroups.set(centerId, []);
@@ -465,8 +469,8 @@ export default function Index() {
         setScrapedAt(new Date().toISOString());
         setZonesScraped(allZonesScraped);
         setLoadSource("live");
-        fetchSnotel(selectedZoneIds);
-        fetchWeatherForecast(selectedZoneIds);
+        fetchSnotel(zoneIds);
+        fetchWeatherForecast(zoneIds);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         Alert.alert("Error", "Failed to fetch avalanche conditions.");
@@ -512,7 +516,12 @@ export default function Index() {
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
-            onRefresh={fetchSummary}
+            onRefresh={() => {
+              // Re-fetch whichever zones are currently on screen, falling
+              // back to the working selection if nothing's loaded yet.
+              const ids = summary?.zones?.map((z) => z.id) ?? selectedZoneIds;
+              fetchSummary(ids);
+            }}
             tintColor={palette.frost[400]}
             colors={[palette.frost[400]]}
             progressBackgroundColor={palette.ink[800]}
@@ -672,119 +681,248 @@ export default function Index() {
           <Card>
             <CardHeader>
               <View className="flex-row items-baseline justify-between">
-                <CardEyebrow>ZONES</CardEyebrow>
-                <Text
-                  variant="mono"
-                  weight="medium"
-                  className="text-ink-100"
-                  style={{ fontSize: 12, letterSpacing: 1.4 }}
-                >
-                  {selectedZoneIds.length} / {AVAILABLE_ZONES.length}
-                </Text>
+                <CardEyebrow>VIEW FORECAST</CardEyebrow>
+                {favoriteZoneIds.length > 0 ? (
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-aspen-400"
+                    style={{ fontSize: 12, letterSpacing: 1.4 }}
+                  >
+                    ★ {favoriteZoneIds.length} FAV
+                  </Text>
+                ) : null}
               </View>
             </CardHeader>
             <CardContent>
+              {/* PRIMARY ACTION — Favorites. One tap, fetches favorite zones,
+                  jumps straight to the forecast view. */}
               <Pressable
                 onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setMapModalOpen(true);
+                  if (favoriteZoneIds.length === 0) {
+                    Alert.alert(
+                      "No favorites yet",
+                      "Tap Compare zones, expand a center, and tap the star next to a zone to favorite it.",
+                    );
+                    return;
+                  }
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  fetchSummary(favoriteZoneIds);
                 }}
+                disabled={isLoading}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
-                  borderRadius: 14,
+                  paddingVertical: 18,
+                  paddingHorizontal: 18,
+                  borderRadius: 16,
+                  backgroundColor:
+                    favoriteZoneIds.length > 0
+                      ? palette.aspen[500]
+                      : palette.ink[800],
                   borderWidth: 0.5,
-                  borderColor: palette.frost[600],
-                  backgroundColor: palette.frost[400] + "12",
-                  marginBottom: 14,
+                  borderColor:
+                    favoriteZoneIds.length > 0
+                      ? palette.aspen[500]
+                      : palette.ink[600],
+                  opacity: isLoading ? 0.5 : 1,
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                  <Ionicons name="map-outline" size={18} color={palette.frost[400]} />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                  <Ionicons
+                    name="star"
+                    size={20}
+                    color={
+                      favoriteZoneIds.length > 0
+                        ? palette.ink[950]
+                        : palette.ink[400]
+                    }
+                  />
                   <View>
+                    <Text
+                      variant="mono"
+                      weight="bold"
+                      style={{
+                        fontSize: 13,
+                        letterSpacing: 1.6,
+                        color:
+                          favoriteZoneIds.length > 0
+                            ? palette.ink[950]
+                            : palette.ink[200],
+                      }}
+                    >
+                      MY FAVORITES
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        marginTop: 2,
+                        color:
+                          favoriteZoneIds.length > 0
+                            ? "rgba(31, 15, 0, 0.7)"
+                            : palette.ink[400],
+                      }}
+                    >
+                      {favoriteZoneIds.length > 0
+                        ? `${favoriteZoneIds.length} zone${favoriteZoneIds.length === 1 ? "" : "s"} · tap to view`
+                        : "No zones starred yet"}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name="arrow-forward"
+                  size={18}
+                  color={
+                    favoriteZoneIds.length > 0
+                      ? palette.ink[950]
+                      : palette.ink[400]
+                  }
+                />
+              </Pressable>
+
+              {/* SECONDARY ACTIONS — Compare + Map */}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setCompareOpen((v) => !v);
+                  }}
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    paddingVertical: 13,
+                    borderRadius: 12,
+                    borderWidth: 0.5,
+                    borderColor: compareOpen ? palette.frost[400] : palette.ink[600],
+                    backgroundColor: compareOpen
+                      ? palette.frost[400] + "1A"
+                      : "transparent",
+                  }}
+                >
+                  <Ionicons
+                    name="list-outline"
+                    size={14}
+                    color={compareOpen ? palette.frost[400] : palette.ink[200]}
+                  />
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: 1.4,
+                      color: compareOpen ? palette.frost[400] : palette.ink[200],
+                    }}
+                  >
+                    COMPARE
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setMapModalOpen(true);
+                  }}
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    paddingVertical: 13,
+                    borderRadius: 12,
+                    borderWidth: 0.5,
+                    borderColor: palette.ink[600],
+                  }}
+                >
+                  <Ionicons name="map-outline" size={14} color={palette.ink[200]} />
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-ink-200"
+                    style={{ fontSize: 11, letterSpacing: 1.4 }}
+                  >
+                    OPEN MAP
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* COMPARE — collapsed by default. The hierarchical selector +
+                  the explicit Get-conditions button live in here so the
+                  zone-picker chrome only appears when the user wants it. */}
+              {compareOpen ? (
+                <View style={{ marginTop: 18 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      marginBottom: 10,
+                    }}
+                  >
                     <Text
                       variant="mono"
                       weight="medium"
                       className="text-frost-400"
                       style={{ fontSize: 11, letterSpacing: 1.6 }}
                     >
-                      OPEN MAP
+                      PICK MULTIPLE
                     </Text>
                     <Text
+                      variant="mono"
                       className="text-ink-300"
-                      style={{ fontSize: 12, marginTop: 2 }}
+                      style={{ fontSize: 11, letterSpacing: 1.2 }}
                     >
-                      Tap zones colored by today's danger.
+                      {selectedZoneIds.length} SEL.
                     </Text>
                   </View>
+                  <HierarchicalZoneSelector
+                    selectedZoneIds={selectedZoneIds}
+                    onSelectionChange={updateSelectedZones}
+                    favoriteZoneIds={favoriteZoneIds}
+                    onFavoriteToggle={toggleFavorite}
+                  />
+                  <View
+                    className="flex-row gap-2 mt-3"
+                    style={{ justifyContent: "flex-end" }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => updateSelectedZones([])}
+                      disabled={selectedZoneIds.length === 0}
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onPress={() => updateSelectedZones(DEFAULT_ZONE_IDS)}
+                      disabled={isDefaultSelection}
+                    >
+                      Reset
+                    </Button>
+                  </View>
+                  <Button
+                    onPress={() => fetchSummary()}
+                    disabled={isLoading || selectedZoneIds.length === 0}
+                    loading={isLoading}
+                    size="lg"
+                    className="w-full mt-3"
+                    leftIcon={
+                      <Ionicons name="snow" size={16} color={palette.ink[950]} />
+                    }
+                  >
+                    {isLoading
+                      ? "Loading…"
+                      : `View ${selectedZoneIds.length} zone${selectedZoneIds.length === 1 ? "" : "s"}`}
+                  </Button>
                 </View>
-                <Ionicons
-                  name="arrow-forward"
-                  size={16}
-                  color={palette.frost[400]}
-                  style={{ transform: [{ rotate: "-45deg" }] }}
-                />
-              </Pressable>
-
-              <HierarchicalZoneSelector
-                selectedZoneIds={selectedZoneIds}
-                onSelectionChange={updateSelectedZones}
-                favoriteZoneIds={favoriteZoneIds}
-                onFavoriteToggle={toggleFavorite}
-              />
-              <View
-                className="flex-row gap-2 mt-4"
-                style={{ justifyContent: "flex-end" }}
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => updateSelectedZones([])}
-                  disabled={selectedZoneIds.length === 0}
-                >
-                  Clear
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onPress={() => updateSelectedZones(DEFAULT_ZONE_IDS)}
-                  disabled={isDefaultSelection}
-                >
-                  Reset
-                </Button>
-              </View>
+              ) : null}
             </CardContent>
           </Card>
-        </View>
-
-        {/* ACTION */}
-        <View
-          style={{
-            paddingHorizontal: 16,
-            marginTop: 18,
-            alignItems: "center",
-            gap: 14,
-          }}
-        >
-          <Button
-            onPress={fetchSummary}
-            disabled={isLoading}
-            loading={isLoading}
-            size="lg"
-            className="w-full"
-            leftIcon={
-              <Ionicons
-                name="snow"
-                size={16}
-                color={palette.ink[950]}
-              />
-            }
-          >
-            {isLoading ? "Loading…" : "Get current conditions"}
-          </Button>
         </View>
 
         {/* STATUS BAR */}
