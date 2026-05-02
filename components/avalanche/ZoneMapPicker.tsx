@@ -7,8 +7,7 @@ import * as Haptics from "expo-haptics";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Text } from "@/components/ui/Text";
-import { dangerColors, palette } from "@/constants/design";
-import { avalancheApi } from "@/lib/api/avalanche";
+import { palette } from "@/constants/design";
 import {
   AVAILABLE_ZONES,
   CENTER_COORDS,
@@ -16,7 +15,6 @@ import {
   REGION_STRUCTURE,
   type AvalancheCenter,
 } from "@/lib/zones";
-import type { DangerRating } from "@/lib/api/avalanche";
 
 interface CenterMeta {
   id: string;
@@ -368,8 +366,6 @@ export function ZoneMapPicker({
   const webRef = useRef<WebView>(null);
   const [activeCenterId, setActiveCenterId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [alpineByZone, setAlpineByZone] = useState<Record<string, string>>({});
-
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
     for (const c of FLAT_CENTERS) {
@@ -379,43 +375,13 @@ export function ZoneMapPicker({
     return out;
   }, [selectedZoneIds]);
 
-  // Fetch all zones' alpine danger via the cached endpoint. Colors polygons
-  // by current above-treeline rating; falls back to NAC's overall color
-  // until this resolves, so polygons paint instantly either way.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const allZoneIds = AVAILABLE_ZONES.map((z) => z.id);
-        const r = await avalancheApi.getCachedForecasts(allZoneIds);
-        if (cancelled || !r.success || !r.zones) return;
-        const map: Record<string, string> = {};
-        for (const z of r.zones) {
-          const alpine = z.forecast?.[0]?.danger?.alpine as DangerRating | undefined;
-          if (alpine) {
-            const c = dangerColors[alpine];
-            if (c) map[z.id] = c.fill;
-          }
-        }
-        setAlpineByZone(map);
-      } catch (err) {
-        console.warn("alpine fetch failed", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Push alpine map into the WebView once both are ready
-  useEffect(() => {
-    if (!mapReady) return;
-    if (Object.keys(alpineByZone).length === 0) return;
-    const js = `window.AVY && window.AVY.setAlpineDanger(${JSON.stringify(
-      alpineByZone,
-    )}); true;`;
-    webRef.current?.injectJavaScript(js);
-  }, [alpineByZone, mapReady]);
+  // Polygons color themselves from NAC's embedded danger color (overall
+  // worst-of-three) baked into each map-layer GeoJSON feature. We used to
+  // overlay alpine-specific colors via a separate cached-forecasts fetch,
+  // but that endpoint depended on a populated DB cache (formerly fed by a
+  // Lovable-managed cron). On the mobile-only backend we don't run that
+  // cron, so the overlay always missed; NAC's overall color is the
+  // pragmatic source of truth here.
 
   // Push selection updates to the map after it's ready
   useEffect(() => {

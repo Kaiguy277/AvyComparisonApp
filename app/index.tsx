@@ -217,38 +217,10 @@ export default function Index() {
     setLoadSource(null);
 
     try {
-      const cached = await avalancheApi.getCachedForecasts(selectedZoneIds);
-      const hasMissingZones = !!cached.missingZoneIds?.length;
-      const hasMissingSummaries = !!cached.missingSummaryCenterIds?.length;
-
-      if (
-        cached.success &&
-        cached.zones &&
-        cached.zones.length > 0 &&
-        !hasMissingZones &&
-        !hasMissingSummaries
-      ) {
-        setSummary({
-          quickTake: "",
-          zones: cached.zones,
-          weatherHighlights: "",
-          bottomLine: "",
-        });
-        setScrapedAt(new Date().toISOString());
-        setLoadSource("cached");
-        setIsLoading(false);
-        fetchSnotel(selectedZoneIds);
-        fetchWeatherForecast(selectedZoneIds);
-        return;
-      }
-
-      const missingZoneIds =
-        cached.missingZoneIds && cached.missingZoneIds.length > 0
-          ? cached.missingZoneIds
-          : selectedZoneIds;
-
+      // Group selected zones by center, then batch the per-center scrapes so
+      // we don't blast a single edge function call with all zones.
       const centerGroups = new Map<string, string[]>();
-      for (const zoneId of missingZoneIds) {
+      for (const zoneId of selectedZoneIds) {
         const info = AVAILABLE_ZONES.find((z) => z.id === zoneId);
         const centerId = info?.center || "UNKNOWN";
         if (!centerGroups.has(centerId)) centerGroups.set(centerId, []);
@@ -257,7 +229,7 @@ export default function Index() {
 
       const BATCH_SIZE = 4;
       const entries = Array.from(centerGroups.entries());
-      const allZones: AvalancheZone[] = cached.zones || [];
+      const allZones: AvalancheZone[] = [];
       const allZonesScraped: ScrapedZoneInfo[] = [];
       let hasAnySuccess = false;
 

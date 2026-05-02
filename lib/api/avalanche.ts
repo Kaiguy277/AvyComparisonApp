@@ -236,17 +236,6 @@ export const avalancheApi = {
     return data;
   },
 
-  async getCachedForecasts(zoneIds: string[]): Promise<CachedForecastResponse> {
-    const { data, error } = await supabase.functions.invoke("get-cached-forecasts", {
-      body: { zoneIds },
-    });
-    if (error) {
-      console.error("Error calling get-cached-forecasts:", error);
-      return { success: false, error: error.message };
-    }
-    return data;
-  },
-
   async getSnotelObservations(zoneIds: string[]): Promise<SnotelResponse> {
     const { data, error } = await supabase.functions.invoke("get-snotel-observations", {
       body: { zoneIds },
