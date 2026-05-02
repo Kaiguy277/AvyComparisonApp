@@ -505,7 +505,7 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.ink[950] }}>
-      <TopoBackground height={580} intensity="low" />
+      <TopoBackground height={320} intensity="low" />
 
       <ScrollView
         style={{ flex: 1 }}
@@ -600,80 +600,43 @@ export default function Index() {
           </View>
         ) : null}
 
-        {/* HERO */}
-        <View style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 28 }}>
-          <View className="flex-row items-center gap-2.5 mb-4">
-            <Image
-              source={require("@/assets/images/wordmark.png")}
-              style={{ width: 22, height: 31 }}
-              resizeMode="contain"
-            />
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-frost-400"
-              style={{ fontSize: 11, letterSpacing: 2.4 }}
-            >
-              AVY · COMPARISON
-            </Text>
-            <View style={{ flex: 1 }} />
-            <Text
-              variant="mono"
-              className="text-ink-400"
-              style={{ fontSize: 11, letterSpacing: 1.6 }}
-            >
-              {today.weekday}
-            </Text>
-          </View>
-
-          <View className="flex-row items-baseline gap-3 mb-2">
-            <Text
-              variant="mono"
-              weight="bold"
-              className="text-ink-50"
-              style={{ fontSize: 56, lineHeight: 60, letterSpacing: -1 }}
-            >
-              {today.day}
-            </Text>
-            <View>
-              <Text
-                variant="mono"
-                weight="medium"
-                className="text-ink-200"
-                style={{ fontSize: 11, letterSpacing: 2.4 }}
-              >
-                {today.month}
-              </Text>
-              <Text
-                variant="mono"
-                className="text-ink-400"
-                style={{ fontSize: 11, letterSpacing: 2.4 }}
-              >
-                {today.year}
-              </Text>
-            </View>
-          </View>
-
-          <Text
-            variant="display"
-            className="text-ink-50"
-            style={{
-              fontSize: 56,
-              lineHeight: 60,
-              letterSpacing: -1.5,
-              marginTop: 14,
-            }}
-          >
-            Conditions
-          </Text>
-
-          <View
-            style={{
-              height: 0.5,
-              backgroundColor: palette.ink[700],
-              marginTop: 18,
-            }}
+        {/* HERO — slim status strip. The user already knows what app this
+            is and what they're here for; we just need a sense of place
+            (logo + wordmark) and a date stamp. ~50px instead of ~180px. */}
+        <View
+          style={{
+            paddingHorizontal: 20,
+            paddingTop: 10,
+            paddingBottom: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            borderBottomWidth: 0.5,
+            borderColor: palette.ink[700],
+          }}
+        >
+          <Image
+            source={require("@/assets/images/wordmark.png")}
+            style={{ width: 18, height: 25 }}
+            resizeMode="contain"
           />
+          <Text
+            variant="mono"
+            weight="medium"
+            className="text-frost-400"
+            style={{ fontSize: 10, letterSpacing: 2 }}
+          >
+            AVY · COMPARISON
+          </Text>
+          <View style={{ flex: 1 }} />
+          <Text
+            variant="mono"
+            weight="medium"
+            className="text-ink-200"
+            style={{ fontSize: 11, letterSpacing: 1.4 }}
+          >
+            {today.weekday} · {today.month} {today.day}
+          </Text>
         </View>
 
         {/* ZONE PICKER */}
