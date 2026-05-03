@@ -101,6 +101,9 @@ export interface WeatherObservation {
     hourlySpeed72hr?: TempDataPoint[];
     hourlyGust24hr?: TempDataPoint[];
     hourlyGust72hr?: TempDataPoint[];
+    // Direction over time (degrees, 0–360, FROM convention).
+    hourlyDirection24hr?: TempDataPoint[];
+    hourlyDirection72hr?: TempDataPoint[];
   } | null;
   dataQuality: "good" | "partial" | "poor";
 }
@@ -156,7 +159,13 @@ export interface CachedForecastResponse {
   zones?: AvalancheZone[];
   missingZoneIds?: string[];
   missingSummaryCenterIds?: string[];
+  // The forecast issue date (YYYY-MM-DD) the response is for. May be older
+  // than `requestedDate` if no row exists for that day.
   forecastDate?: string;
+  // Stations snapshot date (YYYY-MM-DD).
+  stationsDate?: string;
+  // Echo of what the client asked for, when pinned via getCachedForecasts(date).
+  requestedDate?: string | null;
   cached?: boolean;
   // Distinct timestamps so the UI can report each layer's freshness
   // (forecasts update 1–2× per day, stations hourly).
@@ -269,9 +278,14 @@ export const avalancheApi = {
     return data;
   },
 
-  async getCachedForecasts(zoneIds: string[]): Promise<CachedForecastResponse> {
+  // forecastDate (YYYY-MM-DD) optionally pins the response to a specific
+  // archive day. Omit for "give me each zone's most recent row".
+  async getCachedForecasts(
+    zoneIds: string[],
+    forecastDate?: string,
+  ): Promise<CachedForecastResponse> {
     const { data, error } = await supabase.functions.invoke("get-cached-forecasts", {
-      body: { zoneIds },
+      body: forecastDate ? { zoneIds, forecastDate } : { zoneIds },
     });
     if (error) {
       console.error("Error calling get-cached-forecasts:", error);
