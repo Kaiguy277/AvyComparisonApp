@@ -84,9 +84,9 @@ export function AvalancheProblemCard({ problem }: Props) {
             <ProblemRose aspects={problem.aspects} size={104} />
             <View className="flex-1 gap-1.5" style={{ paddingTop: 4 }}>
               {[
-                { key: "Alpine", label: "ABV" },
+                { key: "Alpine", label: "ALP" },
                 { key: "Treeline", label: "TL" },
-                { key: "Below Treeline", label: "BLW" },
+                { key: "Below Treeline", label: "BTL" },
               ].map(({ key, label }) => {
                 const match = problem.aspects.find((a) =>
                   a.elevation.toLowerCase().includes(key.toLowerCase().split(" ")[0]),

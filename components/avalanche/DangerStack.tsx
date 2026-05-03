@@ -14,9 +14,9 @@ interface DangerStackProps {
 }
 
 const ELEVATION_LABELS = [
-  { key: "alpine" as const, code: "ABV", name: "Above Treeline" },
+  { key: "alpine" as const, code: "ALP", name: "Alpine" },
   { key: "treeline" as const, code: "TL", name: "Near Treeline" },
-  { key: "belowTreeline" as const, code: "BLW", name: "Below Treeline" },
+  { key: "belowTreeline" as const, code: "BTL", name: "Below Treeline" },
 ];
 
 export function DangerStack({
