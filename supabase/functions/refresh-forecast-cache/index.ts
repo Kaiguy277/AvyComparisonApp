@@ -59,15 +59,22 @@ serve(async (req) => {
         errors.push(`${centerId}: no zones returned`);
         continue;
       }
+      // forecast_date = the day the cron wrote this row (UTC). Some zones
+      // ship `freshness.issueDate` as a display string ("May 1") that
+      // mis-parses, so we use the wall-clock date instead — matches the
+      // cadence of the cron and is what the phone needs for archive lookup.
+      // The actual NAC issue timestamp is preserved inside the payload.
+      const todayUtc = new Date().toISOString().slice(0, 10);
       const rows = zones.map((z: any) => ({
         zone_id: z.id,
+        forecast_date: todayUtc,
         center_id: centerId,
         fetched_at: new Date().toISOString(),
         payload: z,
       }));
       const { error } = await supabase
         .from("forecast_cache")
-        .upsert(rows, { onConflict: "zone_id" });
+        .upsert(rows, { onConflict: "zone_id,forecast_date" });
       if (error) {
         errors.push(`${centerId}: upsert ${error.message}`);
         continue;

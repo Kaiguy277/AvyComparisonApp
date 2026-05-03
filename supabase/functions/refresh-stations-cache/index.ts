@@ -76,10 +76,15 @@ serve(async (req) => {
     console.error("[stations-cache] weather fetch failed", err);
   }
 
-  // 3. Bundle per zone and upsert.
+  // 3. Bundle per zone and upsert. snapshot_date marks which "day" this row
+  // represents — every cron tick within the same day overwrites the same
+  // row, so the latest run before midnight is what end-of-day archive
+  // viewers will see.
   const now = new Date().toISOString();
+  const today = now.slice(0, 10);
   const rows = ALL_ZONES.map((z) => ({
     zone_id: z.id,
+    snapshot_date: today,
     center_id: z.centerId,
     fetched_at: now,
     payload: {
@@ -95,7 +100,7 @@ serve(async (req) => {
 
   const { error } = await supabase
     .from("stations_cache")
-    .upsert(rows, { onConflict: "zone_id" });
+    .upsert(rows, { onConflict: "zone_id,snapshot_date" });
 
   const elapsed = Date.now() - start;
   if (error) {

@@ -1,6 +1,11 @@
 // Mobile-facing read endpoint. Joins forecast_cache + stations_cache by
-// zone_id and returns the same shape the app already understands. Falls
-// back to "missing" so the client can decide whether to hit live.
+// (zone_id, date) and returns the same shape the app already understands.
+// Falls back to "missing" so the client can decide whether to hit live.
+//
+// Optional `forecastDate` parameter (YYYY-MM-DD) lets the client scroll
+// back through history. Default = latest row per zone (which usually means
+// today, but if NAC hasn't published today's issue yet we'll fall through
+// to whatever's most recent for that zone).
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -9,6 +14,8 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -24,6 +31,10 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const requestedDate: string | null =
+      typeof body?.forecastDate === "string" && DATE_RE.test(body.forecastDate)
+        ? body.forecastDate
+        : null;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -31,29 +42,54 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // Pull from both caches in parallel.
-    const [fc, sc] = await Promise.all([
-      supabase
-        .from("forecast_cache")
-        .select("zone_id, center_id, fetched_at, payload")
-        .in("zone_id", zoneIds),
-      supabase
-        .from("stations_cache")
-        .select("zone_id, center_id, fetched_at, payload")
-        .in("zone_id", zoneIds),
-    ]);
+    // When the client doesn't pin a specific date we want each zone's most
+    // recent row (which is usually today's, but might be yesterday's for
+    // zones that haven't been re-issued yet). Pull a window and pick the
+    // newest per zone in code — Postgres DISTINCT ON would also work but
+    // a window of ~14 rows × N zones stays small enough that an in-memory
+    // pick keeps the query simple.
+    let fcQuery = supabase
+      .from("forecast_cache")
+      .select("zone_id, forecast_date, center_id, fetched_at, payload")
+      .in("zone_id", zoneIds);
+    let scQuery = supabase
+      .from("stations_cache")
+      .select("zone_id, snapshot_date, center_id, fetched_at, payload")
+      .in("zone_id", zoneIds);
+
+    if (requestedDate) {
+      fcQuery = fcQuery.eq("forecast_date", requestedDate);
+      scQuery = scQuery.eq("snapshot_date", requestedDate);
+    } else {
+      // Cap the lookback so we don't pull the full retention window.
+      const cutoff = new Date();
+      cutoff.setUTCDate(cutoff.getUTCDate() - 14);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      fcQuery = fcQuery.gte("forecast_date", cutoffStr);
+      scQuery = scQuery.gte("snapshot_date", cutoffStr);
+    }
+
+    const [fc, sc] = await Promise.all([fcQuery, scQuery]);
 
     if (fc.error) console.error("forecast_cache read error", fc.error);
     if (sc.error) console.error("stations_cache read error", sc.error);
 
-    const stationsByZone = new Map<string, any>();
+    // Pick the most recent row per zone unless a specific date was requested.
+    const newestForecastByZone = new Map<string, any>();
+    for (const r of fc.data || []) {
+      const cur = newestForecastByZone.get(r.zone_id);
+      if (!cur || r.forecast_date > cur.forecast_date) {
+        newestForecastByZone.set(r.zone_id, r);
+      }
+    }
+    const newestStationsByZone = new Map<string, any>();
     for (const r of sc.data || []) {
-      stationsByZone.set(r.zone_id, { fetched_at: r.fetched_at, payload: r.payload });
+      const cur = newestStationsByZone.get(r.zone_id);
+      if (!cur || r.snapshot_date > cur.snapshot_date) {
+        newestStationsByZone.set(r.zone_id, r);
+      }
     }
 
-    // Merge: each forecast row joins its matching stations row. Forecast
-    // freshness and stations freshness are reported separately so the
-    // client can show the user how old each layer is.
     const zones: any[] = [];
     const centerWeather: Record<string, any> = {};
     const zoneNwsForecasts: Record<string, any> = {};
@@ -62,22 +98,28 @@ serve(async (req) => {
 
     let mostRecentForecastFetched: string | null = null;
     let mostRecentStationsFetched: string | null = null;
+    let resolvedForecastDate: string | null = null;
+    let resolvedStationsDate: string | null = null;
 
-    for (const row of fc.data || []) {
-      const stations = stationsByZone.get(row.zone_id);
+    for (const row of newestForecastByZone.values()) {
+      const stations = newestStationsByZone.get(row.zone_id);
       const zone = {
         ...row.payload,
         weatherObservations: stations?.payload?.stations || row.payload.weatherObservations,
-        // freshness fields stay as the forecast's freshness; stations
-        // freshness is at the top level so the UI can report it independently.
       };
       zones.push(zone);
       if (!mostRecentForecastFetched || row.fetched_at > mostRecentForecastFetched) {
         mostRecentForecastFetched = row.fetched_at;
       }
+      if (!resolvedForecastDate || row.forecast_date > resolvedForecastDate) {
+        resolvedForecastDate = row.forecast_date;
+      }
       if (stations) {
         if (!mostRecentStationsFetched || stations.fetched_at > mostRecentStationsFetched) {
           mostRecentStationsFetched = stations.fetched_at;
+        }
+        if (!resolvedStationsDate || stations.snapshot_date > resolvedStationsDate) {
+          resolvedStationsDate = stations.snapshot_date;
         }
         const w = stations.payload?.weather || {};
         if (w.nacWeather) centerWeather[row.center_id] = w.nacWeather;
@@ -97,6 +139,9 @@ serve(async (req) => {
         missingZoneIds,
         forecastFetchedAt: mostRecentForecastFetched,
         stationsFetchedAt: mostRecentStationsFetched,
+        forecastDate: resolvedForecastDate,
+        stationsDate: resolvedStationsDate,
+        requestedDate,
         centerWeather,
         zoneNwsForecasts,
         centerAvgDiscussions,
