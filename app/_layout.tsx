@@ -7,6 +7,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import "react-native-reanimated";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import {
   useFonts as useSerifFonts,
@@ -70,18 +71,20 @@ export default function RootLayout() {
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={navTheme}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: palette.ink[950] },
-          }}
-        >
-          <Stack.Screen name="index" />
-        </Stack>
-        <StatusBar style="light" />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider value={navTheme}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: palette.ink[950] },
+            }}
+          >
+            <Stack.Screen name="index" />
+          </Stack>
+          <StatusBar style="light" />
+        </ThemeProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
