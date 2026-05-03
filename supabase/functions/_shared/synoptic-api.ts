@@ -66,6 +66,10 @@ export interface StationObservation {
     hourlySpeed72hr?: TempDataPoint[];  // hourly speed (mph), last 72h
     hourlyGust24hr?: TempDataPoint[];   // hourly gust (mph), last 24h
     hourlyGust72hr?: TempDataPoint[];   // hourly gust (mph), last 72h
+    // Direction is in degrees (0–360, meteorological FROM convention).
+    // Used to render direction barbs under the wind chart.
+    hourlyDirection24hr?: TempDataPoint[];
+    hourlyDirection72hr?: TempDataPoint[];
   } | null; // null if station doesn't have wind sensors
   dataQuality: 'good' | 'partial' | 'poor';
 }
@@ -300,6 +304,8 @@ function buildObservation(
       hourlySpeed72hr: hourlyPoints(wspdVals, timestamps, 72),
       hourlyGust24hr: hourlyPoints(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 24),
       hourlyGust72hr: hourlyPoints(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 72),
+      hourlyDirection24hr: hourlyPoints(wdirVals, timestamps, 24),
+      hourlyDirection72hr: hourlyPoints(wdirVals, timestamps, 72),
     } : null,
     dataQuality,
   };
