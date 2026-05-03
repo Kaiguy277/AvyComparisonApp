@@ -179,25 +179,37 @@ export function MetricChart({
         {`${formatNum(layout.min)}${unit || ""}`}
       </SvgText>
 
-      {/* X-axis time labels */}
-      <SvgText
-        x={layout.leftPad}
-        y={height - 4}
-        fontSize={10}
-        fill={labelColor}
-        textAnchor="start"
-      >
-        {`-${hours}H`}
-      </SvgText>
-      <SvgText
-        x={VB_W - 4}
-        y={height - 4}
-        fontSize={10}
-        fill={labelColor}
-        textAnchor="end"
-      >
-        NOW
-      </SvgText>
+      {/* X-axis time-of-day ticks. Four evenly spaced labels showing actual
+          local times across the period. Derived from the first/last data
+          timestamps so the labels track the real data window. */}
+      {(() => {
+        const all = series.flatMap((s) => s.data);
+        if (all.length < 2) return null;
+        const stamps = all.map((d) => new Date(d.timestamp).getTime());
+        const tMin = Math.min(...stamps);
+        const tMax = Math.max(...stamps);
+        const ticks = 4;
+        const elements = [];
+        for (let i = 0; i < ticks; i++) {
+          const frac = i / (ticks - 1);
+          const t = tMin + frac * (tMax - tMin);
+          const x = layout.leftPad + frac * layout.usableW;
+          const label = formatTickTime(new Date(t), tMax - tMin);
+          elements.push(
+            <SvgText
+              key={`tick-${i}`}
+              x={x}
+              y={height - 4}
+              fontSize={9}
+              fill={labelColor}
+              textAnchor={i === 0 ? "start" : i === ticks - 1 ? "end" : "middle"}
+            >
+              {label}
+            </SvgText>,
+          );
+        }
+        return elements;
+      })()}
 
       {/* Series rendering */}
       {layout.projected.map((s, idx) => {
@@ -284,5 +296,21 @@ function formatNum(n: number): string {
   if (Math.abs(n) >= 10) return Math.round(n).toString();
   if (Math.abs(n) >= 1) return n.toFixed(1);
   return n.toFixed(2);
+}
+
+// Compact time-of-day label. Adapts format based on how wide the window
+// is — short windows show hour-only ("6P"), longer windows show
+// day+hour ("Tue 6P") so the user knows which day a tick refers to.
+function formatTickTime(d: Date, rangeMs: number): string {
+  const hour = d.getHours();
+  const ampm = hour >= 12 ? "P" : "A";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const hourLabel = `${h12}${ampm}`;
+  if (rangeMs > 36 * 60 * 60 * 1000) {
+    // Long window — include day-of-week prefix
+    const day = d.toLocaleDateString("en-US", { weekday: "short" });
+    return `${day} ${hourLabel}`;
+  }
+  return hourLabel;
 }
 

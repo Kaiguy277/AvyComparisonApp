@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import { Text } from "@/components/ui/Text";
 import { MetricChart } from "./MetricChart";
 import { WindCompass } from "./WindCompass";
+import { WindDirectionRow } from "./WindDirectionRow";
 import { palette } from "@/constants/design";
 import type { TempDataPoint, WeatherObservation } from "@/lib/api/avalanche";
 
@@ -207,54 +208,23 @@ function TempBlock({ obs, period }: { obs: WeatherObservation; period: Period })
   const series = period === 24 ? t.hourly24hr : t.hourly72hr;
   const high = period === 24 ? t.high24hr : t.high72hr;
   const low = period === 24 ? t.low24hr : t.low72hr;
-  const trendCfg = trendStyle(t.trend, t.current);
 
   return (
     <View>
       <SectionLabel>TEMP</SectionLabel>
 
-      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 14 }}>
-        <Text
-          variant="mono"
-          weight="bold"
-          style={{
-            color: palette.ink[50],
-            fontSize: 56,
-            letterSpacing: -1.5,
-            lineHeight: 58,
-          }}
-        >
-          {t.current !== null ? `${t.current}°` : "—"}
-        </Text>
-        {trendCfg ? (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 999,
-              borderWidth: 0.5,
-              borderColor: trendCfg.border,
-              backgroundColor: trendCfg.bg,
-            }}
-          >
-            <Ionicons name={trendCfg.icon} size={12} color={trendCfg.fg} />
-            <Text
-              variant="mono"
-              weight="medium"
-              style={{
-                fontSize: 10,
-                letterSpacing: 1.4,
-                color: trendCfg.fg,
-              }}
-            >
-              {trendCfg.label}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      <Text
+        variant="mono"
+        weight="bold"
+        style={{
+          color: palette.ink[50],
+          fontSize: 56,
+          letterSpacing: -1.5,
+          lineHeight: 58,
+        }}
+      >
+        {t.current !== null ? `${t.current}°` : "—"}
+      </Text>
 
       {series && series.length >= 2 ? (
         <View style={{ marginTop: 14 }}>
@@ -297,6 +267,7 @@ function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period })
 
   const speedSeries = period === 24 ? w.hourlySpeed24hr : w.hourlySpeed72hr;
   const gustSeries = period === 24 ? w.hourlyGust24hr : w.hourlyGust72hr;
+  const dirSeries = period === 24 ? w.hourlyDirection24hr : w.hourlyDirection72hr;
   const avg = period === 24 ? w.speedAvg24hr : w.speedAvg72hr;
   const max = period === 24 ? w.speedMax24hr : w.speedMax72hr;
   const dir = period === 24 ? w.direction24hr : w.direction72hr;
@@ -357,6 +328,12 @@ function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period })
 
       {speedSeries && speedSeries.length >= 2 ? (
         <View style={{ marginTop: 14 }}>
+          {/* Direction sits above the speed/gust chart and shares the same
+              x-axis so the user reads all three wind dimensions in one
+              vertical glance. */}
+          {dirSeries && dirSeries.length >= 2 ? (
+            <WindDirectionRow data={dirSeries} />
+          ) : null}
           <MetricChart
             hours={period}
             height={104}
@@ -377,9 +354,9 @@ function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period })
             ]}
           />
           <View style={{ flexDirection: "row", gap: 14, marginTop: 8 }}>
-            <LegendDot color={palette.ink[100]} label="speed" />
+            <LegendDot color={palette.ink[100]} label="hourly avg" />
             {gustSeries && gustSeries.length >= 2 ? (
-              <LegendDot color={palette.aspen[400]} label="gusts" />
+              <LegendDot color={palette.aspen[400]} label="hourly max gust" />
             ) : null}
           </View>
         </View>
@@ -599,47 +576,6 @@ function DataNote({ children }: { children: string }) {
       {children}
     </Text>
   );
-}
-
-function trendStyle(
-  trend: "warming" | "cooling" | "stable" | null,
-  current: number | null,
-):
-  | {
-      icon: keyof typeof import("@expo/vector-icons").Ionicons.glyphMap;
-      label: string;
-      fg: string;
-      bg: string;
-      border: string;
-    }
-  | null {
-  if (!trend) return null;
-  if (trend === "warming") {
-    const hot = current !== null && current > 32;
-    return {
-      icon: "trending-up",
-      label: "WARMING",
-      fg: hot ? palette.aspen[400] : palette.ink[100],
-      bg: hot ? palette.aspen[500] + "20" : palette.ink[700] + "80",
-      border: hot ? palette.aspen[500] + "60" : palette.ink[600],
-    };
-  }
-  if (trend === "cooling") {
-    return {
-      icon: "trending-down",
-      label: "COOLING",
-      fg: palette.frost[400],
-      bg: palette.frost[400] + "1A",
-      border: palette.frost[600],
-    };
-  }
-  return {
-    icon: "remove-outline",
-    label: "STABLE",
-    fg: palette.ink[300],
-    bg: palette.ink[700] + "80",
-    border: palette.ink[600],
-  };
 }
 
 // Suppress unused-var: TempDataPoint kept for type clarity above
