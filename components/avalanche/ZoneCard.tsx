@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { ActivityIndicator, Linking, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Collapsible } from "@/components/ui/Collapsible";
@@ -10,19 +12,12 @@ import { AvalancheProblemCard } from "./AvalancheProblemCard";
 import { WeatherStationCard } from "./WeatherStationCard";
 import { WeatherForecastCard } from "./WeatherForecastCard";
 import { dangerColors, freshness, palette } from "@/constants/design";
-import { ZONE_TO_CENTER } from "@/lib/zones";
 import type {
   AvalancheZone,
   DangerRating,
   ElevationDanger,
   ZoneWeatherForecast,
 } from "@/lib/api/avalanche";
-
-// Resolve a zone to its avalanche-center ID so we can deep-link to the
-// official observations page (avalanche.org aggregates obs per center).
-function centerIdFor(zone: AvalancheZone): string {
-  return ZONE_TO_CENTER[zone.id] || "";
-}
 
 interface Props {
   zone: AvalancheZone;
@@ -88,6 +83,15 @@ export function ZoneCard({
     ? dangerColors[highest(today.danger)].fill
     : palette.ink[500];
 
+  // Each zone card collapses by default — the header (name, freshness,
+  // today/tomorrow danger panel) gives the at-a-glance read; tap to expand
+  // for bottom line, problems, forecaster discussion, weather + stations.
+  const [expanded, setExpanded] = useState(false);
+  const toggleExpanded = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setExpanded((v) => !v);
+  };
+
   return (
     <Card variant="raised">
       <View
@@ -99,240 +103,371 @@ export function ZoneCard({
         }}
       />
 
-      <View style={{ paddingHorizontal: 20, paddingTop: 18 }}>
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="flex-1">
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-ink-300"
-              style={{ fontSize: 12, letterSpacing: 1.8 }}
+      {/* Two layouts: a dense scannable summary when collapsed (name +
+          today's elevation ratings + problem chips) so 3–4 zones fit on a
+          screen; the full header with dates, freshness badge, and
+          Today+Tomorrow panel when expanded. Tapping the row toggles. */}
+      {!expanded ? (
+        <Pressable onPress={toggleExpanded}>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: 12,
+              paddingBottom: 12,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
             >
-              ZONE
-            </Text>
-            <Text
-              variant="display"
-              className="text-ink-50"
-              style={{ fontSize: 36, lineHeight: 40, marginTop: 4 }}
-            >
-              {zone.name}
-            </Text>
-            <View className="flex-row gap-2 mt-2">
-              {zone.freshness.issueDate ? (
-                <View>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: fresh.fill,
+                }}
+              />
+              <Text
+                variant="display"
+                className="text-ink-50"
+                style={{ fontSize: 18, lineHeight: 22, flex: 1 }}
+                numberOfLines={1}
+              >
+                {zone.name}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={16}
+                color={palette.ink[300]}
+              />
+            </View>
+
+            {today ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 6,
+                  marginTop: 10,
+                }}
+              >
+                <ElevationChip code="ALP" rating={today.danger.alpine} />
+                <ElevationChip code="TL" rating={today.danger.treeline} />
+                <ElevationChip code="BTL" rating={today.danger.belowTreeline} />
+              </View>
+            ) : null}
+
+            {zone.problems && zone.problems.length > 0 ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 6,
+                  marginTop: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                {zone.problems.map((p, i) => (
+                  <ProblemChip key={i} name={p.name} />
+                ))}
+              </View>
+            ) : null}
+
+            {/* Compact issued / expires footnote — quick read of how
+                fresh the forecast is without expanding. */}
+            {zone.freshness.issueDate || zone.freshness.expiresDate ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 12,
+                  marginTop: 8,
+                }}
+              >
+                {zone.freshness.issueDate ? (
                   <Text
                     variant="mono"
                     className="text-ink-400"
                     style={{ fontSize: 9, letterSpacing: 1.2 }}
                   >
-                    ISSUED
+                    ISSUED{" "}
+                    <Text className="text-ink-200" style={{ fontSize: 9 }}>
+                      {zone.freshness.issueDate}
+                    </Text>
                   </Text>
-                  <Text
-                    variant="mono"
-                    className="text-ink-200"
-                    style={{ fontSize: 11 }}
-                  >
-                    {zone.freshness.issueDate}
-                  </Text>
-                </View>
-              ) : null}
-              {zone.freshness.expiresDate ? (
-                <View>
+                ) : null}
+                {zone.freshness.expiresDate ? (
                   <Text
                     variant="mono"
                     className="text-ink-400"
                     style={{ fontSize: 9, letterSpacing: 1.2 }}
                   >
-                    EXPIRES
+                    EXPIRES{" "}
+                    <Text
+                      style={{
+                        fontSize: 9,
+                        color:
+                          zone.freshness.status === "expired"
+                            ? "#FCA5A5"
+                            : zone.freshness.status === "expiring"
+                              ? palette.aspen[400]
+                              : palette.ink[200],
+                      }}
+                    >
+                      {zone.freshness.expiresDate}
+                    </Text>
                   </Text>
-                  <Text
-                    variant="mono"
-                    style={{
-                      fontSize: 11,
-                      color:
-                        zone.freshness.status === "expired"
-                          ? "#FCA5A5"
-                          : zone.freshness.status === "expiring"
-                            ? palette.aspen[400]
-                            : palette.ink[200],
-                    }}
-                  >
-                    {zone.freshness.expiresDate}
-                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
+      ) : (
+        <Pressable onPress={toggleExpanded}>
+          <View style={{ paddingHorizontal: 20, paddingTop: 18 }}>
+            <View className="flex-row items-start justify-between gap-3">
+              <View className="flex-1">
+                <Text
+                  variant="mono"
+                  weight="medium"
+                  className="text-ink-300"
+                  style={{ fontSize: 12, letterSpacing: 1.8 }}
+                >
+                  ZONE
+                </Text>
+                <Text
+                  variant="display"
+                  className="text-ink-50"
+                  style={{ fontSize: 36, lineHeight: 40, marginTop: 4 }}
+                >
+                  {zone.name}
+                </Text>
+                <View className="flex-row gap-2 mt-2">
+                  {zone.freshness.issueDate ? (
+                    <View>
+                      <Text
+                        variant="mono"
+                        className="text-ink-400"
+                        style={{ fontSize: 9, letterSpacing: 1.2 }}
+                      >
+                        ISSUED
+                      </Text>
+                      <Text
+                        variant="mono"
+                        className="text-ink-200"
+                        style={{ fontSize: 11 }}
+                      >
+                        {zone.freshness.issueDate}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {zone.freshness.expiresDate ? (
+                    <View>
+                      <Text
+                        variant="mono"
+                        className="text-ink-400"
+                        style={{ fontSize: 9, letterSpacing: 1.2 }}
+                      >
+                        EXPIRES
+                      </Text>
+                      <Text
+                        variant="mono"
+                        style={{
+                          fontSize: 11,
+                          color:
+                            zone.freshness.status === "expired"
+                              ? "#FCA5A5"
+                              : zone.freshness.status === "expiring"
+                                ? palette.aspen[400]
+                                : palette.ink[200],
+                        }}
+                      >
+                        {zone.freshness.expiresDate}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Badge fill={fresh.fill} ink={fresh.ink}>
+                  {fresh.label}
+                </Badge>
+                <Ionicons
+                  name="chevron-up"
+                  size={18}
+                  color={palette.ink[300]}
+                />
+              </View>
             </View>
           </View>
-          <Badge fill={fresh.fill} ink={fresh.ink}>
-            {fresh.label}
-          </Badge>
-        </View>
 
-        <View className="flex-row items-center gap-3 mt-3 flex-wrap">
-          {zone.forecastUrl ? (
-            <Pressable
-              onPress={() => Linking.openURL(zone.forecastUrl)}
-              className="flex-row items-center gap-1.5"
-              hitSlop={8}
+          {today ? (
+            <View
+              style={{
+                marginTop: 18,
+                marginHorizontal: 20,
+                paddingTop: 18,
+                paddingBottom: 20,
+                borderTopWidth: 0.5,
+                borderColor: palette.ink[700],
+                flexDirection: "row",
+                gap: 12,
+              }}
             >
+              <DayColumn
+                danger={today.danger}
+                label="TODAY"
+                date={formatRelativeDate(today.date, 0)}
+              />
+              {tomorrow ? (
+                <>
+                  <View
+                    style={{
+                      width: 0.5,
+                      backgroundColor: palette.ink[700],
+                      marginVertical: 4,
+                    }}
+                  />
+                  <DayColumn
+                    danger={tomorrow.danger}
+                    label="TOMORROW"
+                    date={formatRelativeDate(tomorrow.date, 1)}
+                  />
+                </>
+              ) : null}
+            </View>
+          ) : null}
+        </Pressable>
+      )}
+
+      {/* Everything below is gated by the expanded state. The forecast
+          link, announcement, bottom line, problems, forecaster discussion,
+          weather outlook, and stations all hide when collapsed. */}
+      {!expanded ? null : (
+        <>
+          <View style={{ paddingHorizontal: 20, paddingBottom: 4 }}>
+            <View className="flex-row items-center gap-3 flex-wrap">
+              {zone.forecastUrl ? (
+                <Pressable
+                  onPress={() => Linking.openURL(zone.forecastUrl)}
+                  hitSlop={8}
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingVertical: 7,
+                    paddingHorizontal: 12,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: palette.frost[400],
+                    backgroundColor: pressed
+                      ? palette.frost[400] + "33"
+                      : palette.frost[400] + "1A",
+                  })}
+                >
+                  <Ionicons
+                    name="open-outline"
+                    size={13}
+                    color={palette.frost[400]}
+                  />
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: 1.2,
+                      color: palette.frost[400],
+                      textDecorationLine: "underline",
+                    }}
+                  >
+                    VIEW OFFICIAL FORECAST & RECENT OBS
+                  </Text>
+                </Pressable>
+              ) : null}
+              {zone.author ? (
+                <Text
+                  variant="mono"
+                  className="text-ink-400"
+                  style={{ fontSize: 10, letterSpacing: 1.2 }}
+                >
+                  · BY {zone.author.toUpperCase()}
+                </Text>
+              ) : null}
+            </View>
+
+            {zone.announcement ? (
+              <View
+                style={{
+                  marginTop: 14,
+                  padding: 12,
+                  borderRadius: 10,
+                  borderWidth: 0.5,
+                  borderColor: palette.aspen[500],
+                  backgroundColor: palette.aspen[500] + "1A",
+                  flexDirection: "row",
+                  gap: 10,
+                }}
+              >
+                <Ionicons
+                  name="warning"
+                  size={14}
+                  color={palette.aspen[400]}
+                  style={{ marginTop: 2 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-aspen-400"
+                    style={{ fontSize: 10, letterSpacing: 1.4, marginBottom: 4 }}
+                  >
+                    ANNOUNCEMENT
+                  </Text>
+                  <Text
+                    className="text-ink-100"
+                    style={{ fontSize: 13, lineHeight: 19 }}
+                  >
+                    {zone.announcement}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          <CardContent style={{ paddingTop: 4 }} className="gap-3">
+        {/* Bottom line — the full forecaster narrative, quoted as the
+            headline read. Wrapped in a Collapsible (default open) so users
+            who've already read it can tuck it away to get to the problems
+            faster, but it's the primary read so it expands by default. */}
+        {zone.travelAdvice && zone.travelAdvice.trim() ? (
+          <Collapsible
+            leadingAccent={palette.frost[500]}
+            title={
               <Text
                 variant="mono"
                 weight="medium"
                 className="text-frost-400"
-                style={{ fontSize: 10, letterSpacing: 1.4 }}
+                style={{ fontSize: 11, letterSpacing: 1.6 }}
               >
-                OFFICIAL FORECAST
+                BOTTOM LINE
               </Text>
-              <Ionicons
-                name="arrow-forward-outline"
-                size={11}
-                color={palette.frost[400]}
-                style={{ transform: [{ rotate: "-45deg" }] }}
-              />
-            </Pressable>
-          ) : null}
-          <Pressable
-            onPress={() =>
-              Linking.openURL(
-                `https://avalanche.org/observations/?center_id=${centerIdFor(zone)}`,
-              )
             }
-            className="flex-row items-center gap-1.5"
-            hitSlop={8}
           >
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-frost-400"
-              style={{ fontSize: 10, letterSpacing: 1.4 }}
-            >
-              RECENT OBS
-            </Text>
-            <Ionicons
-              name="arrow-forward-outline"
-              size={11}
-              color={palette.frost[400]}
-              style={{ transform: [{ rotate: "-45deg" }] }}
-            />
-          </Pressable>
-          {zone.author ? (
-            <Text
-              variant="mono"
-              className="text-ink-400"
-              style={{ fontSize: 10, letterSpacing: 1.2 }}
-            >
-              · BY {zone.author.toUpperCase()}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Announcement / advisory banner — when NAC ships an alert */}
-        {zone.announcement ? (
-          <View
-            style={{
-              marginTop: 14,
-              padding: 12,
-              borderRadius: 10,
-              borderWidth: 0.5,
-              borderColor: palette.aspen[500],
-              backgroundColor: palette.aspen[500] + "1A",
-              flexDirection: "row",
-              gap: 10,
-            }}
-          >
-            <Ionicons
-              name="warning"
-              size={14}
-              color={palette.aspen[400]}
-              style={{ marginTop: 2 }}
-            />
-            <View style={{ flex: 1 }}>
-              <Text
-                variant="mono"
-                weight="medium"
-                className="text-aspen-400"
-                style={{ fontSize: 10, letterSpacing: 1.4, marginBottom: 4 }}
-              >
-                ANNOUNCEMENT
-              </Text>
-              <Text
-                className="text-ink-100"
-                style={{ fontSize: 13, lineHeight: 19 }}
-              >
-                {zone.announcement}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Headline danger panel — today + tomorrow, side by side */}
-      {today ? (
-        <View
-          style={{
-            marginTop: 18,
-            marginHorizontal: 20,
-            paddingTop: 18,
-            paddingBottom: 20,
-            borderTopWidth: 0.5,
-            borderColor: palette.ink[700],
-            flexDirection: "row",
-            gap: 12,
-          }}
-        >
-          <DayColumn
-            danger={today.danger}
-            label="TODAY"
-            date={formatRelativeDate(today.date, 0)}
-          />
-          {tomorrow ? (
-            <>
-              <View
-                style={{
-                  width: 0.5,
-                  backgroundColor: palette.ink[700],
-                  marginVertical: 4,
-                }}
-              />
-              <DayColumn
-                danger={tomorrow.danger}
-                label="TOMORROW"
-                date={formatRelativeDate(tomorrow.date, 1)}
-              />
-            </>
-          ) : null}
-        </View>
-      ) : null}
-
-      <CardContent style={{ paddingTop: 4 }} className="gap-3">
-        {/* Bottom line — the full forecaster narrative, quoted as the
-            headline read. Used to be a synthesized first sentence labeled
-            "KEY MESSAGE"; we now surface the whole thing because it's the
-            primary thing a backcountry user wants to read. */}
-        {zone.travelAdvice && zone.travelAdvice.trim() ? (
-          <View
-            style={{
-              paddingLeft: 16,
-              borderLeftWidth: 2,
-              borderColor: palette.frost[500],
-              marginVertical: 8,
-            }}
-          >
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-frost-400"
-              style={{ fontSize: 11, letterSpacing: 1.6, marginBottom: 6 }}
-            >
-              BOTTOM LINE
-            </Text>
             <Text
               className="text-ink-50"
               style={{ fontSize: 16, lineHeight: 23 }}
             >
               {zone.travelAdvice.trim()}
             </Text>
-          </View>
+          </Collapsible>
         ) : null}
 
         {/* Problems — structured data only (name, likelihood, size, aspect) */}
@@ -489,8 +624,101 @@ export function ZoneCard({
             </Text>
           </View>
         ) : null}
-      </CardContent>
+          </CardContent>
+        </>
+      )}
     </Card>
+  );
+}
+
+// Compact danger chip used in the collapsed-card summary. Shows the
+// elevation code (ALP/TL/BTL) tinted by danger color so the rating reads
+// at a glance without needing an explicit label.
+const RATING_ABBREV: Record<DangerRating, string> = {
+  LOW: "LOW",
+  MODERATE: "MOD",
+  CONSIDERABLE: "CONS",
+  HIGH: "HIGH",
+  EXTREME: "EXTR",
+  NO_RATING: "—",
+};
+
+function ElevationChip({
+  code,
+  rating,
+}: {
+  code: string;
+  rating: DangerRating;
+}) {
+  const c = dangerColors[rating];
+  return (
+    <View
+      style={{
+        flex: 1,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 6,
+        backgroundColor: c.fill,
+        flexDirection: "row",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        gap: 6,
+      }}
+    >
+      <Text
+        variant="mono"
+        weight="bold"
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.2,
+          color: c.ink,
+          opacity: 0.7,
+        }}
+      >
+        {code}
+      </Text>
+      <Text
+        variant="mono"
+        weight="bold"
+        style={{
+          fontSize: 11,
+          letterSpacing: 0.6,
+          color: c.ink,
+        }}
+      >
+        {RATING_ABBREV[rating]}
+      </Text>
+    </View>
+  );
+}
+
+// Tiny pill with the avalanche problem name. Aspen-tinted to match the
+// PROBLEMS section in the expanded card — visual continuity makes it
+// obvious what the chips represent.
+function ProblemChip({ name }: { name: string }) {
+  return (
+    <View
+      style={{
+        paddingVertical: 3,
+        paddingHorizontal: 7,
+        borderRadius: 5,
+        borderWidth: 0.5,
+        borderColor: palette.aspen[500] + "99",
+        backgroundColor: palette.aspen[500] + "1A",
+      }}
+    >
+      <Text
+        variant="mono"
+        weight="medium"
+        style={{
+          fontSize: 9,
+          letterSpacing: 1.2,
+          color: palette.aspen[400],
+        }}
+      >
+        {name.toUpperCase()}
+      </Text>
+    </View>
   );
 }
 
