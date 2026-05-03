@@ -10,11 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kaimyers.avycomparison"
+      "bundleIdentifier": "com.kaimyers.avycomparison",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#070A14",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -33,9 +36,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#070A14",
+          "backgroundColor": "#FFFFFF",
           "dark": {
-            "backgroundColor": "#070A14"
+            "backgroundColor": "#FFFFFF"
           }
         }
       ]
