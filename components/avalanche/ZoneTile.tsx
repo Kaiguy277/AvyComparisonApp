@@ -20,10 +20,15 @@ const ELEVATIONS: { key: keyof ElevationDanger; label: string }[] = [
   { key: "belowTreeline", label: "BTL" },
 ];
 
-function startCase(s: string): string {
-  if (!s) return s;
-  return s.charAt(0) + s.slice(1).toLowerCase();
-}
+// Compact rating words that fit the narrow tile column without
+// truncating. The detail screen still spells them in full.
+const RATING_LABEL: Record<string, string> = {
+  LOW: "Low",
+  MODERATE: "Mod",
+  CONSIDERABLE: "Cons",
+  HIGH: "High",
+  EXTREME: "Extr",
+};
 
 // Color the freshness word by status. Green for current is intentionally
 // muted (the calm state); aspen + red carry the alert weight.
@@ -56,8 +61,8 @@ export function ZoneTile({ zone }: Props) {
         flex: 1,
         minWidth: 0,
         backgroundColor: palette.ink[800],
-        borderWidth: 1.5,
-        borderColor: palette.ink[600],
+        borderWidth: 2,
+        borderColor: palette.ink[700],
         borderRadius: 12,
         overflow: "hidden",
         opacity: pressed ? 0.7 : 1,
@@ -145,7 +150,7 @@ export function ZoneTile({ zone }: Props) {
                     }}
                     numberOfLines={1}
                   >
-                    {r === "NO_RATING" ? "—" : startCase(c.label)}
+                    {r === "NO_RATING" ? "—" : (RATING_LABEL[c.label] ?? c.label)}
                   </Text>
                 </View>
               );

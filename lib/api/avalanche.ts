@@ -262,7 +262,7 @@ export const avalancheApi = {
       body: { zoneIds },
     });
     if (error) {
-      console.error("Error calling avalanche-summary:", error);
+      console.warn("Error calling avalanche-summary:", error);
       // FunctionsHttpError stashes the raw Response on .context — log
       // status + body so we can see what the function actually returned.
       try {
@@ -288,7 +288,7 @@ export const avalancheApi = {
       body: forecastDate ? { zoneIds, forecastDate } : { zoneIds },
     });
     if (error) {
-      console.error("Error calling get-cached-forecasts:", error);
+      console.warn("Error calling get-cached-forecasts:", error);
       return { success: false, error: error.message };
     }
     return data;
@@ -299,7 +299,7 @@ export const avalancheApi = {
       body: { zoneIds },
     });
     if (error) {
-      console.error("Error calling get-snotel-observations:", error);
+      console.warn("Error calling get-snotel-observations:", error);
       return { success: false, error: error.message };
     }
     return data;
@@ -310,7 +310,7 @@ export const avalancheApi = {
       body: { zoneIds },
     });
     if (error) {
-      console.error("Error calling get-weather-forecast:", error);
+      console.warn("Error calling get-weather-forecast:", error);
       return { success: false, error: error.message };
     }
     return data;
