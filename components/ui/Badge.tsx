@@ -25,7 +25,7 @@ const variantStyles: Record<BadgeVariant, { container: string; text: string }> =
   subtle: { container: "bg-ink-700/60", text: "text-ink-200" },
   frost: { container: "bg-frost-400/15 border border-frost-400/30", text: "text-frost-400" },
   aspen: { container: "bg-aspen-500/15 border border-aspen-500/30", text: "text-aspen-400" },
-  danger: { container: "bg-danger-high/15 border border-danger-high/40", text: "text-[#FCA5A5]" },
+  danger: { container: "bg-danger-high/15 border border-danger-high/40", text: "text-[#DC2626]" },
 };
 
 export function Badge({

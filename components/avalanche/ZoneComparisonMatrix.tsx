@@ -125,7 +125,7 @@ export function ZoneComparisonMatrix({ zones }: Props) {
                       variant="mono"
                       className={
                         expired
-                          ? "text-[#FCA5A5]"
+                          ? "text-[#DC2626]"
                           : expiring
                             ? "text-aspen-400"
                             : "text-ink-200"

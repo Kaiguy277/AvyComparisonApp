@@ -843,7 +843,7 @@ export default function Index() {
               borderRadius: 12,
               borderWidth: 0.5,
               borderColor: snapshot && isStale(snapshot.fetchedAt)
-                ? "#FCA5A5"
+                ? "#DC2626"
                 : palette.aspen[500],
               backgroundColor: snapshot && isStale(snapshot.fetchedAt)
                 ? "rgba(252, 165, 165, 0.10)"
@@ -857,7 +857,7 @@ export default function Index() {
                   size={16}
                   color={
                     snapshot && isStale(snapshot.fetchedAt)
-                      ? "#FCA5A5"
+                      ? "#DC2626"
                       : palette.aspen[400]
                   }
                 />
@@ -870,7 +870,7 @@ export default function Index() {
                       letterSpacing: 1.4,
                       color:
                         snapshot && isStale(snapshot.fetchedAt)
-                          ? "#FCA5A5"
+                          ? "#DC2626"
                           : palette.aspen[400],
                     }}
                   >
@@ -2061,7 +2061,7 @@ function PushDiagnosticLine() {
               backgroundColor:
                 diag!.step === "permission-denied"
                   ? palette.aspen[400]
-                  : "#FCA5A5",
+                  : "#DC2626",
             }}
           />
           <Text
@@ -2072,7 +2072,7 @@ function PushDiagnosticLine() {
               color:
                 diag!.step === "permission-denied"
                   ? palette.aspen[400]
-                  : "#FCA5A5",
+                  : "#DC2626",
             }}
           >
             PUSH · {diag!.step.toUpperCase()}

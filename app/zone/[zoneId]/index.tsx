@@ -45,7 +45,7 @@ function startCase(s: string): string {
 }
 
 function freshnessColor(status: keyof typeof freshness): string {
-  if (status === "expired") return "#FCA5A5";
+  if (status === "expired") return "#DC2626";
   if (status === "expiring") return palette.aspen[400];
   if (status === "recent") return palette.frost[400];
   if (status === "unknown") return palette.ink[400];
@@ -55,7 +55,7 @@ function freshnessColor(status: keyof typeof freshness): string {
 function ageColor(iso: string | undefined): string {
   const h = ageHours(iso);
   if (h === null) return palette.ink[400];
-  if (h > 12) return "#FCA5A5";
+  if (h > 12) return "#DC2626";
   if (h > 3) return palette.aspen[400];
   return palette.ink[300];
 }
@@ -231,7 +231,7 @@ export default function ZoneDetailScreen() {
                       fontSize: 11,
                       color:
                         zone.freshness.status === "expired"
-                          ? "#FCA5A5"
+                          ? "#DC2626"
                           : zone.freshness.status === "expiring"
                             ? palette.aspen[400]
                             : palette.ink[200],

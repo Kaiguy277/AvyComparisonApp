@@ -281,7 +281,7 @@ function PermissionRow({
             state === "granted"
               ? "#52BA4A"
               : state === "denied"
-                ? "#FCA5A5"
+                ? "#DC2626"
                 : palette.ink[800],
         }}
       >

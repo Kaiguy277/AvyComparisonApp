@@ -21,7 +21,7 @@ interface Props {
 // Color the freshness word by status. Green for current is intentionally
 // muted (the calm state); aspen + red carry the alert weight.
 function freshnessColor(status: keyof typeof freshness): string {
-  if (status === "expired") return "#FCA5A5";
+  if (status === "expired") return "#DC2626";
   if (status === "expiring") return palette.aspen[400];
   if (status === "recent") return palette.frost[400];
   if (status === "unknown") return palette.ink[400];
@@ -277,7 +277,7 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                   letterSpacing: 0.4,
                   color:
                     zone.freshness.status === "expired"
-                      ? "#FCA5A5"
+                      ? "#DC2626"
                       : zone.freshness.status === "expiring"
                         ? palette.aspen[400]
                         : palette.ink[400],
