@@ -352,7 +352,11 @@ export default function ZoneDetailScreen() {
             >
               <SubTile
                 label="Problems"
-                lines={zone.problems?.map((p) => p.name) ?? []}
+                lines={
+                  zone.problems?.map((p) =>
+                    p.likelihood ? `${p.name} · ${p.likelihood}` : p.name,
+                  ) ?? []
+                }
                 emptyText="None today"
                 icon="alert-circle-outline"
                 accent={palette.aspen[400]}
