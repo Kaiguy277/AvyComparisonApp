@@ -27,6 +27,10 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 
 import { palette } from "@/constants/design";
+// Imported for its side effect: TaskManager.defineTask runs at module load
+// so iOS can dispatch into the headless JS runtime when the OS schedules a
+// background wake. Must be imported before app code touches TaskManager.
+import { registerBackgroundRefresh } from "@/lib/backgroundRefresh";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -67,6 +71,13 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync().catch(() => {});
   }, [loaded]);
+
+  // Register the background refresh task on every launch. iOS persists
+  // registrations across launches but re-registering is a cheap no-op,
+  // and it's the cleanest place to run after permissions/state are ready.
+  useEffect(() => {
+    registerBackgroundRefresh();
+  }, []);
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;
 

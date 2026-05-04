@@ -1,0 +1,112 @@
+import * as TaskManager from "expo-task-manager";
+import * as BackgroundTask from "expo-background-task";
+import { Platform } from "react-native";
+
+import {
+  loadFavorites,
+  loadSnapshot,
+  pruneSnapshot,
+  saveSnapshot,
+  todayIsoDate,
+  type FavoritesSnapshot,
+} from "./offlineCache";
+import { avalancheApi } from "./api/avalanche";
+import { ZONE_TO_CENTER } from "./zones";
+
+// Task identifier persisted by iOS BGTaskScheduler. Must be a stable
+// string — changing it after release leaves orphaned scheduled tasks.
+export const BG_TASK_NAME = "avy.refresh-favorites";
+
+// 15 minutes is the floor iOS will respect; the OS schedules less often
+// based on usage patterns, battery, network, and the user's per-app
+// Background App Refresh setting. There is no guarantee about cadence —
+// this is a hint, not a contract.
+const MIN_INTERVAL_MINUTES = 15;
+
+// defineTask must be evaluated at module load (before app entry resolves)
+// so iOS can dispatch into it when the OS wakes the headless JS runtime.
+// Importing this file from app/_layout.tsx achieves that ordering.
+TaskManager.defineTask(BG_TASK_NAME, async () => {
+  try {
+    const favs = await loadFavorites();
+    if (!favs || favs.length === 0) {
+      return BackgroundTask.BackgroundTaskResult.Success;
+    }
+
+    const r = await avalancheApi.getCachedForecasts(favs);
+    if (!r.success || !r.zones) {
+      return BackgroundTask.BackgroundTaskResult.Failed;
+    }
+
+    const date = r.forecastDate || todayIsoDate();
+    let next: FavoritesSnapshot =
+      (await loadSnapshot()) || { fetchedAt: "", zones: {} };
+    const favSet = new Set(favs);
+    for (const z of r.zones) {
+      if (!favSet.has(z.id)) continue;
+      const cid = ZONE_TO_CENTER[z.id];
+      const weather = {
+        nacWeather: cid ? r.centerWeather?.[cid] : undefined,
+        nwsForecast: r.zoneNwsForecasts?.[z.id],
+        avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
+        avgLocations: r.zoneAvgLocations?.[z.id],
+      };
+      next = {
+        fetchedAt: new Date().toISOString(),
+        zones: {
+          ...next.zones,
+          [z.id]: {
+            ...(next.zones[z.id] || {}),
+            [date]: {
+              forecast: z,
+              stations: z.weatherObservations,
+              weather,
+              cachedAt: new Date().toISOString(),
+            },
+          },
+        },
+      };
+    }
+
+    next = pruneSnapshot(next, favs);
+    await saveSnapshot(next);
+    console.log(`[bg-task] cached ${r.zones.length} zones for ${date}`);
+    return BackgroundTask.BackgroundTaskResult.Success;
+  } catch (err) {
+    console.warn("[bg-task] failed", err);
+    return BackgroundTask.BackgroundTaskResult.Failed;
+  }
+});
+
+// Web has no native background scheduler. Calls become no-ops so the
+// browser dev preview doesn't error.
+const isSupported = Platform.OS === "ios" || Platform.OS === "android";
+
+export async function registerBackgroundRefresh(): Promise<void> {
+  if (!isSupported) return;
+  try {
+    const status = await BackgroundTask.getStatusAsync();
+    if (status === BackgroundTask.BackgroundTaskStatus.Restricted) {
+      console.warn(
+        "[bg-task] restricted — user has Background App Refresh disabled",
+      );
+      return;
+    }
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(BG_TASK_NAME);
+    if (isRegistered) return;
+    await BackgroundTask.registerTaskAsync(BG_TASK_NAME, {
+      minimumInterval: MIN_INTERVAL_MINUTES,
+    });
+    console.log(`[bg-task] registered (>= ${MIN_INTERVAL_MINUTES}min)`);
+  } catch (err) {
+    console.warn("[bg-task] register failed", err);
+  }
+}
+
+export async function unregisterBackgroundRefresh(): Promise<void> {
+  if (!isSupported) return;
+  try {
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(BG_TASK_NAME);
+    if (isRegistered) await BackgroundTask.unregisterTaskAsync(BG_TASK_NAME);
+  } catch {}
+}
