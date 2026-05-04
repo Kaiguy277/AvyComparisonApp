@@ -58,7 +58,7 @@ import { Text } from "@/components/ui/Text";
 import { FavoritesReorder } from "@/components/avalanche/FavoritesReorder";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
 import { ZoneMapPicker } from "@/components/avalanche/ZoneMapPicker";
-import { ZoneCard } from "@/components/avalanche/ZoneCard";
+import { ZoneTile } from "@/components/avalanche/ZoneTile";
 import { PermissionsIntro } from "@/components/onboarding/PermissionsIntro";
 import { TopoBackground } from "@/components/visual/TopoBackground";
 import { freshness, palette } from "@/constants/design";
@@ -1375,16 +1375,28 @@ export default function Index() {
                     {summary.zones.length}
                   </Text>
                 </View>
-                <View style={{ paddingHorizontal: 16, gap: 8 }}>
+                {/* 2-column grid of zone tiles. Tap → /zone/[zoneId]
+                    detail. Pairs render side by side; an odd number of
+                    favorites still aligns left because the spacer fills
+                    the right column at the tail. */}
+                <View
+                  style={{
+                    paddingHorizontal: 12,
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 10,
+                  }}
+                >
                   {orderedZones.map((zone) => (
-                    <ZoneCard
+                    <View
                       key={zone.id}
-                      zone={zone}
-                      isSnotelLoading={isSnotelLoading}
-                      isWeatherForecastLoading={isWeatherForecastLoading}
-                      weatherForecast={getZoneWeatherForecast(zone.id)}
-                      dataFetchedAt={scrapedAt ?? undefined}
-                    />
+                      style={{
+                        width: "48.5%",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <ZoneTile zone={zone} />
+                    </View>
                   ))}
                 </View>
               </View>

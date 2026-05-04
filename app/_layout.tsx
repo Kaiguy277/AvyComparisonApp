@@ -98,6 +98,8 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="index" />
+            <Stack.Screen name="zone/[zoneId]/index" />
+            <Stack.Screen name="zone/[zoneId]/specifics" />
           </Stack>
           <StatusBar style="light" />
         </ThemeProvider>
