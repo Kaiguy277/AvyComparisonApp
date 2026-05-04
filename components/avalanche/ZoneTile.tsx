@@ -104,18 +104,38 @@ export function ZoneTile({ zone, viewedDate }: Props) {
             {fresh.label.toUpperCase()}
           </Text>
 
-          {/* Row: mountain glyph on the left, highest-elevation station
-              readout on the right. The mountain carries the danger
-              numerals (1..5) inside itself. The right column shows
-              station name + elevation, then a stacked list of icon+
-              value rows for temp, wind, and 24h new-snow delta. */}
+          {/* Station name + elevation — full-width above the mountain
+              row so long names ("Eagle River Valley", etc.) are never
+              truncated. */}
+          {station ? (
+            <Text
+              variant="mono"
+              weight="bold"
+              style={{
+                fontSize: 9,
+                letterSpacing: 1,
+                color: palette.ink[400],
+                marginTop: 14,
+              }}
+              numberOfLines={2}
+            >
+              {station.stationName.toUpperCase()}
+              {typeof station.elevation === "number"
+                ? ` · ${station.elevation.toLocaleString()}′`
+                : ""}
+            </Text>
+          ) : null}
+
+          {/* Row: mountain glyph (with danger numerals 1..5 inside its
+              bands) on the left, current station readouts on the right.
+              Stacked icon+value rows: temp, wind, 24h new-snow delta. */}
           {today ? (
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "flex-start",
-                gap: 10,
-                marginTop: 14,
+                gap: 12,
+                marginTop: station ? 6 : 14,
               }}
             >
               <MountainDanger
@@ -124,59 +144,33 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                 labelMode="numbers"
               />
               {station ? (
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text
-                    variant="mono"
-                    weight="bold"
-                    style={{
-                      fontSize: 9,
-                      letterSpacing: 1,
-                      color: palette.ink[400],
-                    }}
-                    numberOfLines={1}
-                  >
-                    {station.stationName.toUpperCase()}
-                  </Text>
-                  {typeof station.elevation === "number" ? (
-                    <Text
-                      variant="mono"
-                      style={{
-                        fontSize: 9,
-                        letterSpacing: 0.6,
-                        color: palette.ink[400],
-                        marginBottom: 4,
-                      }}
-                    >
-                      {station.elevation.toLocaleString()}′
-                    </Text>
-                  ) : null}
-                  <View style={{ gap: 3 }}>
-                    <StationStat
-                      icon="thermometer-outline"
-                      value={
-                        station.temperature.current !== null
-                          ? `${station.temperature.current}°`
-                          : "—"
-                      }
-                    />
-                    <StationStat
-                      icon="speedometer-outline"
-                      value={
-                        station.wind?.speedCurrent !== null &&
-                        station.wind?.speedCurrent !== undefined
-                          ? `${Math.round(station.wind.speedCurrent)}${
-                              station.wind.direction
-                                ? ` ${station.wind.direction}`
-                                : ""
-                            }`
-                          : "—"
-                      }
-                    />
-                    <StationStat
-                      icon="snow-outline"
-                      value={formatSnowDelta(station.snow.depth24hrChange)}
-                    />
-                  </View>
+                <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                  <StationStat
+                    icon="thermometer-outline"
+                    value={
+                      station.temperature.current !== null
+                        ? `${station.temperature.current}°`
+                        : "—"
+                    }
+                  />
+                  <StationStat
+                    icon="speedometer-outline"
+                    value={
+                      station.wind?.speedCurrent !== null &&
+                      station.wind?.speedCurrent !== undefined
+                        ? `${Math.round(station.wind.speedCurrent)}${
+                            station.wind.direction
+                              ? ` ${station.wind.direction}`
+                              : ""
+                          }`
+                        : "—"
+                    }
+                  />
+                  <StationStat
+                    icon="snow-outline"
+                    value={formatSnowDelta(station.snow.depth24hrChange)}
+                    suffix="24H"
+                  />
                 </View>
               ) : null}
             </View>
@@ -285,9 +279,13 @@ export function ZoneTile({ zone, viewedDate }: Props) {
 function StationStat({
   icon,
   value,
+  suffix,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   value: string;
+  // Tiny muted-mono trailing label, e.g. "24H" on the snow-delta stat
+  // to disambiguate it from a current reading.
+  suffix?: string;
 }) {
   return (
     <View
@@ -313,6 +311,19 @@ function StationStat({
       >
         {value}
       </Text>
+      {suffix ? (
+        <Text
+          variant="mono"
+          style={{
+            fontSize: 8,
+            letterSpacing: 0.8,
+            color: palette.ink[400],
+            marginLeft: 1,
+          }}
+        >
+          {suffix}
+        </Text>
+      ) : null}
     </View>
   );
 }
