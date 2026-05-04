@@ -1354,6 +1354,7 @@ export default function Index() {
                       isSnotelLoading={isSnotelLoading}
                       isWeatherForecastLoading={isWeatherForecastLoading}
                       weatherForecast={getZoneWeatherForecast(zone.id)}
+                      dataFetchedAt={scrapedAt ?? undefined}
                     />
                   ))}
                 </View>

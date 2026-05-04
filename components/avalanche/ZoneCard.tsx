@@ -12,6 +12,7 @@ import { AvalancheProblemCard } from "./AvalancheProblemCard";
 import { WeatherStationCard } from "./WeatherStationCard";
 import { WeatherForecastCard } from "./WeatherForecastCard";
 import { dangerColors, freshness, palette } from "@/constants/design";
+import { ageHours, formatAge } from "@/lib/offlineCache";
 import type {
   AvalancheZone,
   DangerRating,
@@ -24,6 +25,23 @@ interface Props {
   isSnotelLoading?: boolean;
   isWeatherForecastLoading?: boolean;
   weatherForecast?: ZoneWeatherForecast;
+  // ISO timestamp of when the underlying bundle was last fetched (server
+  // cache when online, snapshot fetchedAt when offline). Drives the small
+  // "FETCHED Xh ago" badge in the card header so age is visible at a glance
+  // on every card, not just buried in the offline banner.
+  dataFetchedAt?: string;
+}
+
+// Map fetch age to a tint so old data is visually obvious.
+//   < 3h   →  muted (normal)
+//   3–12h  →  aspen (warning — older than the cron cadence by a wide margin)
+//   > 12h  →  red   (alarm — likely from before today)
+function ageColor(iso: string | undefined): string {
+  const h = ageHours(iso);
+  if (h === null) return palette.ink[400];
+  if (h > 12) return "#FCA5A5";
+  if (h > 3) return palette.aspen[400];
+  return palette.ink[300];
 }
 
 const RATING_ORDER: DangerRating[] = [
@@ -78,6 +96,7 @@ export function ZoneCard({
   isSnotelLoading,
   isWeatherForecastLoading,
   weatherForecast,
+  dataFetchedAt,
 }: Props) {
   const fresh = freshness[zone.freshness.status];
   const today = zone.forecast?.[0];
@@ -178,9 +197,9 @@ export function ZoneCard({
               </View>
             ) : null}
 
-            {/* Compact issued / expires footnote — quick read of how
-                fresh the forecast is without expanding. */}
-            {zone.freshness.issueDate || zone.freshness.expiresDate ? (
+            {/* Compact issued / expires / fetched footnote — quick read of
+                how fresh the forecast is without expanding. */}
+            {zone.freshness.issueDate || zone.freshness.expiresDate || dataFetchedAt ? (
               <View
                 style={{
                   flexDirection: "row",
@@ -220,6 +239,18 @@ export function ZoneCard({
                       }}
                     >
                       {zone.freshness.expiresDate}
+                    </Text>
+                  </Text>
+                ) : null}
+                {dataFetchedAt ? (
+                  <Text
+                    variant="mono"
+                    className="text-ink-400"
+                    style={{ fontSize: 9, letterSpacing: 1.2 }}
+                  >
+                    FETCHED{" "}
+                    <Text style={{ fontSize: 9, color: ageColor(dataFetchedAt) }}>
+                      {formatAge(dataFetchedAt).toUpperCase()}
                     </Text>
                   </Text>
                 ) : null}
@@ -288,6 +319,23 @@ export function ZoneCard({
                         }}
                       >
                         {zone.freshness.expiresDate}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {dataFetchedAt ? (
+                    <View>
+                      <Text
+                        variant="mono"
+                        className="text-ink-400"
+                        style={{ fontSize: 9, letterSpacing: 1.2 }}
+                      >
+                        FETCHED
+                      </Text>
+                      <Text
+                        variant="mono"
+                        style={{ fontSize: 11, color: ageColor(dataFetchedAt) }}
+                      >
+                        {formatAge(dataFetchedAt).toUpperCase()}
                       </Text>
                     </View>
                   ) : null}
