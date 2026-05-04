@@ -49,21 +49,6 @@ export function ZoneTile({ zone }: Props) {
     router.push({ pathname: "/zone/[zoneId]", params: { zoneId: zone.id } });
   };
 
-  const headlineRating = today
-    ? ([today.danger.alpine, today.danger.treeline, today.danger.belowTreeline].reduce(
-        (b, c) =>
-          (
-            ["NO_RATING", "LOW", "MODERATE", "CONSIDERABLE", "HIGH", "EXTREME"] as DangerRating[]
-          ).indexOf(c) >
-          (
-            ["NO_RATING", "LOW", "MODERATE", "CONSIDERABLE", "HIGH", "EXTREME"] as DangerRating[]
-          ).indexOf(b)
-            ? c
-            : b,
-      ) as DangerRating)
-    : ("NO_RATING" as DangerRating);
-  const headlineColor = dangerColors[headlineRating].fill;
-
   return (
     <Pressable
       onPress={onPress}
@@ -71,22 +56,13 @@ export function ZoneTile({ zone }: Props) {
         flex: 1,
         minWidth: 0,
         backgroundColor: palette.ink[800],
-        borderWidth: 1,
-        borderColor: palette.ink[600],
-        borderRadius: 14,
+        borderWidth: 0.5,
+        borderColor: palette.ink[500] + "AA",
+        borderRadius: 12,
         overflow: "hidden",
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      {/* Top danger stripe — at-a-glance scan when stacked in a 2-col
-          grid. Headline color is the worst rating across elevations. */}
-      <View
-        style={{
-          height: 6,
-          backgroundColor: headlineColor,
-        }}
-      />
-
       <View style={{ padding: 12 }}>
 
       {/* Name + freshness word */}

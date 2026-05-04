@@ -5,47 +5,42 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        // Editorial serif for display moments — gravitas, weather-report feel
         display: ["InstrumentSerif_400Regular"],
         "display-italic": ["InstrumentSerif_400Regular_Italic"],
-        // UI sans — humanist grotesque, characterful but legible
         sans: ["InstrumentSans_400Regular"],
         "sans-medium": ["InstrumentSans_500Medium"],
         "sans-semibold": ["InstrumentSans_600SemiBold"],
         "sans-bold": ["InstrumentSans_700Bold"],
-        // Data/numeric — instrument panel feel for timestamps, elevations, mph
         mono: ["JetBrainsMono_400Regular"],
         "mono-medium": ["JetBrainsMono_500Medium"],
         "mono-bold": ["JetBrainsMono_700Bold"],
       },
       colors: {
-        // Cold dawn palette
+        // Warm-paper editorial palette.
         ink: {
-          950: "#070A14", // page bg, deepest
-          900: "#0B1220", // card bg
-          800: "#141C2E", // raised surface
-          700: "#1E2840", // hover/active surface
-          600: "#2A3550", // border strong
-          500: "#3B4A6B", // border default
-          400: "#5A6B8C", // muted text
-          300: "#8794AE", // secondary text
-          200: "#B8C2D6", // body text
-          100: "#E1E7F0", // primary text
-          50: "#F5F8FC",  // brightest, headlines
+          950: "#EDE5D2", // page bg
+          900: "#E5DCC4", // recessed surface
+          800: "#F6EFDD", // tile / raised surface
+          700: "#1B1916", // strong ink line
+          600: "#3A332A", // medium ink
+          500: "#A89A82", // soft sepia border
+          400: "#7B7160", // muted text
+          300: "#5C534A", // secondary text
+          200: "#2E2A24", // body text
+          100: "#1B1916", // primary text
+          50: "#0F0D0B",  // emphasis text
         },
-        // Frost accent — used sparingly for emphasis
         frost: {
-          400: "#67D5F0",
-          500: "#3DB8E0",
-          600: "#1F94BF",
+          400: "#3F7AB8",
+          500: "#2D5F95",
+          600: "#1F4773",
         },
-        // Aspen — sunrise-on-snow warm accent
         aspen: {
-          400: "#F0C674",
-          500: "#E8B765",
-          600: "#C99850",
+          400: "#B25437",
+          500: "#92402A",
+          600: "#73311F",
         },
-        // NAC official danger rating colors
+        // NAC official danger rating colors (locked).
         danger: {
           low: "#52BA4A",
           moderate: "#FFF200",
@@ -53,11 +48,10 @@ module.exports = {
           high: "#ED1C24",
           extreme: "#000000",
           extremeBorder: "#ED1C24",
-          none: "#5A6B8C",
+          none: "#A89A82",
         },
       },
       spacing: {
-        // Hairline borders for refined cards
         hairline: "0.5px",
       },
       borderRadius: {

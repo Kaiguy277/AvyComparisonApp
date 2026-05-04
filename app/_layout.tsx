@@ -1,7 +1,7 @@
 import "../global.css";
 import { useEffect } from "react";
 import { View } from "react-native";
-import { DarkTheme, ThemeProvider } from "@react-navigation/native";
+import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -41,9 +41,9 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 const queryClient = new QueryClient();
 
 const navTheme = {
-  ...DarkTheme,
+  ...DefaultTheme,
   colors: {
-    ...DarkTheme.colors,
+    ...DefaultTheme.colors,
     background: palette.ink[950],
     card: palette.ink[900],
     text: palette.ink[100],
@@ -104,7 +104,7 @@ export default function RootLayout() {
             <Stack.Screen name="zone/[zoneId]/nws" />
             <Stack.Screen name="zone/[zoneId]/stations" />
           </Stack>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
         </ThemeProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>

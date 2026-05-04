@@ -285,24 +285,24 @@ export default function ZoneDetailScreen() {
                     ? `${zone.problems.length} listed`
                     : "—"
                 }
-                icon="alert-circle"
-                accent="#F7941D"
+                icon="alert-circle-outline"
+                accent={palette.aspen[400]}
                 disabled={!zone.problems || zone.problems.length === 0}
                 onPress={() => navigateTo("problems")}
               />
               <SubTile
                 label="Full forecast"
                 value={hasFullForecast(zone, bundle) ? "Read" : "—"}
-                icon="newspaper"
-                accent="#67D5F0"
+                icon="newspaper-outline"
+                accent={palette.frost[400]}
                 disabled={!hasFullForecast(zone, bundle)}
                 onPress={() => navigateTo("forecast")}
               />
               <SubTile
                 label="NWS forecast"
                 value={bundle?.weather?.nwsForecast ? "Read" : "—"}
-                icon="cloud"
-                accent="#5377A8"
+                icon="cloud-outline"
+                accent={palette.frost[500]}
                 disabled={!bundle?.weather?.nwsForecast}
                 onPress={() => navigateTo("nws")}
               />
@@ -313,8 +313,8 @@ export default function ZoneDetailScreen() {
                     ? `${bundle.stations.length} active`
                     : "—"
                 }
-                icon="thermometer"
-                accent="#52BA4A"
+                icon="thermometer-outline"
+                accent="#3D8A37"
                 disabled={!bundle?.stations?.length}
                 onPress={() => navigateTo("stations")}
               />
@@ -522,100 +522,77 @@ function SubTile({
   disabled?: boolean;
   onPress: () => void;
 }) {
-  // Tile pops via three layered moves on the dark page bg:
-  //   1. Translucent accent fill (10% opacity) so the tile reads as a
-  //      colored card instead of disappearing into the page.
-  //   2. Solid accent stripe along the top edge — instant identity scan.
-  //   3. Big circular icon glyph in the accent color, anchored upper-left.
-  // Disabled state collapses the accent treatment so unavailable tiles
-  // recede instead of demanding attention.
+  // On warm-paper bg the tile reads as a contained card just by sitting
+  // a half-step lighter than the page (raised surface ink-800) inside a
+  // hairline ink-500 border. The accent color shows in the icon glyph
+  // and the chevron — no fills, stripes, or chrome required.
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       style={({ pressed }) => ({
         width: "48.5%",
-        backgroundColor: disabled
-          ? palette.ink[900]
-          : accent + "1F",
-        borderWidth: 1,
-        borderColor: disabled ? palette.ink[700] : accent + "55",
-        borderRadius: 14,
-        overflow: "hidden",
-        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
-        minHeight: 130,
+        backgroundColor: palette.ink[800],
+        borderWidth: 0.5,
+        borderColor: palette.ink[500] + "AA",
+        borderRadius: 12,
+        padding: 14,
+        opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+        minHeight: 116,
+        justifyContent: "space-between",
       })}
     >
-      {!disabled ? (
-        <View
-          style={{
-            height: 4,
-            backgroundColor: accent,
-          }}
-        />
-      ) : null}
       <View
         style={{
-          padding: 14,
-          flex: 1,
-          justifyContent: "space-between",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
         }}
       >
-        <View
+        <Ionicons
+          name={icon}
+          size={20}
+          color={disabled ? palette.ink[400] : accent}
+        />
+        <Text
+          variant="mono"
+          weight="bold"
           style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: disabled ? palette.ink[800] : accent + "33",
-            alignItems: "center",
-            justifyContent: "center",
+            fontSize: 10,
+            letterSpacing: 1.4,
+            color: disabled ? palette.ink[400] : accent,
+            flex: 1,
+          }}
+          numberOfLines={1}
+        >
+          {label.toUpperCase()}
+        </Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          marginTop: 12,
+        }}
+      >
+        <Text
+          variant="display"
+          style={{
+            fontSize: 18,
+            lineHeight: 22,
+            color: disabled ? palette.ink[400] : palette.ink[100],
           }}
         >
+          {value}
+        </Text>
+        {!disabled ? (
           <Ionicons
-            name={icon}
-            size={20}
-            color={disabled ? palette.ink[400] : accent}
+            name="chevron-forward"
+            size={14}
+            color={palette.ink[400]}
           />
-        </View>
-        <View>
-          <Text
-            variant="mono"
-            weight="bold"
-            style={{
-              fontSize: 10,
-              letterSpacing: 1.4,
-              color: disabled ? palette.ink[400] : accent,
-              marginBottom: 4,
-            }}
-          >
-            {label.toUpperCase()}
-          </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text
-              variant="display"
-              style={{
-                fontSize: 18,
-                lineHeight: 22,
-                color: disabled ? palette.ink[400] : palette.ink[50],
-              }}
-            >
-              {value}
-            </Text>
-            {!disabled ? (
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={accent}
-              />
-            ) : null}
-          </View>
-        </View>
+        ) : null}
       </View>
     </Pressable>
   );
