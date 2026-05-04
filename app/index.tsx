@@ -214,7 +214,6 @@ export default function Index() {
     if (!isOnline || favoriteZoneIds.length === 0) return;
     const now = Date.now();
     if (now - lastBgFetchRef.current < 30 * 60 * 1000) return;
-    lastBgFetchRef.current = now;
     try {
       // The server-side cache (refreshed by cron every 1–2h) is fast enough
       // and complete enough that we don't need separate live calls here.
@@ -254,6 +253,9 @@ export default function Index() {
       next = pruneSnapshot(next, favoriteZoneIds);
       await saveSnapshot(next);
       setSnapshot(next);
+      // Tick throttle only after a successful save — a failed fetch
+      // shouldn't eat the next 30-minute retry window.
+      lastBgFetchRef.current = now;
       console.log(`[bg-refresh] cached ${r.zones.length} zones for ${date}`);
     } catch (err) {
       console.warn("[bg-refresh] failed", err);
@@ -405,8 +407,12 @@ export default function Index() {
   // in-memory summary or weather bundle changes. Only favorites are written
   // — random one-off selections shouldn't bloat AsyncStorage. Each write
   // tags the bundle with `viewedDate` so back-scrolling can read it later.
+  // Skip when the summary was just loaded FROM the snapshot — re-stamping
+  // `fetchedAt` and `cachedAt` would falsify the freshness signal (banner
+  // reads "0m ago" even though the underlying data is hours/days old).
   useEffect(() => {
     if (!summary || favoriteZoneIds.length === 0) return;
+    if (loadSource === "offline") return;
     const favSet = new Set(favoriteZoneIds);
     (async () => {
       let next: FavoritesSnapshot =
@@ -451,7 +457,7 @@ export default function Index() {
         setSnapshot(pruned);
       }
     })();
-  }, [summary, weatherForecastData, favoriteZoneIds, viewedDate]);
+  }, [summary, weatherForecastData, favoriteZoneIds, viewedDate, loadSource]);
 
   const fetchSnotel = useCallback(async (zoneIds: string[]) => {
     setIsSnotelLoading(true);
