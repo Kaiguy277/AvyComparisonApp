@@ -6,8 +6,11 @@ import type { ElevationDanger } from "@/lib/api/avalanche";
 // Single mountain silhouette, divided horizontally into three bands —
 // alpine on top, near-treeline in the middle, below-treeline at the
 // base — each filled with the NAC danger color for that elevation.
-// Each band carries its label inside (A / TL / BTL) so the glyph is
-// self-explanatory; A on alpine fits the narrow apex.
+// Each band carries a label inside; the labelMode prop chooses what
+// it shows:
+//   "letters"  → A / TL / BTL  (which elevation band it represents)
+//   "numbers"  → 1..5          (the danger level for that band)
+//   "none"     → no labels     (color-only, smallest read)
 //
 // EXTREME's official rendering is black with a red border; that's
 // preserved by stroking the affected band's interior cut with the
@@ -16,7 +19,7 @@ import type { ElevationDanger } from "@/lib/api/avalanche";
 interface Props {
   danger: ElevationDanger;
   size?: number; // viewport width in px (height scales 0.8x)
-  showLabels?: boolean;
+  labelMode?: "letters" | "numbers" | "none";
 }
 
 const Y_PEAK = 6;
@@ -59,7 +62,7 @@ const BELOW_LABEL_Y = 67;
 export function MountainDanger({
   danger,
   size = 56,
-  showLabels = true,
+  labelMode = "letters",
 }: Props) {
   const aFill = dangerColors[danger.alpine].fill;
   const tFill = dangerColors[danger.treeline].fill;
@@ -72,6 +75,19 @@ export function MountainDanger({
   const aInk = dangerColors[danger.alpine].ink;
   const tInk = dangerColors[danger.treeline].ink;
   const bInk = dangerColors[danger.belowTreeline].ink;
+
+  let aLabel = "";
+  let tLabel = "";
+  let bLabel = "";
+  if (labelMode === "letters") {
+    aLabel = "A";
+    tLabel = "TL";
+    bLabel = "BTL";
+  } else if (labelMode === "numbers") {
+    aLabel = String(dangerColors[danger.alpine].level || "—");
+    tLabel = String(dangerColors[danger.treeline].level || "—");
+    bLabel = String(dangerColors[danger.belowTreeline].level || "—");
+  }
 
   return (
     <View style={{ width: size, height: (size * 80) / 100 }}>
@@ -95,37 +111,37 @@ export function MountainDanger({
           fill="none"
           strokeLinejoin="round"
         />
-        {showLabels ? (
+        {labelMode !== "none" ? (
           <>
             <SvgText
               x={50}
               y={ALPINE_LABEL_Y}
-              fontSize={9}
+              fontSize={labelMode === "numbers" ? 11 : 9}
               fontWeight="bold"
               fill={aInk}
               textAnchor="middle"
             >
-              A
+              {aLabel}
             </SvgText>
             <SvgText
               x={50}
               y={TREELINE_LABEL_Y}
-              fontSize={9}
+              fontSize={labelMode === "numbers" ? 11 : 9}
               fontWeight="bold"
               fill={tInk}
               textAnchor="middle"
             >
-              TL
+              {tLabel}
             </SvgText>
             <SvgText
               x={50}
               y={BELOW_LABEL_Y}
-              fontSize={9}
+              fontSize={labelMode === "numbers" ? 11 : 9}
               fontWeight="bold"
               fill={bInk}
               textAnchor="middle"
             >
-              BTL
+              {bLabel}
             </SvgText>
           </>
         ) : null}
