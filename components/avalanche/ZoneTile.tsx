@@ -82,7 +82,7 @@ export function ZoneTile({ zone, viewedDate }: Props) {
         })}
       >
         <View style={{ padding: 12 }}>
-          {/* Name + freshness word */}
+          {/* Zone name */}
           <Text
             variant="display"
             className="text-ink-50"
@@ -90,18 +90,6 @@ export function ZoneTile({ zone, viewedDate }: Props) {
             numberOfLines={2}
           >
             {zone.name}
-          </Text>
-          <Text
-            variant="mono"
-            weight="bold"
-            style={{
-              fontSize: 10,
-              letterSpacing: 1.2,
-              color: freshnessColor(zone.freshness.status),
-              marginTop: 4,
-            }}
-          >
-            {fresh.label.toUpperCase()}
           </Text>
 
           {/* Station name + elevation — full-width above the mountain
@@ -192,6 +180,66 @@ export function ZoneTile({ zone, viewedDate }: Props) {
             </View>
           )}
 
+          {/* Freshness word + issued/expires meta — clustered so the
+              user reads CURRENT/EXPIRED right above the dates that
+              determined that status. */}
+          <View style={{ marginTop: 12, gap: 2 }}>
+            <Text
+              variant="mono"
+              weight="bold"
+              style={{
+                fontSize: 10,
+                letterSpacing: 1.2,
+                color: freshnessColor(zone.freshness.status),
+                marginBottom: 2,
+              }}
+            >
+              {fresh.label.toUpperCase()}
+            </Text>
+            {zone.freshness.issueDate ? (
+              <Text
+                variant="mono"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: 0.6,
+                  color: palette.ink[400],
+                }}
+                numberOfLines={1}
+              >
+                ISSUED{" "}
+                <Text style={{ fontSize: 9, color: palette.ink[200] }}>
+                  {zone.freshness.issueDate}
+                </Text>
+              </Text>
+            ) : null}
+              {zone.freshness.expiresDate ? (
+                <Text
+                  variant="mono"
+                  style={{
+                    fontSize: 9,
+                    letterSpacing: 0.6,
+                    color: palette.ink[400],
+                  }}
+                  numberOfLines={1}
+                >
+                  EXPIRES{" "}
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      color:
+                        zone.freshness.status === "expired"
+                          ? "#FCA5A5"
+                          : zone.freshness.status === "expiring"
+                            ? palette.aspen[400]
+                            : palette.ink[200],
+                    }}
+                  >
+                    {zone.freshness.expiresDate}
+                  </Text>
+                </Text>
+              ) : null}
+          </View>
+
           {/* Problem names listed. */}
           {zone.problems && zone.problems.length > 0 ? (
             <View style={{ marginTop: 12 }}>
@@ -220,54 +268,6 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                   {p.name}
                 </Text>
               ))}
-            </View>
-          ) : null}
-
-          {/* Issued + expires meta. */}
-          {zone.freshness.issueDate || zone.freshness.expiresDate ? (
-            <View style={{ marginTop: 12, gap: 2 }}>
-              {zone.freshness.issueDate ? (
-                <Text
-                  variant="mono"
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: 0.6,
-                    color: palette.ink[400],
-                  }}
-                  numberOfLines={1}
-                >
-                  ISSUED{" "}
-                  <Text style={{ fontSize: 9, color: palette.ink[200] }}>
-                    {zone.freshness.issueDate}
-                  </Text>
-                </Text>
-              ) : null}
-              {zone.freshness.expiresDate ? (
-                <Text
-                  variant="mono"
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: 0.6,
-                    color: palette.ink[400],
-                  }}
-                  numberOfLines={1}
-                >
-                  EXPIRES{" "}
-                  <Text
-                    style={{
-                      fontSize: 9,
-                      color:
-                        zone.freshness.status === "expired"
-                          ? "#FCA5A5"
-                          : zone.freshness.status === "expiring"
-                            ? palette.aspen[400]
-                            : palette.ink[200],
-                    }}
-                  >
-                    {zone.freshness.expiresDate}
-                  </Text>
-                </Text>
-              ) : null}
             </View>
           ) : null}
         </View>
