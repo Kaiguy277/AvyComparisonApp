@@ -867,101 +867,155 @@ export default function Index() {
           </View>
         ) : null}
 
-        {/* HERO — slim status strip. The user already knows what app this
-            is and what they're here for; we just need a sense of place
-            (logo + wordmark) and a date stamp. ~50px instead of ~180px. */}
+        {/* HEADER — wordmark + date pager on the top row, status meta
+            (cached/live/offline + fetched time) on a small line below.
+            Carries every bit of session-context the page needs in one
+            block, so the area above the zone tiles is just header →
+            MANAGE ZONES → tiles. */}
         <View
           style={{
             paddingHorizontal: 20,
             paddingTop: 10,
-            paddingBottom: 12,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
+            paddingBottom: 10,
             borderBottomWidth: 0.5,
-            borderColor: palette.ink[700],
+            borderColor: palette.ink[500] + "AA",
           }}
         >
-          <Image
-            source={require("@/assets/images/wordmark.png")}
-            style={{ width: 18, height: 25 }}
-            resizeMode="contain"
-          />
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-frost-400"
-            style={{ fontSize: 10, letterSpacing: 2 }}
-          >
-            AVY · COMPARISON
-          </Text>
-          <View style={{ flex: 1 }} />
-          {/* Date pager — left arrow goes back, right arrow goes forward,
-              the label between shows what day's forecast is on screen. The
-              right arrow is hidden when already on today since "tomorrow's
-              forecast" doesn't exist in the archive. */}
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
+              gap: 10,
             }}
           >
-            <Pressable
-              onPress={() => stepDate(-1)}
-              hitSlop={10}
-              disabled={!canStepBack}
+            <Image
+              source={require("@/assets/images/wordmark.png")}
+              style={{ width: 18, height: 25 }}
+              resizeMode="contain"
+            />
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-frost-400"
+              style={{ fontSize: 10, letterSpacing: 2 }}
+            >
+              AVY · COMPARISON
+            </Text>
+            <View style={{ flex: 1 }} />
+            <View
               style={{
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-                opacity: canStepBack ? 1 : 0.25,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              <Ionicons
-                name="chevron-back"
-                size={14}
-                color={palette.ink[200]}
-              />
-            </Pressable>
-            <View style={{ alignItems: "center", minWidth: 110 }}>
+              <Pressable
+                onPress={() => stepDate(-1)}
+                hitSlop={10}
+                disabled={!canStepBack}
+                style={{
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                  opacity: canStepBack ? 1 : 0.25,
+                }}
+              >
+                <Ionicons
+                  name="chevron-back"
+                  size={14}
+                  color={palette.ink[200]}
+                />
+              </Pressable>
               <Text
                 variant="mono"
                 weight="medium"
                 className="text-ink-200"
-                style={{ fontSize: 11, letterSpacing: 1.4 }}
+                style={{ fontSize: 11, letterSpacing: 1.4, minWidth: 110, textAlign: "center" }}
               >
                 {isViewingToday
                   ? `${today.weekday.slice(0, 3)} · ${today.month.slice(0, 3)} ${today.day}`
                   : viewedDateLabel(viewedDate)}
               </Text>
-              {!isViewingToday ? (
+              <Pressable
+                onPress={() => stepDate(1)}
+                hitSlop={10}
+                disabled={!canStepForward}
+                style={{
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                  opacity: canStepForward ? 1 : 0.25,
+                }}
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={14}
+                  color={palette.ink[200]}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Status meta — colored dot + source + fetched time,
+              left-aligned under the wordmark. Plain text so it
+              doesn't compete with anything tappable. */}
+          {scrapedAt ? (
+            <View
+              style={{
+                marginTop: 6,
+                flexDirection: "row",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 6,
+              }}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: !isViewingToday
+                    ? palette.aspen[400]
+                    : loadSource === "offline"
+                      ? palette.aspen[400]
+                      : "#52BA4A",
+                }}
+              />
+              <Text
+                variant="mono"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  color: palette.ink[400],
+                }}
+              >
+                {!isViewingToday
+                  ? `ARCHIVE · ${formatDateLabel(viewedDate).toUpperCase()}`
+                  : loadSource === "cached"
+                    ? "CACHED"
+                    : loadSource === "offline"
+                      ? "OFFLINE"
+                      : "LIVE"}
+                {" · "}
+                {new Date(scrapedAt)
+                  .toLocaleString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                  .toUpperCase()}
+              </Text>
+              {isSnotelLoading || isWeatherForecastLoading ? (
                 <Text
                   variant="mono"
-                  weight="medium"
-                  className="text-aspen-400"
-                  style={{ fontSize: 8, letterSpacing: 1.6, marginTop: 1 }}
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                    color: palette.aspen[400],
+                  }}
                 >
-                  ARCHIVE
+                  · {isSnotelLoading ? "STATIONS…" : "WEATHER…"}
                 </Text>
               ) : null}
             </View>
-            <Pressable
-              onPress={() => stepDate(1)}
-              hitSlop={10}
-              disabled={!canStepForward}
-              style={{
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-                opacity: canStepForward ? 1 : 0.25,
-              }}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={14}
-                color={palette.ink[200]}
-              />
-            </Pressable>
-          </View>
+          ) : null}
         </View>
 
         {/* MANAGE ZONES — tile-style pane matching the zone tiles +
@@ -1325,70 +1379,7 @@ export default function Index() {
           </View>
         </View>
 
-        {/* Status meta — plain inline text, no card chrome. The visual
-            weight is subordinate so it can't be confused with the
-            tappable panes around it (MANAGE ZONES / zone tiles). */}
-        {scrapedAt ? (
-          <View
-            style={{
-              marginTop: 18,
-              paddingHorizontal: 20,
-              flexDirection: "row",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: 8,
-            }}
-          >
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor:
-                  loadSource === "offline"
-                    ? palette.aspen[400]
-                    : !isViewingToday
-                      ? palette.aspen[400]
-                      : "#52BA4A",
-              }}
-            />
-            <Text
-              variant="mono"
-              style={{
-                fontSize: 11,
-                letterSpacing: 1.2,
-                color: palette.ink[400],
-              }}
-            >
-              {!isViewingToday
-                ? `ARCHIVE · ${formatDateLabel(viewedDate).toUpperCase()}`
-                : loadSource === "cached"
-                  ? "CACHED"
-                  : loadSource === "offline"
-                    ? "OFFLINE"
-                    : "LIVE"}
-              {" · "}
-              {new Date(scrapedAt)
-                .toLocaleString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })
-                .toUpperCase()}
-            </Text>
-            {isSnotelLoading || isWeatherForecastLoading ? (
-              <Text
-                variant="mono"
-                style={{
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: palette.aspen[400],
-                }}
-              >
-                · {isSnotelLoading ? "STATIONS…" : "WEATHER…"}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
+        {/* Status meta now lives in the header. */}
 
         {/* RESULTS */}
         {summary ? (
