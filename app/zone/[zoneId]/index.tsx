@@ -280,35 +280,43 @@ export default function ZoneDetailScreen() {
             >
               <SubTile
                 label="Problems"
-                value={zone.problems?.length ?? 0}
-                icon="alert-circle-outline"
-                accent={palette.aspen[400]}
+                value={
+                  zone.problems && zone.problems.length > 0
+                    ? `${zone.problems.length} listed`
+                    : "—"
+                }
+                icon="alert-circle"
+                accent="#F7941D"
                 disabled={!zone.problems || zone.problems.length === 0}
                 onPress={() => navigateTo("problems")}
               />
               <SubTile
-                label="Weather outlook"
-                value={hasWeatherOutlook(bundle) ? "View" : "—"}
-                icon="cloud-outline"
-                accent={palette.frost[400]}
-                disabled={!hasWeatherOutlook(bundle)}
-                onPress={() => navigateTo("weather")}
+                label="Full forecast"
+                value={hasFullForecast(zone, bundle) ? "Read" : "—"}
+                icon="newspaper"
+                accent="#67D5F0"
+                disabled={!hasFullForecast(zone, bundle)}
+                onPress={() => navigateTo("forecast")}
               />
               <SubTile
-                label="Stations"
-                value={bundle?.stations?.length ?? 0}
-                icon="hardware-chip-outline"
+                label="NWS forecast"
+                value={bundle?.weather?.nwsForecast ? "Read" : "—"}
+                icon="cloud"
+                accent="#5377A8"
+                disabled={!bundle?.weather?.nwsForecast}
+                onPress={() => navigateTo("nws")}
+              />
+              <SubTile
+                label="WX stations"
+                value={
+                  bundle?.stations && bundle.stations.length > 0
+                    ? `${bundle.stations.length} active`
+                    : "—"
+                }
+                icon="thermometer"
                 accent="#52BA4A"
                 disabled={!bundle?.stations?.length}
                 onPress={() => navigateTo("stations")}
-              />
-              <SubTile
-                label="Forecaster notes"
-                value={hasForecasterDiscussion(zone) ? "Read" : "—"}
-                icon="document-text-outline"
-                accent={palette.frost[500]}
-                disabled={!hasForecasterDiscussion(zone)}
-                onPress={() => navigateTo("discussion")}
               />
             </View>
 
@@ -514,58 +522,100 @@ function SubTile({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  // Tile pops via three layered moves on the dark page bg:
+  //   1. Translucent accent fill (10% opacity) so the tile reads as a
+  //      colored card instead of disappearing into the page.
+  //   2. Solid accent stripe along the top edge — instant identity scan.
+  //   3. Big circular icon glyph in the accent color, anchored upper-left.
+  // Disabled state collapses the accent treatment so unavailable tiles
+  // recede instead of demanding attention.
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       style={({ pressed }) => ({
         width: "48.5%",
-        backgroundColor: palette.ink[900],
-        borderWidth: 0.5,
-        borderColor: palette.ink[700],
-        borderRadius: 12,
-        padding: 14,
-        opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+        backgroundColor: disabled
+          ? palette.ink[900]
+          : accent + "1F",
+        borderWidth: 1,
+        borderColor: disabled ? palette.ink[700] : accent + "55",
+        borderRadius: 14,
+        overflow: "hidden",
+        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+        minHeight: 130,
       })}
     >
+      {!disabled ? (
+        <View
+          style={{
+            height: 4,
+            backgroundColor: accent,
+          }}
+        />
+      ) : null}
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 12,
-        }}
-      >
-        <Ionicons name={icon} size={16} color={accent} />
-        <Text
-          variant="mono"
-          weight="medium"
-          style={{ fontSize: 10, letterSpacing: 1.4, color: accent }}
-        >
-          {label.toUpperCase()}
-        </Text>
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "baseline",
+          padding: 14,
+          flex: 1,
           justifyContent: "space-between",
         }}
       >
-        <Text
-          variant="display"
-          className="text-ink-50"
-          style={{ fontSize: 22, lineHeight: 26 }}
+        <View
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            backgroundColor: disabled ? palette.ink[800] : accent + "33",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          {value}
-        </Text>
-        {!disabled ? (
           <Ionicons
-            name="chevron-forward"
-            size={14}
-            color={palette.ink[400]}
+            name={icon}
+            size={20}
+            color={disabled ? palette.ink[400] : accent}
           />
-        ) : null}
+        </View>
+        <View>
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.4,
+              color: disabled ? palette.ink[400] : accent,
+              marginBottom: 4,
+            }}
+          >
+            {label.toUpperCase()}
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text
+              variant="display"
+              style={{
+                fontSize: 18,
+                lineHeight: 22,
+                color: disabled ? palette.ink[400] : palette.ink[50],
+              }}
+            >
+              {value}
+            </Text>
+            {!disabled ? (
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={accent}
+              />
+            ) : null}
+          </View>
+        </View>
       </View>
     </Pressable>
   );
@@ -604,15 +654,22 @@ function Meta({
   );
 }
 
-function hasWeatherOutlook(bundle: ZoneSnapshot | undefined): boolean {
+// True when there's any published narrative beyond avalanche problems —
+// drives whether the "Full forecast" tile is enabled. Includes the
+// bottom line, snowpack discussion, weather discussion, the avalanche
+// center's mountain weather summary, and the AVG synthesized blurb.
+function hasFullForecast(
+  zone: AvalancheZone,
+  bundle: ZoneSnapshot | undefined,
+): boolean {
   const w = bundle?.weather;
-  return !!(w?.nacWeather || w?.nwsForecast || w?.avgDiscussion);
-}
-
-function hasForecasterDiscussion(zone: AvalancheZone): boolean {
   return !!(
+    (zone.travelAdvice && zone.travelAdvice.trim()) ||
     (zone.hazardDiscussion && zone.hazardDiscussion.trim()) ||
-    (zone.weatherDiscussion && zone.weatherDiscussion.trim())
+    (zone.weatherDiscussion && zone.weatherDiscussion.trim()) ||
+    zone.announcement ||
+    w?.nacWeather ||
+    w?.avgDiscussion
   );
 }
 

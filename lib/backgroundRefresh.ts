@@ -1,6 +1,7 @@
 import * as TaskManager from "expo-task-manager";
 import * as BackgroundTask from "expo-background-task";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 
 import {
   loadFavorites,
@@ -22,6 +23,13 @@ export const BG_TASK_NAME = "avy.refresh-favorites";
 // Background App Refresh setting. There is no guarantee about cadence —
 // this is a hint, not a contract.
 const MIN_INTERVAL_MINUTES = 15;
+
+// Expo Go doesn't include the native side of expo-background-task;
+// calling defineTask / registerTaskAsync there throws. Detect and no-op
+// so the visual preview on phone (via Expo Go) doesn't crash. In a
+// production build (TestFlight / standalone), this is false and the
+// task wires up normally.
+const isExpoGo = Constants.appOwnership === "expo";
 
 // Shared refresh body — reusable across the BGTaskScheduler wake-up, the
 // silent-push notification handler, and the in-app foreground refresh.
@@ -74,21 +82,25 @@ export async function refreshFavoritesSnapshot(
 // defineTask must be evaluated at module load (before app entry resolves)
 // so iOS can dispatch into it when the OS wakes the headless JS runtime.
 // Importing this file from app/_layout.tsx achieves that ordering.
-TaskManager.defineTask(BG_TASK_NAME, async () => {
-  try {
-    const n = await refreshFavoritesSnapshot("bg-task");
-    return n === null
-      ? BackgroundTask.BackgroundTaskResult.Failed
-      : BackgroundTask.BackgroundTaskResult.Success;
-  } catch (err) {
-    console.warn("[bg-task] threw", err);
-    return BackgroundTask.BackgroundTaskResult.Failed;
-  }
-});
+// Skipped on Expo Go (no native scheduler) and web.
+if (!isExpoGo) {
+  TaskManager.defineTask(BG_TASK_NAME, async () => {
+    try {
+      const n = await refreshFavoritesSnapshot("bg-task");
+      return n === null
+        ? BackgroundTask.BackgroundTaskResult.Failed
+        : BackgroundTask.BackgroundTaskResult.Success;
+    } catch (err) {
+      console.warn("[bg-task] threw", err);
+      return BackgroundTask.BackgroundTaskResult.Failed;
+    }
+  });
+}
 
-// Web has no native background scheduler. Calls become no-ops so the
-// browser dev preview doesn't error.
-const isSupported = Platform.OS === "ios" || Platform.OS === "android";
+// Web has no native background scheduler; Expo Go ships without
+// expo-background-task. Calls become no-ops so the dev preview doesn't error.
+const isSupported =
+  !isExpoGo && (Platform.OS === "ios" || Platform.OS === "android");
 
 export async function registerBackgroundRefresh(): Promise<void> {
   if (!isSupported) return;

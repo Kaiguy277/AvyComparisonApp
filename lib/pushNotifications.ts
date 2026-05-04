@@ -7,42 +7,51 @@ import Constants from "expo-constants";
 import { supabase } from "./supabase";
 import { refreshFavoritesSnapshot } from "./backgroundRefresh";
 
-// Background notification task — runs in headless JS when iOS/Android
-// delivers a silent push (`_contentAvailable: true` on iOS, data-only on
-// Android). Body just forwards to the shared snapshot refresh.
-//
-// defineTask must be at module scope so the runtime is bound by the time
-// the OS dispatches; importing this file from app/_layout.tsx achieves
-// that ordering.
 export const PUSH_REFRESH_TASK = "avy.push-refresh";
 
-TaskManager.defineTask(PUSH_REFRESH_TASK, async ({ error }) => {
-  if (error) {
-    console.warn("[push-task] dispatched with error", error);
-    return;
-  }
-  try {
-    await refreshFavoritesSnapshot("push");
-  } catch (err) {
-    console.warn("[push-task] threw", err);
-  }
-});
+// Expo Go ships an older notifications module without
+// getExpoPushTokenAsync support for arbitrary projectIds, and doesn't
+// route silent pushes through the headless JS task. Detect it and skip
+// the module-level wiring so the visual preview on phone doesn't crash.
+const isExpoGo = Constants.appOwnership === "expo";
 
-// While the app is foregrounded, silent-push payloads still trigger this
-// foreground handler. We don't want to surface a banner — just refresh
-// the snapshot quietly. (Real user-facing notifications would set the
-// shouldShow* fields true.)
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: false,
-    shouldShowList: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+if (!isExpoGo) {
+  // Background notification task — runs in headless JS when iOS/Android
+  // delivers a silent push (`_contentAvailable: true` on iOS, data-only
+  // on Android). Body just forwards to the shared snapshot refresh.
+  //
+  // defineTask must be at module scope so the runtime is bound by the
+  // time the OS dispatches; importing this file from app/_layout.tsx
+  // achieves that ordering.
+  TaskManager.defineTask(PUSH_REFRESH_TASK, async ({ error }) => {
+    if (error) {
+      console.warn("[push-task] dispatched with error", error);
+      return;
+    }
+    try {
+      await refreshFavoritesSnapshot("push");
+    } catch (err) {
+      console.warn("[push-task] threw", err);
+    }
+  });
 
-// Web has no native notifications API in Expo. Calls are no-ops there.
-const isSupported = Platform.OS === "ios" || Platform.OS === "android";
+  // While the app is foregrounded, silent-push payloads still trigger
+  // this foreground handler. We don't want to surface a banner — just
+  // refresh the snapshot quietly.
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: false,
+      shouldShowList: false,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
+// Web has no native notifications API in Expo, and Expo Go can't mint
+// project-specific push tokens. Calls become no-ops in either case.
+const isSupported =
+  !isExpoGo && (Platform.OS === "ios" || Platform.OS === "android");
 
 // Register the device for silent pushes and upsert its Expo push token
 // into the device_tokens table. Idempotent — safe to call on every launch.

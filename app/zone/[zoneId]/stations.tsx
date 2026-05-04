@@ -9,7 +9,7 @@ import {
   loadSnapshot,
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
-import { ZoneScreenHeader, ZoneScreenContainer } from "./_chrome";
+import { ZoneScreenHeader, ZoneScreenContainer } from "@/components/avalanche/ZoneScreenChrome";
 
 export default function ZoneStationsScreen() {
   const { zoneId } = useLocalSearchParams<{ zoneId: string }>();
