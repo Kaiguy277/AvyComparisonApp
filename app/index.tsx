@@ -964,51 +964,88 @@ export default function Index() {
           </View>
         </View>
 
-        {/* ZONE PICKER — collapsible, default open. Tap the header to
-            tuck it away once selections are dialed in. */}
+        {/* MANAGE ZONES — tile-style pane matching the zone tiles +
+            sub-tiles. Bold 2px outline on a raised surface, with a
+            press-to-toggle header that says exactly what it does
+            ("Manage zones" + "tap to expand/collapse"). */}
         <View style={{ paddingHorizontal: 16 }}>
-          <Card>
+          <View
+            style={{
+              backgroundColor: palette.ink[800],
+              borderWidth: 2,
+              borderColor: palette.ink[700],
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
             <Pressable
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
                 setPickerOpen((v) => !v);
               }}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
-              <CardHeader>
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-baseline gap-3 flex-1">
-                    <CardEyebrow>VIEW FORECAST</CardEyebrow>
-                    {favoriteZoneIds.length > 0 ? (
-                      <Text
-                        variant="mono"
-                        weight="medium"
-                        className="text-aspen-400"
-                        style={{ fontSize: 12, letterSpacing: 1.4 }}
-                      >
-                        ★ {favoriteZoneIds.length} FAV
-                      </Text>
-                    ) : null}
-                    {!pickerOpen && displayedZoneIds.length > 0 ? (
-                      <Text
-                        variant="mono"
-                        className="text-ink-400"
-                        style={{ fontSize: 11, letterSpacing: 1.2 }}
-                      >
-                        {displayedZoneIds.length} ZONE
-                        {displayedZoneIds.length === 1 ? "" : "S"}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Ionicons
-                    name={pickerOpen ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={palette.ink[300]}
-                  />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  gap: 10,
+                }}
+              >
+                <Ionicons
+                  name="list"
+                  size={20}
+                  color={palette.aspen[400]}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="mono"
+                    weight="bold"
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: 1.4,
+                      color: palette.aspen[400],
+                    }}
+                  >
+                    MANAGE ZONES
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      lineHeight: 16,
+                      color: palette.ink[300],
+                      marginTop: 2,
+                    }}
+                  >
+                    {favoriteZoneIds.length} favorite
+                    {favoriteZoneIds.length === 1 ? "" : "s"}
+                    {displayedZoneIds.length !== favoriteZoneIds.length
+                      ? ` · ${displayedZoneIds.length} on screen`
+                      : ""}
+                    {" · tap to "}
+                    {pickerOpen ? "collapse" : "add or reorder"}
+                  </Text>
                 </View>
-              </CardHeader>
+                <Ionicons
+                  name={pickerOpen ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={palette.ink[300]}
+                />
+              </View>
             </Pressable>
             {!pickerOpen ? null : (
-            <CardContent>
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingBottom: 16,
+                borderTopWidth: 0.5,
+                borderColor: palette.ink[500] + "AA",
+              }}
+            >
               {/* Unified zone tray — favorites + ad-hoc rows in one drag-
                   reorderable list. Filled star = persists across launches,
                   outline star = session-only. × removes the row entirely. */}
@@ -1283,9 +1320,9 @@ export default function Index() {
                   </Button>
                 </View>
               ) : null}
-            </CardContent>
+            </View>
             )}
-          </Card>
+          </View>
         </View>
 
         {/* STATUS BAR */}
