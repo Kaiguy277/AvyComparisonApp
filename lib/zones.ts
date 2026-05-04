@@ -377,10 +377,12 @@ export const AVAILABLE_ZONES = REGION_STRUCTURE.flatMap((region) =>
 );
 
 export const ZONE_TO_CENTER: Record<string, string> = {};
+export const ZONE_TO_CENTER_NAME: Record<string, string> = {};
 for (const region of REGION_STRUCTURE) {
   for (const center of region.centers) {
     for (const zone of center.zones) {
       ZONE_TO_CENTER[zone.id] = center.id;
+      ZONE_TO_CENTER_NAME[zone.id] = center.name;
     }
   }
 }

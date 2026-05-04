@@ -8,6 +8,7 @@ import * as Haptics from "expo-haptics";
 import { Text } from "@/components/ui/Text";
 import { MountainDanger } from "@/components/avalanche/MountainDanger";
 import { dangerColors, freshness, palette } from "@/constants/design";
+import { ZONE_TO_CENTER_NAME } from "@/lib/zones";
 import {
   ageHours,
   formatAge,
@@ -351,11 +352,8 @@ export default function ZoneDetailScreen() {
             >
               <SubTile
                 label="Problems"
-                value={
-                  zone.problems && zone.problems.length > 0
-                    ? `${zone.problems.length} listed`
-                    : "—"
-                }
+                lines={zone.problems?.map((p) => p.name) ?? []}
+                emptyText="None today"
                 icon="alert-circle-outline"
                 accent={palette.aspen[400]}
                 disabled={!zone.problems || zone.problems.length === 0}
@@ -363,7 +361,8 @@ export default function ZoneDetailScreen() {
               />
               <SubTile
                 label="Full forecast"
-                value={hasFullForecast(zone, bundle) ? "Read" : "—"}
+                lines={fullForecastLines(zone, ZONE_TO_CENTER_NAME[zoneId])}
+                emptyText="Not published"
                 icon="newspaper-outline"
                 accent={palette.frost[400]}
                 disabled={!hasFullForecast(zone, bundle)}
@@ -371,7 +370,12 @@ export default function ZoneDetailScreen() {
               />
               <SubTile
                 label="NWS forecast"
-                value={bundle?.weather?.nwsForecast ? "Read" : "—"}
+                lines={
+                  bundle?.weather?.nwsForecast
+                    ? ["Read NWS zone forecast"]
+                    : []
+                }
+                emptyText="Not bundled"
                 icon="cloud-outline"
                 accent={palette.frost[500]}
                 disabled={!bundle?.weather?.nwsForecast}
@@ -379,11 +383,10 @@ export default function ZoneDetailScreen() {
               />
               <SubTile
                 label="WX stations"
-                value={
-                  bundle?.stations && bundle.stations.length > 0
-                    ? `${bundle.stations.length} active`
-                    : "—"
+                lines={
+                  bundle?.stations?.map((s) => s.stationName ?? "Unnamed") ?? []
                 }
+                emptyText="No stations"
                 icon="thermometer-outline"
                 accent="#3D8A37"
                 disabled={!bundle?.stations?.length}
@@ -548,25 +551,28 @@ function DayColumn({
 
 function SubTile({
   label,
-  value,
+  lines,
+  emptyText,
   icon,
   accent,
   disabled,
   onPress,
 }: {
   label: string;
-  value: string | number;
+  lines: string[];
+  emptyText?: string;
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
   disabled?: boolean;
   onPress: () => void;
 }) {
-  // Larger, more square tile with a bold outline so each destination
-  // reads as its own button on the cream page. Icon at 28px sits in
-  // the upper-left, label below it, value + chevron pinned to the
-  // bottom — gives the tile real presence instead of a cramped row.
-  // Border lives on an outer View so Pressable rendering quirks on
-  // iOS (border occasionally not painting on Pressable) don't lose it.
+  // Square tile with bold outline. Icon + label up top, then a stacked
+  // list of body lines (problem names, station names, by-line, etc.),
+  // chevron pinned to the bottom-right. Each line is allowed to wrap
+  // once if a name is long; the tile clips the rest cleanly.
+  // Border lives on an outer View so Pressable rendering quirks on iOS
+  // don't drop it.
+  const showLines = lines.length > 0 ? lines : emptyText ? [emptyText] : [];
   return (
     <View
       style={{
@@ -580,62 +586,66 @@ function SubTile({
         opacity: disabled ? 0.45 : 1,
       }}
     >
-    <Pressable
-      onPress={disabled ? undefined : onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
-        flex: 1,
-        padding: 18,
-        opacity: pressed ? 0.7 : 1,
-        justifyContent: "space-between",
-      })}
-    >
-      <View>
-        <Ionicons
-          name={icon}
-          size={32}
-          color={disabled ? palette.ink[400] : accent}
-        />
-        <Text
-          variant="mono"
-          weight="bold"
-          style={{
-            fontSize: 11,
-            letterSpacing: 1.4,
-            color: disabled ? palette.ink[400] : accent,
-            marginTop: 14,
-          }}
-          numberOfLines={2}
-        >
-          {label.toUpperCase()}
-        </Text>
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-        }}
+      <Pressable
+        onPress={disabled ? undefined : onPress}
+        disabled={disabled}
+        style={({ pressed }) => ({
+          flex: 1,
+          padding: 14,
+          opacity: pressed ? 0.7 : 1,
+        })}
       >
-        <Text
-          variant="display"
-          style={{
-            fontSize: 22,
-            lineHeight: 26,
-            color: disabled ? palette.ink[400] : palette.ink[100],
-          }}
-        >
-          {value}
-        </Text>
-        {!disabled ? (
+        {/* Header — icon + label */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Ionicons
-            name="chevron-forward"
-            size={16}
-            color={palette.ink[300]}
+            name={icon}
+            size={22}
+            color={disabled ? palette.ink[400] : accent}
           />
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color: disabled ? palette.ink[400] : accent,
+              flex: 1,
+            }}
+            numberOfLines={1}
+          >
+            {label.toUpperCase()}
+          </Text>
+        </View>
+
+        {/* Body — stacked lines */}
+        <View style={{ flex: 1, marginTop: 10, gap: 2 }}>
+          {showLines.map((line, i) => (
+            <Text
+              key={i}
+              variant="display"
+              style={{
+                fontSize: 14,
+                lineHeight: 18,
+                color: disabled ? palette.ink[400] : palette.ink[100],
+              }}
+              numberOfLines={2}
+            >
+              {line}
+            </Text>
+          ))}
+        </View>
+
+        {/* Chevron — bottom right */}
+        {!disabled ? (
+          <View style={{ alignItems: "flex-end", marginTop: 4 }}>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={palette.ink[300]}
+            />
+          </View>
         ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
     </View>
   );
 }
@@ -677,6 +687,18 @@ function Meta({
 // drives whether the "Full forecast" tile is enabled. Includes the
 // bottom line, snowpack discussion, weather discussion, the avalanche
 // center's mountain weather summary, and the AVG synthesized blurb.
+// Body lines for the Full forecast tile — by-line and the avalanche
+// center, formatted so a 175px-square tile reads cleanly.
+function fullForecastLines(
+  zone: AvalancheZone,
+  centerName: string | undefined,
+): string[] {
+  const out: string[] = ["Read full forecast"];
+  if (zone.author) out.push(`by ${zone.author}`);
+  if (centerName) out.push(`at ${centerName}`);
+  return out;
+}
+
 function hasFullForecast(
   zone: AvalancheZone,
   bundle: ZoneSnapshot | undefined,
