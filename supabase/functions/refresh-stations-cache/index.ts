@@ -115,8 +115,32 @@ serve(async (req) => {
     `[refresh-stations-cache] wrote=${rows.length} took=${elapsed}ms`,
   );
 
+  // Fan out a silent push to every registered device so on-device
+  // snapshots refresh in the background. Best-effort — errors here don't
+  // fail the cache refresh, since clients can still pull on next launch.
+  let pushSent = 0;
+  try {
+    const r = await fetch(`${supabaseUrl}/functions/v1/send-snapshot-pushes`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+        "Content-Type": "application/json",
+      },
+    });
+    const body = await r.json();
+    pushSent = body?.sent || 0;
+  } catch (err) {
+    console.warn("[refresh-stations-cache] push fan-out failed", err);
+  }
+
   return new Response(
-    JSON.stringify({ success: true, written: rows.length, elapsedMs: elapsed }),
+    JSON.stringify({
+      success: true,
+      written: rows.length,
+      pushSent,
+      elapsedMs: elapsed,
+    }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

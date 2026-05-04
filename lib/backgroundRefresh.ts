@@ -23,57 +23,65 @@ export const BG_TASK_NAME = "avy.refresh-favorites";
 // this is a hint, not a contract.
 const MIN_INTERVAL_MINUTES = 15;
 
+// Shared refresh body — reusable across the BGTaskScheduler wake-up, the
+// silent-push notification handler, and the in-app foreground refresh.
+// Returns the count of zones written, or null if nothing was attempted.
+export async function refreshFavoritesSnapshot(
+  source: "bg-task" | "push" | "foreground" = "bg-task",
+): Promise<number | null> {
+  const favs = await loadFavorites();
+  if (!favs || favs.length === 0) return 0;
+  const r = await avalancheApi.getCachedForecasts(favs);
+  if (!r.success || !r.zones) {
+    console.warn(`[${source}] getCachedForecasts unsuccessful`);
+    return null;
+  }
+  const date = r.forecastDate || todayIsoDate();
+  let next: FavoritesSnapshot =
+    (await loadSnapshot()) || { fetchedAt: "", zones: {} };
+  const favSet = new Set(favs);
+  for (const z of r.zones) {
+    if (!favSet.has(z.id)) continue;
+    const cid = ZONE_TO_CENTER[z.id];
+    const weather = {
+      nacWeather: cid ? r.centerWeather?.[cid] : undefined,
+      nwsForecast: r.zoneNwsForecasts?.[z.id],
+      avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
+      avgLocations: r.zoneAvgLocations?.[z.id],
+    };
+    next = {
+      fetchedAt: new Date().toISOString(),
+      zones: {
+        ...next.zones,
+        [z.id]: {
+          ...(next.zones[z.id] || {}),
+          [date]: {
+            forecast: z,
+            stations: z.weatherObservations,
+            weather,
+            cachedAt: new Date().toISOString(),
+          },
+        },
+      },
+    };
+  }
+  next = pruneSnapshot(next, favs);
+  await saveSnapshot(next);
+  console.log(`[${source}] cached ${r.zones.length} zones for ${date}`);
+  return r.zones.length;
+}
+
 // defineTask must be evaluated at module load (before app entry resolves)
 // so iOS can dispatch into it when the OS wakes the headless JS runtime.
 // Importing this file from app/_layout.tsx achieves that ordering.
 TaskManager.defineTask(BG_TASK_NAME, async () => {
   try {
-    const favs = await loadFavorites();
-    if (!favs || favs.length === 0) {
-      return BackgroundTask.BackgroundTaskResult.Success;
-    }
-
-    const r = await avalancheApi.getCachedForecasts(favs);
-    if (!r.success || !r.zones) {
-      return BackgroundTask.BackgroundTaskResult.Failed;
-    }
-
-    const date = r.forecastDate || todayIsoDate();
-    let next: FavoritesSnapshot =
-      (await loadSnapshot()) || { fetchedAt: "", zones: {} };
-    const favSet = new Set(favs);
-    for (const z of r.zones) {
-      if (!favSet.has(z.id)) continue;
-      const cid = ZONE_TO_CENTER[z.id];
-      const weather = {
-        nacWeather: cid ? r.centerWeather?.[cid] : undefined,
-        nwsForecast: r.zoneNwsForecasts?.[z.id],
-        avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
-        avgLocations: r.zoneAvgLocations?.[z.id],
-      };
-      next = {
-        fetchedAt: new Date().toISOString(),
-        zones: {
-          ...next.zones,
-          [z.id]: {
-            ...(next.zones[z.id] || {}),
-            [date]: {
-              forecast: z,
-              stations: z.weatherObservations,
-              weather,
-              cachedAt: new Date().toISOString(),
-            },
-          },
-        },
-      };
-    }
-
-    next = pruneSnapshot(next, favs);
-    await saveSnapshot(next);
-    console.log(`[bg-task] cached ${r.zones.length} zones for ${date}`);
-    return BackgroundTask.BackgroundTaskResult.Success;
+    const n = await refreshFavoritesSnapshot("bg-task");
+    return n === null
+      ? BackgroundTask.BackgroundTaskResult.Failed
+      : BackgroundTask.BackgroundTaskResult.Success;
   } catch (err) {
-    console.warn("[bg-task] failed", err);
+    console.warn("[bg-task] threw", err);
     return BackgroundTask.BackgroundTaskResult.Failed;
   }
 });

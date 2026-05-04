@@ -1034,16 +1034,16 @@ export default function Index() {
                       style={{ fontSize: 11, lineHeight: 16 }}
                     >
                       Star a zone to favorite it. Favorites auto-load on
-                      launch, and avy + wx info stays current in the
-                      background even with the app closed{" "}
+                      launch and stay current in the background while you
+                      have service{" "}
                       <Text
                         variant="mono"
                         className="text-ink-400"
                         style={{ fontSize: 10, letterSpacing: 0.6 }}
                       >
-                        (syncs every 1–2 hrs)
+                        (best-effort, OS-scheduled)
                       </Text>
-                      .
+                      . Always force-refreshes when you open the app online.
                     </Text>
                   </View>
                 </View>
