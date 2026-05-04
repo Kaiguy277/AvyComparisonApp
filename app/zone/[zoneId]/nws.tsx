@@ -9,6 +9,7 @@ import {
   loadSnapshot,
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
+import { getZoneSession } from "@/lib/zoneSession";
 import {
   ZoneScreenHeader,
   ZoneScreenContainer,
@@ -30,8 +31,10 @@ export default function ZoneNwsScreen() {
   }, []);
 
   const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
-  const zone = bundle?.forecast;
-  const nws = bundle?.weather?.nwsForecast;
+  const session = getZoneSession(zoneId);
+  const zone = bundle?.forecast ?? session?.forecast;
+  const nws =
+    bundle?.weather?.nwsForecast ?? session?.weather?.nwsForecast;
 
   return (
     <ZoneScreenContainer>

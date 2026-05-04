@@ -79,6 +79,7 @@ import {
   type ZoneWeatherForecast,
 } from "@/lib/api/avalanche";
 import { AVAILABLE_ZONES, DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
+import { setZoneSession } from "@/lib/zoneSession";
 
 interface WeatherForecastBundle {
   centerWeather: Record<string, NacWeatherProduct>;
@@ -483,6 +484,35 @@ export default function Index() {
       }
     })();
   }, [summary, weatherForecastData, favoriteZoneIds, viewedDate, loadSource]);
+
+  // Fan every zone we have data for into the session-level in-memory
+  // cache so the detail / sub-screens can find them — including ad-hoc
+  // zones that aren't favorites and therefore aren't written to the
+  // persistent offline snapshot.
+  useEffect(() => {
+    if (!summary) return;
+    for (const z of summary.zones) {
+      const cid = ZONE_TO_CENTER[z.id];
+      const wf = weatherForecastData
+        ? {
+            nacWeather: cid
+              ? weatherForecastData.centerWeather[cid]
+              : undefined,
+            nwsForecast: weatherForecastData.zoneNwsForecasts[z.id],
+            avgDiscussion: cid
+              ? weatherForecastData.centerAvgDiscussions[cid]
+              : undefined,
+            avgLocations: weatherForecastData.zoneAvgLocations[z.id],
+          }
+        : undefined;
+      setZoneSession(z.id, {
+        forecast: z,
+        stations: z.weatherObservations,
+        weather: wf,
+        cachedAt: new Date().toISOString(),
+      });
+    }
+  }, [summary, weatherForecastData]);
 
   const fetchSnotel = useCallback(async (zoneIds: string[]) => {
     setIsSnotelLoading(true);
