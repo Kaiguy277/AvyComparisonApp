@@ -599,60 +599,68 @@ function SubTile({
         style={({ pressed }) => ({
           width: "100%",
           height: "100%",
-          padding: 14,
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        {/* Header — icon + label */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Ionicons
-            name={icon}
-            size={22}
-            color={disabled ? palette.ink[400] : accent}
-          />
-          <Text
-            variant="mono"
-            weight="bold"
-            style={{
-              fontSize: 10,
-              letterSpacing: 1.2,
-              color: disabled ? palette.ink[400] : accent,
-              flex: 1,
-            }}
-            numberOfLines={1}
-          >
-            {label.toUpperCase()}
-          </Text>
-        </View>
-
-        {/* Body — stacked lines */}
-        <View style={{ flex: 1, marginTop: 10, gap: 2 }}>
-          {showLines.map((line, i) => (
-            <Text
-              key={i}
-              variant="display"
-              style={{
-                fontSize: 14,
-                lineHeight: 18,
-                color: disabled ? palette.ink[400] : palette.ink[100],
-              }}
-              numberOfLines={2}
-            >
-              {line}
-            </Text>
-          ))}
-        </View>
-
-        {/* Chevron — bottom right */}
-        {!disabled ? (
-          <View style={{ alignItems: "flex-end", marginTop: 4 }}>
+        {/* Inner View handles layout — Pressable's content area
+            doesn't always propagate flex behavior, so the body's
+            flex: 1 collapses if it's a direct Pressable child. */}
+        <View
+          style={{
+            width: "100%",
+            height: "100%",
+            padding: 14,
+            justifyContent: "space-between",
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={palette.ink[300]}
+              name={icon}
+              size={22}
+              color={disabled ? palette.ink[400] : accent}
             />
+            <Text
+              variant="mono"
+              weight="bold"
+              style={{
+                fontSize: 10,
+                letterSpacing: 1.2,
+                color: disabled ? palette.ink[400] : accent,
+                flex: 1,
+              }}
+              numberOfLines={1}
+            >
+              {label.toUpperCase()}
+            </Text>
           </View>
-        ) : null}
+
+          <View style={{ gap: 2 }}>
+            {showLines.map((line, i) => (
+              <Text
+                key={i}
+                variant="display"
+                style={{
+                  fontSize: 14,
+                  lineHeight: 18,
+                  color: disabled ? palette.ink[400] : palette.ink[100],
+                }}
+                numberOfLines={2}
+              >
+                {line}
+              </Text>
+            ))}
+          </View>
+
+          <View style={{ alignItems: "flex-end" }}>
+            {!disabled ? (
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={palette.ink[300]}
+              />
+            ) : null}
+          </View>
+        </View>
       </Pressable>
     </View>
   );
