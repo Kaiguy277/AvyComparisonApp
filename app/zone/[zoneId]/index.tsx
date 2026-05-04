@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, View } from "react-native";
+import { Dimensions, Linking, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -549,6 +549,13 @@ function DayColumn({
   );
 }
 
+// Tile size: half the screen width minus the page's horizontal padding
+// (16+16) and the 10px inter-tile gap, divided by 2. This gives a true
+// square — RN's aspectRatio doesn't reliably apply inside flexWrap rows
+// when the width is a percentage, so we compute it explicitly.
+const TILE_SIZE =
+  (Dimensions.get("window").width - 16 * 2 - 10) / 2;
+
 function SubTile({
   label,
   lines,
@@ -576,8 +583,8 @@ function SubTile({
   return (
     <View
       style={{
-        width: "48.5%",
-        aspectRatio: 1,
+        width: TILE_SIZE,
+        height: TILE_SIZE,
         backgroundColor: palette.ink[800],
         borderWidth: 2,
         borderColor: disabled ? palette.ink[500] : palette.ink[700],
