@@ -40,10 +40,13 @@ export interface FavoritesSnapshot {
 
 // ────────── Favorites (the list of zone IDs the user wants kept fresh) ──────────
 
-export async function loadFavorites(): Promise<string[]> {
+// Returns null on a true first run (key has never been written) so callers
+// can seed defaults; returns [] only when the user has explicitly emptied
+// their favorites list (which we should respect, not overwrite).
+export async function loadFavorites(): Promise<string[] | null> {
   try {
     const raw = await AsyncStorage.getItem(FAVORITES_KEY);
-    if (!raw) return [];
+    if (raw === null) return null;
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((s) => typeof s === "string") : [];
   } catch {

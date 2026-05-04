@@ -178,9 +178,18 @@ export default function Index() {
     (async () => {
       try {
         const [favs, snap] = await Promise.all([loadFavorites(), loadSnapshot()]);
-        setFavoriteZoneIds(favs);
+        // First run (favs === null): seed favorites with the default zones
+        // so they're starred AND selected, not just selected. After the user
+        // edits and saves, favs becomes [] or a list and we respect that.
+        if (favs === null) {
+          setFavoriteZoneIds(DEFAULT_ZONE_IDS);
+          setDisplayedZoneIds(DEFAULT_ZONE_IDS);
+          await saveFavorites(DEFAULT_ZONE_IDS);
+        } else {
+          setFavoriteZoneIds(favs);
+          setDisplayedZoneIds(favs.length > 0 ? favs : DEFAULT_ZONE_IDS);
+        }
         setSnapshot(snap);
-        setDisplayedZoneIds(favs.length > 0 ? favs : DEFAULT_ZONE_IDS);
       } catch (err) {
         console.warn("Failed to load preferences", err);
       } finally {
