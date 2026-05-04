@@ -34,7 +34,7 @@ import { palette } from "@/constants/design";
 // app/index.tsx — we don't want iOS asking for notifications cold at app
 // launch before the user has any context for the request.
 import { registerBackgroundRefresh } from "@/lib/backgroundRefresh";
-import "@/lib/pushNotifications";
+import { registerIfPermitted } from "@/lib/pushNotifications";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -79,10 +79,16 @@ export default function RootLayout() {
   // Register the background refresh task on every launch. iOS persists
   // registrations across launches but re-registering is a cheap no-op,
   // and it's the cleanest place to run after permissions/state are ready.
-  // Push registration is deferred to the onboarding flow on first launch,
-  // and re-runs from index.tsx on later launches.
+  //
+  // Push registration also runs every launch but in a no-prompt mode —
+  // if the user already granted notification permission anywhere
+  // (onboarding modal, iOS Settings), we mint a token and upsert it.
+  // If permission isn't granted, we no-op silently. The onboarding
+  // modal's "Enable Notifications" button is what asks; this is the
+  // backstop that ensures every launch retries until it succeeds.
   useEffect(() => {
     registerBackgroundRefresh();
+    registerIfPermitted();
   }, []);
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;

@@ -66,7 +66,13 @@ import {
   hasCompletedOnboarding,
   markOnboardingComplete,
 } from "@/lib/onboarding";
-import { registerPushNotifications } from "@/lib/pushNotifications";
+// Push registration moved to app/_layout.tsx (every-launch no-prompt
+// retry); the PermissionsIntro modal calls requestAndRegister directly.
+import {
+  readPushDiagnostic,
+  requestAndRegister,
+  type PushDiagnostic,
+} from "@/lib/pushNotifications";
 import {
   avalancheApi,
   type AvalancheSummary,
@@ -161,9 +167,8 @@ export default function Index() {
     (async () => {
       const done = await hasCompletedOnboarding();
       setShowOnboarding(!done);
-      // Quietly refresh the push token on every later launch — registration
-      // is idempotent and skips silently if the user denied permission.
-      if (done) registerPushNotifications();
+      // Push registration is now driven from app/_layout.tsx — runs
+      // every launch in no-prompt mode regardless of onboarding state.
     })();
   }, []);
   const dismissOnboarding = useCallback(() => {
@@ -1046,6 +1051,11 @@ export default function Index() {
               ) : null}
             </View>
           ) : null}
+
+          {/* Push diagnostic — shown only when registration didn't
+              succeed. Tap to retry. Helps debug TestFlight builds
+              where there's no console access. */}
+          <PushDiagnosticLine />
         </View>
 
         {/* MANAGE ZONES — tile-style pane matching the zone tiles +
@@ -1997,6 +2007,76 @@ export default function Index() {
         </View>
       </Modal>
     </View>
+  );
+}
+
+// Renders the most recent push registration outcome from
+// AsyncStorage. Hidden when registration succeeded ("ok") so it only
+// surfaces noise when there's something the user can act on.
+// Tap to manually retry registration.
+function PushDiagnosticLine() {
+  const [diag, setDiag] = useState<PushDiagnostic | null>(null);
+  const refresh = useCallback(() => {
+    readPushDiagnostic().then(setDiag);
+  }, []);
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 5000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  if (!diag || diag.step === "ok") return null;
+
+  const tint =
+    diag.step === "permission-denied" ? palette.aspen[400] : "#FCA5A5";
+
+  const onTap = async () => {
+    Haptics.selectionAsync().catch(() => {});
+    await requestAndRegister();
+    refresh();
+  };
+
+  return (
+    <Pressable
+      onPress={onTap}
+      style={{
+        marginTop: 6,
+        flexDirection: "row",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 6,
+      }}
+    >
+      <View
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: tint,
+        }}
+      />
+      <Text
+        variant="mono"
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.2,
+          color: tint,
+        }}
+      >
+        PUSH · {diag.step.toUpperCase()}
+        {diag.message ? ` · ${diag.message.slice(0, 60)}` : ""}
+      </Text>
+      <Text
+        variant="mono"
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.2,
+          color: palette.ink[400],
+        }}
+      >
+        · TAP TO RETRY
+      </Text>
+    </Pressable>
   );
 }
 
