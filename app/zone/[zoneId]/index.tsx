@@ -565,19 +565,28 @@ function SubTile({
   // reads as its own button on the cream page. Icon at 28px sits in
   // the upper-left, label below it, value + chevron pinned to the
   // bottom — gives the tile real presence instead of a cramped row.
+  // Border lives on an outer View so Pressable rendering quirks on
+  // iOS (border occasionally not painting on Pressable) don't lose it.
   return (
-    <Pressable
-      onPress={disabled ? undefined : onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
+    <View
+      style={{
         width: "48.5%",
         aspectRatio: 1,
         backgroundColor: palette.ink[800],
         borderWidth: 2,
         borderColor: disabled ? palette.ink[500] : palette.ink[700],
         borderRadius: 14,
+        overflow: "hidden",
+        opacity: disabled ? 0.45 : 1,
+      }}
+    >
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        flex: 1,
         padding: 18,
-        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+        opacity: pressed ? 0.7 : 1,
         justifyContent: "space-between",
       })}
     >
@@ -627,6 +636,7 @@ function SubTile({
         ) : null}
       </View>
     </Pressable>
+    </View>
   );
 }
 

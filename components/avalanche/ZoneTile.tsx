@@ -55,9 +55,8 @@ export function ZoneTile({ zone }: Props) {
   };
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
+    <View
+      style={{
         flex: 1,
         minWidth: 0,
         backgroundColor: palette.ink[800],
@@ -65,7 +64,12 @@ export function ZoneTile({ zone }: Props) {
         borderColor: palette.ink[700],
         borderRadius: 12,
         overflow: "hidden",
-        opacity: pressed ? 0.7 : 1,
+      }}
+    >
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.6 : 1,
       })}
     >
       <View style={{ padding: 12 }}>
@@ -256,5 +260,6 @@ export function ZoneTile({ zone }: Props) {
       ) : null}
       </View>
     </Pressable>
+    </View>
   );
 }
