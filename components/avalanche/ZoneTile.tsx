@@ -14,10 +14,10 @@ interface Props {
   zone: AvalancheZone;
 }
 
-const ELEVATIONS: { key: keyof ElevationDanger; label: string }[] = [
-  { key: "alpine", label: "ALP" },
-  { key: "treeline", label: "TL" },
-  { key: "belowTreeline", label: "BTL" },
+const ELEVATIONS: (keyof ElevationDanger)[] = [
+  "alpine",
+  "treeline",
+  "belowTreeline",
 ];
 
 // Compact rating words that fit the narrow tile column without
@@ -51,7 +51,10 @@ export function ZoneTile({ zone }: Props) {
 
   const onPress = () => {
     Haptics.selectionAsync().catch(() => {});
-    router.push({ pathname: "/zone/[zoneId]", params: { zoneId: zone.id } });
+    router.push({
+      pathname: "/zone/[zoneId]" as never,
+      params: { zoneId: zone.id },
+    });
   };
 
   return (
@@ -110,7 +113,7 @@ export function ZoneTile({ zone }: Props) {
         >
           <MountainDanger danger={today.danger} size={66} />
           <View style={{ flex: 1, gap: 4 }}>
-            {ELEVATIONS.map(({ key, label }) => {
+            {ELEVATIONS.map((key) => {
               const r = today.danger[key] as DangerRating;
               const c = dangerColors[r];
               return (
@@ -124,24 +127,12 @@ export function ZoneTile({ zone }: Props) {
                 >
                   <Text
                     variant="mono"
-                    weight="medium"
-                    style={{
-                      fontSize: 9,
-                      letterSpacing: 1,
-                      color: palette.ink[400],
-                      width: 22,
-                    }}
-                  >
-                    {label}
-                  </Text>
-                  <Text
-                    variant="mono"
                     weight="bold"
                     style={{
-                      fontSize: 12,
+                      fontSize: 13,
                       color: c.fill,
                       letterSpacing: -0.2,
-                      width: 12,
+                      width: 14,
                     }}
                   >
                     {c.level || "—"}
@@ -149,7 +140,7 @@ export function ZoneTile({ zone }: Props) {
                   <Text
                     style={{
                       flex: 1,
-                      fontSize: 11,
+                      fontSize: 12,
                       color: c.fill,
                     }}
                     numberOfLines={1}

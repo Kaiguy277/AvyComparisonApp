@@ -498,13 +498,7 @@ function DayColumn({
         </Text>
       </View>
       <View style={{ gap: 3, marginTop: 10, alignSelf: "stretch" }}>
-        {(
-          [
-            { key: "alpine" as const, label: "ALP" },
-            { key: "treeline" as const, label: "TL" },
-            { key: "belowTreeline" as const, label: "BTL" },
-          ]
-        ).map(({ key, label }) => {
+        {(["alpine", "treeline", "belowTreeline"] as const).map((key) => {
           const r = danger[key];
           const cc = dangerColors[r];
           return (
@@ -518,29 +512,17 @@ function DayColumn({
             >
               <Text
                 variant="mono"
-                weight="medium"
-                style={{
-                  fontSize: 9,
-                  letterSpacing: 1,
-                  color: palette.ink[400],
-                  width: 26,
-                }}
-              >
-                {label}
-              </Text>
-              <Text
-                variant="mono"
                 weight="bold"
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   color: cc.fill,
-                  width: 12,
+                  width: 14,
                 }}
               >
                 {cc.level || "—"}
               </Text>
               <Text
-                style={{ flex: 1, fontSize: 11, color: cc.fill }}
+                style={{ flex: 1, fontSize: 12, color: cc.fill }}
                 numberOfLines={1}
               >
                 {r === "NO_RATING" ? "—" : startCase(cc.label)}

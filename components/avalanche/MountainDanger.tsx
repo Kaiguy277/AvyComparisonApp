@@ -1,13 +1,13 @@
 import { View } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Path, Text as SvgText } from "react-native-svg";
 import { dangerColors, palette } from "@/constants/design";
 import type { ElevationDanger } from "@/lib/api/avalanche";
 
 // Single mountain silhouette, divided horizontally into three bands —
 // alpine on top, near-treeline in the middle, below-treeline at the
 // base — each filled with the NAC danger color for that elevation.
-// Spatially honest: avalanche conditions actually do live at elevations
-// within one peak.
+// Each band carries its label inside (A / TL / BTL) so the glyph is
+// self-explanatory; A on alpine fits the narrow apex.
 //
 // EXTREME's official rendering is black with a red border; that's
 // preserved by stroking the affected band's interior cut with the
@@ -16,6 +16,7 @@ import type { ElevationDanger } from "@/lib/api/avalanche";
 interface Props {
   danger: ElevationDanger;
   size?: number; // viewport width in px (height scales 0.8x)
+  showLabels?: boolean;
 }
 
 const Y_PEAK = 6;
@@ -47,11 +48,30 @@ const PATHS = (() => {
   };
 })();
 
-export function MountainDanger({ danger, size = 56 }: Props) {
+// Label centroids — vertically positioned for visual centering inside
+// each band. Triangle band centroid is 1/3 from the wide base; the two
+// trapezoid bands center on the midline. Y values include a small
+// fontSize-derived offset since SVG text anchors on the baseline.
+const ALPINE_LABEL_Y = 24;
+const TREELINE_LABEL_Y = 45;
+const BELOW_LABEL_Y = 67;
+
+export function MountainDanger({
+  danger,
+  size = 56,
+  showLabels = true,
+}: Props) {
   const aFill = dangerColors[danger.alpine].fill;
   const tFill = dangerColors[danger.treeline].fill;
   const bFill = dangerColors[danger.belowTreeline].fill;
   const stroke = palette.ink[700];
+
+  // Per-band ink colors come from the NAC contrast value so labels
+  // stay readable across the full danger scale (white on red, black
+  // on yellow, red on the EXTREME black, etc.).
+  const aInk = dangerColors[danger.alpine].ink;
+  const tInk = dangerColors[danger.treeline].ink;
+  const bInk = dangerColors[danger.belowTreeline].ink;
 
   return (
     <View style={{ width: size, height: (size * 80) / 100 }}>
@@ -75,6 +95,40 @@ export function MountainDanger({ danger, size = 56 }: Props) {
           fill="none"
           strokeLinejoin="round"
         />
+        {showLabels ? (
+          <>
+            <SvgText
+              x={50}
+              y={ALPINE_LABEL_Y}
+              fontSize={9}
+              fontWeight="bold"
+              fill={aInk}
+              textAnchor="middle"
+            >
+              A
+            </SvgText>
+            <SvgText
+              x={50}
+              y={TREELINE_LABEL_Y}
+              fontSize={9}
+              fontWeight="bold"
+              fill={tInk}
+              textAnchor="middle"
+            >
+              TL
+            </SvgText>
+            <SvgText
+              x={50}
+              y={BELOW_LABEL_Y}
+              fontSize={9}
+              fontWeight="bold"
+              fill={bInk}
+              textAnchor="middle"
+            >
+              BTL
+            </SvgText>
+          </>
+        ) : null}
       </Svg>
     </View>
   );
