@@ -131,19 +131,8 @@ export default function ZoneDetailScreen() {
             </Text>
           ) : null}
         </View>
-        {fresh && zone ? (
-          <Text
-            variant="mono"
-            weight="bold"
-            style={{
-              fontSize: 10,
-              letterSpacing: 1.2,
-              color: freshnessColor(zone.freshness.status),
-            }}
-          >
-            {fresh.label.toUpperCase()}
-          </Text>
-        ) : null}
+        {/* Freshness moved into the strip below the header so it sits
+            next to issued/expires/fetched with shared context. */}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
@@ -175,12 +164,94 @@ export default function ZoneDetailScreen() {
           </View>
         ) : (
           <>
+            {/* FRESHNESS STRIP — sits right at the top, framing the
+                pyramids with the issued / expires / fetched signal so
+                the user always knows how trustworthy the read is. */}
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingTop: 16,
+                paddingBottom: 4,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 14,
+                alignItems: "baseline",
+              }}
+            >
+              <Text
+                variant="mono"
+                weight="bold"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 1.4,
+                  color: freshnessColor(zone.freshness.status),
+                }}
+              >
+                {fresh ? fresh.label.toUpperCase() : "—"}
+              </Text>
+              {zone.freshness.issueDate ? (
+                <Text
+                  variant="mono"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 0.8,
+                    color: palette.ink[400],
+                  }}
+                >
+                  ISSUED{" "}
+                  <Text style={{ fontSize: 11, color: palette.ink[200] }}>
+                    {zone.freshness.issueDate}
+                  </Text>
+                </Text>
+              ) : null}
+              {zone.freshness.expiresDate ? (
+                <Text
+                  variant="mono"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 0.8,
+                    color: palette.ink[400],
+                  }}
+                >
+                  EXPIRES{" "}
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color:
+                        zone.freshness.status === "expired"
+                          ? "#FCA5A5"
+                          : zone.freshness.status === "expiring"
+                            ? palette.aspen[400]
+                            : palette.ink[200],
+                    }}
+                  >
+                    {zone.freshness.expiresDate}
+                  </Text>
+                </Text>
+              ) : null}
+              {fetchedAt ? (
+                <Text
+                  variant="mono"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 0.8,
+                    color: palette.ink[400],
+                  }}
+                >
+                  FETCHED{" "}
+                  <Text style={{ fontSize: 11, color: ageColor(fetchedAt) }}>
+                    {formatAge(fetchedAt).toUpperCase()}
+                  </Text>
+                </Text>
+              ) : null}
+            </View>
+
             {/* TODAY | TOMORROW — two day columns side by side. */}
             <View
               style={{
                 flexDirection: "row",
                 paddingHorizontal: 16,
-                paddingTop: 18,
+                paddingTop: 14,
                 gap: 12,
               }}
             >
@@ -190,7 +261,7 @@ export default function ZoneDetailScreen() {
                   <View
                     style={{
                       width: 0.5,
-                      backgroundColor: palette.ink[700],
+                      backgroundColor: palette.ink[500],
                       marginVertical: 8,
                     }}
                   />
@@ -320,40 +391,8 @@ export default function ZoneDetailScreen() {
               />
             </View>
 
-            {/* Issued / expires / fetched */}
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: 16,
-                paddingHorizontal: 16,
-                marginTop: 28,
-              }}
-            >
-              {zone.freshness.issueDate ? (
-                <Meta label="ISSUED" value={zone.freshness.issueDate} />
-              ) : null}
-              {zone.freshness.expiresDate ? (
-                <Meta
-                  label="EXPIRES"
-                  value={zone.freshness.expiresDate}
-                  valueColor={
-                    zone.freshness.status === "expired"
-                      ? "#FCA5A5"
-                      : zone.freshness.status === "expiring"
-                        ? palette.aspen[400]
-                        : palette.ink[200]
-                  }
-                />
-              ) : null}
-              {fetchedAt ? (
-                <Meta
-                  label="FETCHED"
-                  value={formatAge(fetchedAt).toUpperCase()}
-                  valueColor={ageColor(fetchedAt)}
-                />
-              ) : null}
-            </View>
+            {/* Issued / expires / fetched moved to the freshness strip
+                near the top of the page. */}
 
             {zone.forecastUrl ? (
               <Pressable
@@ -522,48 +561,42 @@ function SubTile({
   disabled?: boolean;
   onPress: () => void;
 }) {
-  // On warm-paper bg the tile reads as a contained card just by sitting
-  // a half-step lighter than the page (raised surface ink-800) inside a
-  // hairline ink-500 border. The accent color shows in the icon glyph
-  // and the chevron — no fills, stripes, or chrome required.
+  // Larger, more square tile with a bold outline so each destination
+  // reads as its own button on the cream page. Icon at 28px sits in
+  // the upper-left, label below it, value + chevron pinned to the
+  // bottom — gives the tile real presence instead of a cramped row.
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       style={({ pressed }) => ({
         width: "48.5%",
+        aspectRatio: 1,
         backgroundColor: palette.ink[800],
-        borderWidth: 0.5,
-        borderColor: palette.ink[500] + "AA",
-        borderRadius: 12,
-        padding: 14,
-        opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
-        minHeight: 116,
+        borderWidth: 2,
+        borderColor: disabled ? palette.ink[500] : palette.ink[700],
+        borderRadius: 14,
+        padding: 18,
+        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
         justifyContent: "space-between",
       })}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
+      <View>
         <Ionicons
           name={icon}
-          size={20}
+          size={32}
           color={disabled ? palette.ink[400] : accent}
         />
         <Text
           variant="mono"
           weight="bold"
           style={{
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: 1.4,
             color: disabled ? palette.ink[400] : accent,
-            flex: 1,
+            marginTop: 14,
           }}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {label.toUpperCase()}
         </Text>
@@ -573,14 +606,13 @@ function SubTile({
           flexDirection: "row",
           alignItems: "baseline",
           justifyContent: "space-between",
-          marginTop: 12,
         }}
       >
         <Text
           variant="display"
           style={{
-            fontSize: 18,
-            lineHeight: 22,
+            fontSize: 22,
+            lineHeight: 26,
             color: disabled ? palette.ink[400] : palette.ink[100],
           }}
         >
@@ -589,8 +621,8 @@ function SubTile({
         {!disabled ? (
           <Ionicons
             name="chevron-forward"
-            size={14}
-            color={palette.ink[400]}
+            size={16}
+            color={palette.ink[300]}
           />
         ) : null}
       </View>
