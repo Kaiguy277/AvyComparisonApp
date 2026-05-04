@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Linking, Pressable, ScrollView, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 
 import { Text } from "@/components/ui/Text";
@@ -14,11 +15,15 @@ import {
   ZoneScreenHeader,
   ZoneScreenContainer,
 } from "@/components/avalanche/ZoneScreenChrome";
+import type { NwsForecast, NwsForecastPeriod } from "@/lib/api/avalanche";
 
-// NWS forecast — National Weather Service zone forecast that's bundled
-// alongside the avalanche center's products. Separated from the avalanche
-// center's own mountain weather + AVG discussion (those live in the
-// "Full forecast" tile).
+// NWS forecast screen — National Weather Service forecast for the
+// gridpoint nearest this zone. Some areas (especially mountain WFOs in
+// winter) get a curated forecast; many just emit auto-generated text
+// derived from the NDFD gridded model. We render both the same way and
+// surface the source attribution + a link to the original page so the
+// user can judge for themselves.
+
 export default function ZoneNwsScreen() {
   const { zoneId } = useLocalSearchParams<{ zoneId: string }>();
   const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
@@ -33,14 +38,14 @@ export default function ZoneNwsScreen() {
   const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
   const session = getZoneSession(zoneId);
   const zone = bundle?.forecast ?? session?.forecast;
-  const nws =
+  const nws: NwsForecast | undefined =
     bundle?.weather?.nwsForecast ?? session?.weather?.nwsForecast;
 
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
       <ZoneScreenHeader eyebrow="NWS FORECAST" title={zone?.name ?? "Zone"} />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 18 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         {!loaded ? (
           <Text
             variant="mono"
@@ -54,7 +59,7 @@ export default function ZoneNwsScreen() {
             className="text-ink-300"
             style={{ fontSize: 14, lineHeight: 20 }}
           >
-            No NWS zone forecast bundled with this zone in the offline snapshot.
+            No NWS forecast bundled with this zone yet.
           </Text>
         ) : (
           <NwsForecastView nws={nws} />
@@ -64,85 +69,294 @@ export default function ZoneNwsScreen() {
   );
 }
 
-// Renders the NwsForecast object — periods (Today / Tonight / Tomorrow)
-// each with a short detailed forecast paragraph. Defensive against shape
-// drift since NWS payloads vary across endpoints.
-function NwsForecastView({ nws }: { nws: unknown }) {
-  // Try the shape we usually get: { periods: [{ name, detailedForecast,
-  // temperature, ... }] }. Fall back to displaying the raw text if shape
-  // is unfamiliar.
-  const periods = (nws as { periods?: NwsPeriod[] }).periods ?? [];
-  if (periods.length === 0) {
-    return (
-      <Text className="text-ink-300" style={{ fontSize: 13, lineHeight: 19 }}>
-        {typeof nws === "string" ? nws : JSON.stringify(nws, null, 2)}
-      </Text>
-    );
-  }
+function NwsForecastView({ nws }: { nws: NwsForecast }) {
+  const periods = nws.periods ?? [];
+
+  // High/low across the day periods so the user can read the temperature
+  // arc at a glance before scrolling through period cards.
+  const tempRange = useMemo(() => {
+    const temps = periods
+      .filter((p) => typeof p.temperature === "number")
+      .map((p) => p.temperature);
+    if (temps.length === 0) return null;
+    return {
+      hi: Math.max(...temps),
+      lo: Math.min(...temps),
+      unit: periods.find((p) => p.temperatureUnit)?.temperatureUnit ?? "F",
+    };
+  }, [periods]);
+
   return (
-    <View style={{ gap: 18 }}>
-      {periods.map((p, i) => (
+    <View style={{ gap: 16 }}>
+      <SourceAttribution nws={nws} />
+
+      {tempRange ? (
         <View
-          key={i}
           style={{
-            paddingBottom: 16,
-            borderBottomWidth: i === periods.length - 1 ? 0 : 0.5,
-            borderColor: palette.ink[700],
+            flexDirection: "row",
+            alignItems: "baseline",
+            gap: 18,
+            paddingHorizontal: 4,
           }}
         >
-          <View
+          <RangeStat label="HIGH" value={`${tempRange.hi}°${tempRange.unit}`} />
+          <RangeStat label="LOW" value={`${tempRange.lo}°${tempRange.unit}`} />
+          <RangeStat label="PERIODS" value={`${periods.length}`} />
+        </View>
+      ) : null}
+
+      {periods.length === 0 ? (
+        <Text
+          className="text-ink-300"
+          style={{ fontSize: 14, lineHeight: 20 }}
+        >
+          NWS returned no period data for this gridpoint.
+        </Text>
+      ) : (
+        <View style={{ gap: 10 }}>
+          {periods.map((p, i) => (
+            <PeriodCard key={i} period={p} />
+          ))}
+        </View>
+      )}
+
+      {nws.forecastPageUrl ? (
+        <Pressable
+          onPress={() => Linking.openURL(nws.forecastPageUrl)}
+          style={({ pressed }) => ({
+            marginTop: 8,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            borderRadius: 10,
+            borderWidth: 0.5,
+            borderColor: palette.ink[600],
+            backgroundColor: pressed ? palette.ink[800] : "transparent",
+          })}
+        >
+          <Text
+            variant="mono"
+            weight="medium"
             style={{
-              flexDirection: "row",
-              alignItems: "baseline",
-              gap: 10,
-              marginBottom: 6,
+              fontSize: 12,
+              letterSpacing: 1.4,
+              color: palette.ink[200],
             }}
           >
-            <Text
-              variant="display"
-              className="text-ink-50"
-              style={{ fontSize: 16, lineHeight: 20 }}
-            >
-              {p.name ?? `Period ${i + 1}`}
-            </Text>
-            {typeof p.temperature === "number" ? (
-              <Text
-                variant="mono"
-                weight="bold"
-                className="text-ink-200"
-                style={{ fontSize: 13 }}
-              >
-                {p.temperature}°{p.temperatureUnit ?? "F"}
-              </Text>
-            ) : null}
-            {p.windSpeed ? (
-              <Text
-                variant="mono"
-                className="text-ink-300"
-                style={{ fontSize: 11 }}
-              >
-                {p.windSpeed} {p.windDirection ?? ""}
-              </Text>
-            ) : null}
-          </View>
-          <Text
-            className="text-ink-100"
-            style={{ fontSize: 14, lineHeight: 21 }}
-          >
-            {p.detailedForecast ?? p.shortForecast ?? "—"}
+            OPEN AT WEATHER.GOV
           </Text>
-        </View>
-      ))}
+          <Ionicons name="open-outline" size={14} color={palette.ink[300]} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
-interface NwsPeriod {
-  name?: string;
-  temperature?: number;
-  temperatureUnit?: string;
-  windSpeed?: string;
-  windDirection?: string;
-  shortForecast?: string;
-  detailedForecast?: string;
+function SourceAttribution({ nws }: { nws: NwsForecast }) {
+  return (
+    <View
+      style={{
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: palette.frost[500],
+        backgroundColor: palette.ink[900],
+      }}
+    >
+      <Text
+        variant="mono"
+        weight="bold"
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.4,
+          color: palette.frost[500],
+          marginBottom: 4,
+        }}
+      >
+        FROM api.weather.gov
+      </Text>
+      <Text
+        style={{
+          fontSize: 12,
+          lineHeight: 17,
+          color: palette.ink[300],
+        }}
+      >
+        Gridded NWS forecast for the point nearest this zone. Often
+        auto-generated from the NDFD model; some mountain WFOs hand-edit
+        in winter. Compare against the avalanche-center mountain
+        forecast on the “Full forecast” tile.
+      </Text>
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 12,
+          marginTop: 8,
+        }}
+      >
+        {nws.gridpoint ? (
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: 0.8,
+              color: palette.ink[400],
+            }}
+          >
+            GRIDPOINT{" "}
+            <Text style={{ fontSize: 10, color: palette.ink[200] }}>
+              {nws.gridpoint}
+            </Text>
+          </Text>
+        ) : null}
+        {nws.forecastZone ? (
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: 0.8,
+              color: palette.ink[400],
+            }}
+          >
+            ZONE{" "}
+            <Text style={{ fontSize: 10, color: palette.ink[200] }}>
+              {nws.forecastZone}
+            </Text>
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function PeriodCard({ period: p }: { period: NwsForecastPeriod }) {
+  const dayNightIcon = p.isDaytime ? "sunny-outline" : "moon-outline";
+  const dayNightColor = p.isDaytime
+    ? palette.aspen[400]
+    : palette.frost[500];
+
+  return (
+    <View
+      style={{
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: palette.ink[500] + "AA",
+        backgroundColor: palette.ink[800],
+      }}
+    >
+      {/* Header row — period name + day/night icon, then chip row with
+          temp + wind. */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 4,
+        }}
+      >
+        <Ionicons name={dayNightIcon} size={16} color={dayNightColor} />
+        <Text
+          variant="display"
+          className="text-ink-50"
+          style={{ fontSize: 17, lineHeight: 21, flex: 1 }}
+        >
+          {p.name ?? "Period"}
+        </Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 10,
+        }}
+      >
+        {typeof p.temperature === "number" ? (
+          <Chip>
+            {p.temperature}°{p.temperatureUnit ?? "F"}
+          </Chip>
+        ) : null}
+        {p.windSpeed ? (
+          <Chip>
+            {p.windSpeed}
+            {p.windDirection ? ` ${p.windDirection}` : ""}
+          </Chip>
+        ) : null}
+        {p.shortForecast ? <Chip subtle>{p.shortForecast}</Chip> : null}
+      </View>
+
+      {/* Detailed forecast — full prose from NWS. */}
+      {p.detailedForecast ? (
+        <Text
+          className="text-ink-100"
+          style={{ fontSize: 14, lineHeight: 21 }}
+        >
+          {p.detailedForecast}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function Chip({
+  children,
+  subtle,
+}: {
+  children: React.ReactNode;
+  subtle?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        paddingVertical: 3,
+        paddingHorizontal: 8,
+        borderRadius: 999,
+        borderWidth: 0.5,
+        borderColor: subtle ? palette.ink[500] : palette.ink[600],
+        backgroundColor: subtle ? "transparent" : palette.ink[900],
+      }}
+    >
+      <Text
+        variant="mono"
+        weight={subtle ? "regular" : "bold"}
+        style={{
+          fontSize: 10,
+          letterSpacing: 0.8,
+          color: subtle ? palette.ink[300] : palette.ink[100],
+        }}
+      >
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+function RangeStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text
+        variant="mono"
+        weight="medium"
+        style={{
+          fontSize: 9,
+          letterSpacing: 1.2,
+          color: palette.ink[400],
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        variant="display"
+        className="text-ink-50"
+        style={{ fontSize: 22, lineHeight: 26, marginTop: 2 }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
 }
