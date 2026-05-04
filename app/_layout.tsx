@@ -99,7 +99,10 @@ export default function RootLayout() {
           >
             <Stack.Screen name="index" />
             <Stack.Screen name="zone/[zoneId]/index" />
-            <Stack.Screen name="zone/[zoneId]/specifics" />
+            <Stack.Screen name="zone/[zoneId]/problems" />
+            <Stack.Screen name="zone/[zoneId]/weather" />
+            <Stack.Screen name="zone/[zoneId]/stations" />
+            <Stack.Screen name="zone/[zoneId]/discussion" />
           </Stack>
           <StatusBar style="light" />
         </ThemeProvider>

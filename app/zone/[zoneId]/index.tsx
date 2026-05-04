@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Linking,
-  Pressable,
-  ScrollView,
-  View,
-} from "react-native";
+import { Linking, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -19,6 +14,7 @@ import {
   getZoneSnapshotForDate,
   loadSnapshot,
   type FavoritesSnapshot,
+  type ZoneSnapshot,
 } from "@/lib/offlineCache";
 import type {
   AvalancheZone,
@@ -39,6 +35,19 @@ function highest(d: ElevationDanger): DangerRating {
   return [d.alpine, d.treeline, d.belowTreeline].reduce((b, c) =>
     RATING_ORDER.indexOf(c) > RATING_ORDER.indexOf(b) ? c : b,
   );
+}
+
+function startCase(s: string): string {
+  if (!s) return s;
+  return s.charAt(0) + s.slice(1).toLowerCase();
+}
+
+function freshnessColor(status: keyof typeof freshness): string {
+  if (status === "expired") return "#FCA5A5";
+  if (status === "expiring") return palette.aspen[400];
+  if (status === "recent") return palette.frost[400];
+  if (status === "unknown") return palette.ink[400];
+  return "#52BA4A";
 }
 
 function ageColor(iso: string | undefined): string {
@@ -66,16 +75,22 @@ export default function ZoneDetailScreen() {
   const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
   const zone: AvalancheZone | undefined = bundle?.forecast;
   const today = zone?.forecast?.[0];
-  const headlineRating = today ? highest(today.danger) : "NO_RATING";
-  const c = dangerColors[headlineRating];
+  const tomorrow = zone?.forecast?.[1];
   const fresh = zone ? freshness[zone.freshness.status] : null;
   const fetchedAt = bundle?.cachedAt ?? snap?.fetchedAt;
+
+  const navigateTo = (suffix: string) => {
+    Haptics.selectionAsync().catch(() => {});
+    router.push({
+      pathname: `/zone/[zoneId]/${suffix}` as never,
+      params: { zoneId },
+    });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.ink[950] }}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Custom header — back button, zone name, freshness pill */}
       <View
         style={{
           paddingTop: insets.top + 8,
@@ -95,11 +110,7 @@ export default function ZoneDetailScreen() {
           }}
           hitSlop={12}
         >
-          <Ionicons
-            name="chevron-back"
-            size={24}
-            color={palette.ink[100]}
-          />
+          <Ionicons name="chevron-back" size={24} color={palette.ink[100]} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text
@@ -114,58 +125,40 @@ export default function ZoneDetailScreen() {
             <Text
               variant="mono"
               className="text-ink-400"
-              style={{
-                fontSize: 10,
-                letterSpacing: 1.2,
-                marginTop: 2,
-              }}
+              style={{ fontSize: 10, letterSpacing: 1.2, marginTop: 2 }}
             >
               BY {zone.author.toUpperCase()}
             </Text>
           ) : null}
         </View>
-        {fresh ? (
-          <View
+        {fresh && zone ? (
+          <Text
+            variant="mono"
+            weight="bold"
             style={{
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 999,
-              backgroundColor: fresh.fill,
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color: freshnessColor(zone.freshness.status),
             }}
           >
-            <Text
-              variant="mono"
-              weight="bold"
-              style={{
-                fontSize: 9,
-                letterSpacing: 1.2,
-                color: fresh.ink,
-              }}
-            >
-              {fresh.label.toUpperCase()}
-            </Text>
-          </View>
+            {fresh.label.toUpperCase()}
+          </Text>
         ) : null}
       </View>
 
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 24,
-          paddingBottom: insets.bottom + 32,
-        }}
-      >
-        {/* Loading / not-found states */}
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         {!loaded ? (
-          <Text
-            variant="mono"
-            className="text-ink-400"
-            style={{ fontSize: 11, letterSpacing: 1.4 }}
-          >
-            LOADING…
-          </Text>
+          <View style={{ padding: 20 }}>
+            <Text
+              variant="mono"
+              className="text-ink-400"
+              style={{ fontSize: 11, letterSpacing: 1.4 }}
+            >
+              LOADING…
+            </Text>
+          </View>
         ) : !zone || !today ? (
-          <View>
+          <View style={{ padding: 20 }}>
             <Text
               variant="display"
               className="text-ink-100"
@@ -182,72 +175,33 @@ export default function ZoneDetailScreen() {
           </View>
         ) : (
           <>
-            {/* HERO — big mountain + numeral/word verdict */}
-            <View style={{ alignItems: "center", marginBottom: 8 }}>
-              <MountainDanger danger={today.danger} size={180} />
-            </View>
+            {/* TODAY | TOMORROW — two day columns side by side. */}
             <View
               style={{
                 flexDirection: "row",
-                alignItems: "baseline",
-                justifyContent: "center",
-                gap: 10,
-                marginTop: 4,
+                paddingHorizontal: 16,
+                paddingTop: 18,
+                gap: 12,
               }}
             >
-              <Text
-                variant="mono"
-                weight="bold"
-                style={{
-                  fontSize: 56,
-                  lineHeight: 60,
-                  color: c.fill,
-                  letterSpacing: -2,
-                }}
-              >
-                {c.level || "—"}
-              </Text>
-              <Text
-                variant="display"
-                style={{
-                  fontSize: 28,
-                  lineHeight: 32,
-                  color: c.fill,
-                  letterSpacing: 0.4,
-                }}
-              >
-                {headlineRating === "NO_RATING"
-                  ? "no rating"
-                  : c.label.charAt(0) + c.label.slice(1).toLowerCase()}
-              </Text>
+              <DayColumn label="TODAY" danger={today.danger} />
+              {tomorrow ? (
+                <>
+                  <View
+                    style={{
+                      width: 0.5,
+                      backgroundColor: palette.ink[700],
+                      marginVertical: 8,
+                    }}
+                  />
+                  <DayColumn label="TOMORROW" danger={tomorrow.danger} muted />
+                </>
+              ) : null}
             </View>
 
-            {/* Per-elevation breakdown */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "center",
-                gap: 18,
-                marginTop: 14,
-              }}
-            >
-              <ElevRow
-                label="ALP"
-                rating={today.danger.alpine}
-              />
-              <ElevRow
-                label="TL"
-                rating={today.danger.treeline}
-              />
-              <ElevRow
-                label="BTL"
-                rating={today.danger.belowTreeline}
-              />
-            </View>
-
-            {/* Bottom line — forecaster's prose */}
+            {/* BOTTOM LINE */}
             {zone.travelAdvice && zone.travelAdvice.trim() ? (
-              <View style={{ marginTop: 28 }}>
+              <View style={{ paddingHorizontal: 16, paddingTop: 28 }}>
                 <Text
                   variant="mono"
                   weight="medium"
@@ -261,65 +215,11 @@ export default function ZoneDetailScreen() {
                   BOTTOM LINE
                 </Text>
                 <Text
-                  variant="display"
                   className="text-ink-50"
-                  style={{ fontSize: 17, lineHeight: 25 }}
+                  style={{ fontSize: 16, lineHeight: 24 }}
                 >
                   {zone.travelAdvice.trim()}
                 </Text>
-              </View>
-            ) : null}
-
-            {/* Problem chips — show problem names. Detail-level views of
-                each problem (rose, likelihood, size, discussion) live in
-                the specifics deep-dive screen. */}
-            {zone.problems && zone.problems.length > 0 ? (
-              <View style={{ marginTop: 24 }}>
-                <Text
-                  variant="mono"
-                  weight="medium"
-                  className="text-ink-400"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: 1.6,
-                    marginBottom: 10,
-                  }}
-                >
-                  PROBLEMS · {zone.problems.length}
-                </Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    flexWrap: "wrap",
-                    gap: 8,
-                  }}
-                >
-                  {zone.problems.map((p, i) => (
-                    <View
-                      key={i}
-                      style={{
-                        paddingVertical: 5,
-                        paddingHorizontal: 10,
-                        borderRadius: 6,
-                        borderWidth: 0.5,
-                        borderColor: palette.aspen[500] + "AA",
-                        backgroundColor: palette.aspen[500] + "1A",
-                      }}
-                    >
-                      <Text
-                        variant="mono"
-                        weight="medium"
-                        style={{
-                          fontSize: 11,
-                          letterSpacing: 1,
-                          color: palette.aspen[400],
-                        }}
-                      >
-                        {p.name.toUpperCase()}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
               </View>
             ) : null}
 
@@ -327,7 +227,8 @@ export default function ZoneDetailScreen() {
             {zone.announcement ? (
               <View
                 style={{
-                  marginTop: 24,
+                  marginHorizontal: 16,
+                  marginTop: 16,
                   paddingVertical: 12,
                   paddingHorizontal: 14,
                   borderRadius: 10,
@@ -367,12 +268,57 @@ export default function ZoneDetailScreen() {
               </View>
             ) : null}
 
-            {/* Issued / expires / fetched footnote */}
+            {/* SUB-TILES — each navigates to a focused detail screen */}
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingTop: 28,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 10,
+              }}
+            >
+              <SubTile
+                label="Problems"
+                value={zone.problems?.length ?? 0}
+                icon="alert-circle-outline"
+                accent={palette.aspen[400]}
+                disabled={!zone.problems || zone.problems.length === 0}
+                onPress={() => navigateTo("problems")}
+              />
+              <SubTile
+                label="Weather outlook"
+                value={hasWeatherOutlook(bundle) ? "View" : "—"}
+                icon="cloud-outline"
+                accent={palette.frost[400]}
+                disabled={!hasWeatherOutlook(bundle)}
+                onPress={() => navigateTo("weather")}
+              />
+              <SubTile
+                label="Stations"
+                value={bundle?.stations?.length ?? 0}
+                icon="hardware-chip-outline"
+                accent="#52BA4A"
+                disabled={!bundle?.stations?.length}
+                onPress={() => navigateTo("stations")}
+              />
+              <SubTile
+                label="Forecaster notes"
+                value={hasForecasterDiscussion(zone) ? "Read" : "—"}
+                icon="document-text-outline"
+                accent={palette.frost[500]}
+                disabled={!hasForecasterDiscussion(zone)}
+                onPress={() => navigateTo("discussion")}
+              />
+            </View>
+
+            {/* Issued / expires / fetched */}
             <View
               style={{
                 flexDirection: "row",
                 flexWrap: "wrap",
                 gap: 16,
+                paddingHorizontal: 16,
                 marginTop: 28,
               }}
             >
@@ -401,17 +347,12 @@ export default function ZoneDetailScreen() {
               ) : null}
             </View>
 
-            {/* Action buttons — open specifics deep-dive + official forecast */}
-            <View style={{ gap: 10, marginTop: 28 }}>
+            {zone.forecastUrl ? (
               <Pressable
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  router.push({
-                    pathname: "/zone/[zoneId]/specifics",
-                    params: { zoneId },
-                  });
-                }}
+                onPress={() => Linking.openURL(zone.forecastUrl)}
                 style={({ pressed }) => ({
+                  marginTop: 24,
+                  marginHorizontal: 16,
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -419,10 +360,8 @@ export default function ZoneDetailScreen() {
                   paddingHorizontal: 16,
                   borderRadius: 10,
                   borderWidth: 0.5,
-                  borderColor: palette.frost[400],
-                  backgroundColor: pressed
-                    ? palette.frost[400] + "33"
-                    : palette.frost[400] + "12",
+                  borderColor: palette.ink[600],
+                  backgroundColor: pressed ? palette.ink[800] : "transparent",
                 })}
               >
                 <Text
@@ -431,54 +370,18 @@ export default function ZoneDetailScreen() {
                   style={{
                     fontSize: 12,
                     letterSpacing: 1.4,
-                    color: palette.frost[400],
+                    color: palette.ink[200],
                   }}
                 >
-                  OPEN FULL SPECIFICS
+                  OFFICIAL FORECAST · {hostname(zone.forecastUrl)}
                 </Text>
                 <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={palette.frost[400]}
+                  name="open-outline"
+                  size={14}
+                  color={palette.ink[300]}
                 />
               </Pressable>
-
-              {zone.forecastUrl ? (
-                <Pressable
-                  onPress={() => Linking.openURL(zone.forecastUrl)}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    paddingVertical: 14,
-                    paddingHorizontal: 16,
-                    borderRadius: 10,
-                    borderWidth: 0.5,
-                    borderColor: palette.ink[600],
-                    backgroundColor: pressed
-                      ? palette.ink[800]
-                      : "transparent",
-                  })}
-                >
-                  <Text
-                    variant="mono"
-                    weight="medium"
-                    style={{
-                      fontSize: 12,
-                      letterSpacing: 1.4,
-                      color: palette.ink[200],
-                    }}
-                  >
-                    OFFICIAL FORECAST · {hostname(zone.forecastUrl)}
-                  </Text>
-                  <Ionicons
-                    name="open-outline"
-                    size={14}
-                    color={palette.ink[300]}
-                  />
-                </Pressable>
-              ) : null}
-            </View>
+            ) : null}
           </>
         )}
       </ScrollView>
@@ -486,58 +389,185 @@ export default function ZoneDetailScreen() {
   );
 }
 
-function ElevRow({
+function DayColumn({
   label,
-  rating,
+  danger,
+  muted,
 }: {
   label: string;
-  rating: DangerRating;
+  danger: ElevationDanger;
+  muted?: boolean;
 }) {
-  const c = dangerColors[rating];
+  const top = highest(danger);
+  const c = dangerColors[top];
   return (
-    <View style={{ alignItems: "center" }}>
+    <View style={{ flex: 1, alignItems: "center", opacity: muted ? 0.95 : 1 }}>
       <Text
         variant="mono"
         weight="medium"
         className="text-ink-400"
-        style={{ fontSize: 10, letterSpacing: 1.4 }}
+        style={{ fontSize: 10, letterSpacing: 1.6, marginBottom: 8 }}
       >
         {label}
       </Text>
+      <MountainDanger danger={danger} size={108} />
       <View
         style={{
           flexDirection: "row",
           alignItems: "baseline",
-          gap: 4,
-          marginTop: 4,
+          gap: 6,
+          marginTop: 10,
         }}
       >
         <Text
           variant="mono"
           weight="bold"
           style={{
-            fontSize: 18,
+            fontSize: 32,
             color: c.fill,
-            letterSpacing: -0.5,
+            letterSpacing: -1,
+            lineHeight: 34,
           }}
         >
           {c.level || "—"}
         </Text>
         <Text
-          variant="mono"
+          variant="display"
           style={{
-            fontSize: 10,
+            fontSize: 16,
             color: c.fill,
-            letterSpacing: 0.6,
-            opacity: 0.85,
+            letterSpacing: 0.3,
+            lineHeight: 20,
           }}
         >
-          {rating === "NO_RATING"
-            ? ""
-            : c.label.slice(0, 4)}
+          {top === "NO_RATING" ? "no rating" : startCase(c.label)}
         </Text>
       </View>
+      <View style={{ gap: 3, marginTop: 10, alignSelf: "stretch" }}>
+        {(
+          [
+            { key: "alpine" as const, label: "ALP" },
+            { key: "treeline" as const, label: "TL" },
+            { key: "belowTreeline" as const, label: "BTL" },
+          ]
+        ).map(({ key, label }) => {
+          const r = danger[key];
+          const cc = dangerColors[r];
+          return (
+            <View
+              key={key}
+              style={{
+                flexDirection: "row",
+                alignItems: "baseline",
+                gap: 4,
+              }}
+            >
+              <Text
+                variant="mono"
+                weight="medium"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: 1,
+                  color: palette.ink[400],
+                  width: 26,
+                }}
+              >
+                {label}
+              </Text>
+              <Text
+                variant="mono"
+                weight="bold"
+                style={{
+                  fontSize: 11,
+                  color: cc.fill,
+                  width: 12,
+                }}
+              >
+                {cc.level || "—"}
+              </Text>
+              <Text
+                style={{ flex: 1, fontSize: 11, color: cc.fill }}
+                numberOfLines={1}
+              >
+                {r === "NO_RATING" ? "—" : startCase(cc.label)}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
     </View>
+  );
+}
+
+function SubTile({
+  label,
+  value,
+  icon,
+  accent,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  value: string | number;
+  icon: keyof typeof Ionicons.glyphMap;
+  accent: string;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        width: "48.5%",
+        backgroundColor: palette.ink[900],
+        borderWidth: 0.5,
+        borderColor: palette.ink[700],
+        borderRadius: 12,
+        padding: 14,
+        opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+      })}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        <Ionicons name={icon} size={16} color={accent} />
+        <Text
+          variant="mono"
+          weight="medium"
+          style={{ fontSize: 10, letterSpacing: 1.4, color: accent }}
+        >
+          {label.toUpperCase()}
+        </Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text
+          variant="display"
+          className="text-ink-50"
+          style={{ fontSize: 22, lineHeight: 26 }}
+        >
+          {value}
+        </Text>
+        {!disabled ? (
+          <Ionicons
+            name="chevron-forward"
+            size={14}
+            color={palette.ink[400]}
+          />
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -571,6 +601,18 @@ function Meta({
         {value}
       </Text>
     </View>
+  );
+}
+
+function hasWeatherOutlook(bundle: ZoneSnapshot | undefined): boolean {
+  const w = bundle?.weather;
+  return !!(w?.nacWeather || w?.nwsForecast || w?.avgDiscussion);
+}
+
+function hasForecasterDiscussion(zone: AvalancheZone): boolean {
+  return !!(
+    (zone.hazardDiscussion && zone.hazardDiscussion.trim()) ||
+    (zone.weatherDiscussion && zone.weatherDiscussion.trim())
   );
 }
 
