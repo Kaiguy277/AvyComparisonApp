@@ -92,73 +92,156 @@ export function ZoneTile({ zone, viewedDate }: Props) {
             {zone.name}
           </Text>
 
-          {/* Station name + elevation — full-width above the mountain
-              row so long names ("Eagle River Valley", etc.) are never
-              truncated. */}
-          {station ? (
-            <Text
-              variant="mono"
-              weight="bold"
-              style={{
-                fontSize: 9,
-                letterSpacing: 1,
-                color: palette.ink[400],
-                marginTop: 14,
-              }}
-              numberOfLines={2}
-            >
-              {station.stationName.toUpperCase()}
-              {typeof station.elevation === "number"
-                ? ` · ${station.elevation.toLocaleString()}′`
-                : ""}
-            </Text>
-          ) : null}
-
-          {/* Row: mountain glyph (with danger numerals 1..5 inside its
-              bands) on the left, current station readouts on the right.
-              Stacked icon+value rows: temp, wind, 24h new-snow delta. */}
+          {/* Two-column body — left side is the avy forecast (mountain
+              glyph + freshness word + issued/expires), right side is
+              the highest-station weather snapshot. Problems below
+              spans full width since names can be long. */}
           {today ? (
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "flex-start",
                 gap: 12,
-                marginTop: station ? 6 : 14,
+                marginTop: 14,
               }}
             >
-              <MountainDanger
-                danger={today.danger}
-                size={74}
-                labelMode="numbers"
-              />
+              {/* LEFT — avalanche column */}
+              <View style={{ width: 74 }}>
+                <MountainDanger
+                  danger={today.danger}
+                  size={74}
+                  labelMode="numbers"
+                />
+                <Text
+                  variant="mono"
+                  weight="bold"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                    color: freshnessColor(zone.freshness.status),
+                    marginTop: 8,
+                  }}
+                >
+                  {fresh.label.toUpperCase()}
+                </Text>
+                {zone.freshness.issueDate ? (
+                  <View style={{ marginTop: 4 }}>
+                    <Text
+                      variant="mono"
+                      weight="bold"
+                      style={{
+                        fontSize: 8,
+                        letterSpacing: 0.8,
+                        color: palette.ink[400],
+                      }}
+                    >
+                      ISSUED
+                    </Text>
+                    <Text
+                      variant="mono"
+                      style={{
+                        fontSize: 9,
+                        color: palette.ink[200],
+                        marginTop: 1,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {zone.freshness.issueDate}
+                    </Text>
+                  </View>
+                ) : null}
+                {zone.freshness.expiresDate ? (
+                  <View style={{ marginTop: 4 }}>
+                    <Text
+                      variant="mono"
+                      weight="bold"
+                      style={{
+                        fontSize: 8,
+                        letterSpacing: 0.8,
+                        color: palette.ink[400],
+                      }}
+                    >
+                      EXPIRES
+                    </Text>
+                    <Text
+                      variant="mono"
+                      style={{
+                        fontSize: 9,
+                        color:
+                          zone.freshness.status === "expired"
+                            ? "#FCA5A5"
+                            : zone.freshness.status === "expiring"
+                              ? palette.aspen[400]
+                              : palette.ink[200],
+                        marginTop: 1,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {zone.freshness.expiresDate}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* RIGHT — weather column */}
               {station ? (
-                <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                  <StationStat
-                    icon="thermometer-outline"
-                    value={
-                      station.temperature.current !== null
-                        ? `${station.temperature.current}°`
-                        : "—"
-                    }
-                  />
-                  <StationStat
-                    icon="speedometer-outline"
-                    value={
-                      station.wind?.speedCurrent !== null &&
-                      station.wind?.speedCurrent !== undefined
-                        ? `${Math.round(station.wind.speedCurrent)}${
-                            station.wind.direction
-                              ? ` ${station.wind.direction}`
-                              : ""
-                          }`
-                        : "—"
-                    }
-                  />
-                  <StationStat
-                    icon="snow-outline"
-                    value={formatSnowDelta(station.snow.depth24hrChange)}
-                    suffix="24H"
-                  />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    variant="mono"
+                    weight="bold"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: 1,
+                      color: palette.ink[400],
+                    }}
+                    numberOfLines={2}
+                  >
+                    {station.stationName.toUpperCase()}
+                  </Text>
+                  {typeof station.elevation === "number" ? (
+                    <Text
+                      variant="mono"
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: 0.6,
+                        color: palette.ink[400],
+                        marginTop: 1,
+                        marginBottom: 6,
+                      }}
+                    >
+                      {station.elevation.toLocaleString()}′
+                    </Text>
+                  ) : (
+                    <View style={{ height: 6 }} />
+                  )}
+                  <View style={{ gap: 3 }}>
+                    <StationStat
+                      icon="thermometer-outline"
+                      value={
+                        station.temperature.current !== null
+                          ? `${station.temperature.current}°`
+                          : "—"
+                      }
+                    />
+                    <StationStat
+                      icon="speedometer-outline"
+                      value={
+                        station.wind?.speedCurrent !== null &&
+                        station.wind?.speedCurrent !== undefined
+                          ? `${Math.round(station.wind.speedCurrent)}${
+                              station.wind.direction
+                                ? ` ${station.wind.direction}`
+                                : ""
+                            }`
+                          : "—"
+                      }
+                    />
+                    <StationStat
+                      icon="snow-outline"
+                      value={formatSnowDelta(station.snow.depth24hrChange)}
+                      suffix="24H"
+                    />
+                  </View>
                 </View>
               ) : null}
             </View>
@@ -179,66 +262,6 @@ export function ZoneTile({ zone, viewedDate }: Props) {
               </Text>
             </View>
           )}
-
-          {/* Freshness word + issued/expires meta — clustered so the
-              user reads CURRENT/EXPIRED right above the dates that
-              determined that status. */}
-          <View style={{ marginTop: 12, gap: 2 }}>
-            <Text
-              variant="mono"
-              weight="bold"
-              style={{
-                fontSize: 10,
-                letterSpacing: 1.2,
-                color: freshnessColor(zone.freshness.status),
-                marginBottom: 2,
-              }}
-            >
-              {fresh.label.toUpperCase()}
-            </Text>
-            {zone.freshness.issueDate ? (
-              <Text
-                variant="mono"
-                style={{
-                  fontSize: 9,
-                  letterSpacing: 0.6,
-                  color: palette.ink[400],
-                }}
-                numberOfLines={1}
-              >
-                ISSUED{" "}
-                <Text style={{ fontSize: 9, color: palette.ink[200] }}>
-                  {zone.freshness.issueDate}
-                </Text>
-              </Text>
-            ) : null}
-              {zone.freshness.expiresDate ? (
-                <Text
-                  variant="mono"
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: 0.6,
-                    color: palette.ink[400],
-                  }}
-                  numberOfLines={1}
-                >
-                  EXPIRES{" "}
-                  <Text
-                    style={{
-                      fontSize: 9,
-                      color:
-                        zone.freshness.status === "expired"
-                          ? "#FCA5A5"
-                          : zone.freshness.status === "expiring"
-                            ? palette.aspen[400]
-                            : palette.ink[200],
-                    }}
-                  >
-                    {zone.freshness.expiresDate}
-                  </Text>
-                </Text>
-              ) : null}
-          </View>
 
           {/* Problem names listed. */}
           {zone.problems && zone.problems.length > 0 ? (
