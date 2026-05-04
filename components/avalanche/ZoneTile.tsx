@@ -1,6 +1,6 @@
 import { Pressable, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "@/components/ui/Text";
 import { MountainDanger } from "./MountainDanger";
@@ -105,13 +105,12 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                 marginTop: 14,
               }}
             >
-              {/* LEFT — avalanche column */}
+              {/* LEFT — avalanche column. CURRENT/EXPIRED freshness
+                  word sits above the mountain to give the dates
+                  below it context, so we can drop the ISSUED/EXPIRES
+                  labels and just show the date range (top = start,
+                  bottom = end). Saves vertical room. */}
               <View style={{ width: 74 }}>
-                <MountainDanger
-                  danger={today.danger}
-                  size={74}
-                  labelMode="numbers"
-                />
                 <Text
                   variant="mono"
                   weight="bold"
@@ -119,67 +118,46 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                     fontSize: 10,
                     letterSpacing: 1.2,
                     color: freshnessColor(zone.freshness.status),
-                    marginTop: 8,
+                    marginBottom: 6,
                   }}
                 >
                   {fresh.label.toUpperCase()}
                 </Text>
+                <MountainDanger
+                  danger={today.danger}
+                  size={74}
+                  labelMode="numbers"
+                />
                 {zone.freshness.issueDate ? (
-                  <View style={{ marginTop: 4 }}>
-                    <Text
-                      variant="mono"
-                      weight="bold"
-                      style={{
-                        fontSize: 8,
-                        letterSpacing: 0.8,
-                        color: palette.ink[400],
-                      }}
-                    >
-                      ISSUED
-                    </Text>
-                    <Text
-                      variant="mono"
-                      style={{
-                        fontSize: 9,
-                        color: palette.ink[200],
-                        marginTop: 1,
-                      }}
-                      numberOfLines={2}
-                    >
-                      {zone.freshness.issueDate}
-                    </Text>
-                  </View>
+                  <Text
+                    variant="mono"
+                    style={{
+                      fontSize: 9,
+                      color: palette.ink[200],
+                      marginTop: 6,
+                    }}
+                    numberOfLines={2}
+                  >
+                    {zone.freshness.issueDate}
+                  </Text>
                 ) : null}
                 {zone.freshness.expiresDate ? (
-                  <View style={{ marginTop: 4 }}>
-                    <Text
-                      variant="mono"
-                      weight="bold"
-                      style={{
-                        fontSize: 8,
-                        letterSpacing: 0.8,
-                        color: palette.ink[400],
-                      }}
-                    >
-                      EXPIRES
-                    </Text>
-                    <Text
-                      variant="mono"
-                      style={{
-                        fontSize: 9,
-                        color:
-                          zone.freshness.status === "expired"
-                            ? "#FCA5A5"
-                            : zone.freshness.status === "expiring"
-                              ? palette.aspen[400]
-                              : palette.ink[200],
-                        marginTop: 1,
-                      }}
-                      numberOfLines={2}
-                    >
-                      {zone.freshness.expiresDate}
-                    </Text>
-                  </View>
+                  <Text
+                    variant="mono"
+                    style={{
+                      fontSize: 9,
+                      color:
+                        zone.freshness.status === "expired"
+                          ? "#FCA5A5"
+                          : zone.freshness.status === "expiring"
+                            ? palette.aspen[400]
+                            : palette.ink[200],
+                      marginTop: 2,
+                    }}
+                    numberOfLines={2}
+                  >
+                    {zone.freshness.expiresDate}
+                  </Text>
                 ) : null}
               </View>
 
@@ -224,11 +202,12 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                       }
                     />
                     <StationStat
-                      icon="speedometer-outline"
+                      iconSet="material"
+                      icon="weather-windy"
                       value={
                         station.wind?.speedCurrent !== null &&
                         station.wind?.speedCurrent !== undefined
-                          ? `${Math.round(station.wind.speedCurrent)}${
+                          ? `${Math.round(station.wind.speedCurrent)} mph${
                               station.wind.direction
                                 ? ` ${station.wind.direction}`
                                 : ""
@@ -299,17 +278,22 @@ export function ZoneTile({ zone, viewedDate }: Props) {
   );
 }
 
-function StationStat({
-  icon,
-  value,
-  suffix,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  value: string;
-  // Tiny muted-mono trailing label, e.g. "24H" on the snow-delta stat
-  // to disambiguate it from a current reading.
-  suffix?: string;
-}) {
+type StationStatProps =
+  | {
+      iconSet?: "ion";
+      icon: keyof typeof Ionicons.glyphMap;
+      value: string;
+      suffix?: string;
+    }
+  | {
+      iconSet: "material";
+      icon: keyof typeof MaterialCommunityIcons.glyphMap;
+      value: string;
+      suffix?: string;
+    };
+
+function StationStat(props: StationStatProps) {
+  const { value, suffix } = props;
   return (
     <View
       style={{
@@ -318,11 +302,19 @@ function StationStat({
         gap: 3,
       }}
     >
-      <Ionicons
-        name={icon}
-        size={12}
-        color={palette.ink[400]}
-      />
+      {props.iconSet === "material" ? (
+        <MaterialCommunityIcons
+          name={props.icon}
+          size={13}
+          color={palette.ink[400]}
+        />
+      ) : (
+        <Ionicons
+          name={props.icon}
+          size={12}
+          color={palette.ink[400]}
+        />
+      )}
       <Text
         variant="mono"
         weight="medium"
