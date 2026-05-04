@@ -105,11 +105,9 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                 marginTop: 14,
               }}
             >
-              {/* LEFT — avalanche column. CURRENT/EXPIRED freshness
-                  word sits above the mountain to give the dates
-                  below it context, so we can drop the ISSUED/EXPIRES
-                  labels and just show the date range (top = start,
-                  bottom = end). Saves vertical room. */}
+              {/* LEFT — avalanche column. CURRENT/EXPIRED label above
+                  the mountain glyph; date range moves to its own
+                  full-width row below the problems. */}
               <View style={{ width: 74 }}>
                 <Text
                   variant="mono"
@@ -128,37 +126,6 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                   size={74}
                   labelMode="numbers"
                 />
-                {zone.freshness.issueDate ? (
-                  <Text
-                    variant="mono"
-                    style={{
-                      fontSize: 9,
-                      color: palette.ink[200],
-                      marginTop: 6,
-                    }}
-                    numberOfLines={2}
-                  >
-                    {zone.freshness.issueDate}
-                  </Text>
-                ) : null}
-                {zone.freshness.expiresDate ? (
-                  <Text
-                    variant="mono"
-                    style={{
-                      fontSize: 9,
-                      color:
-                        zone.freshness.status === "expired"
-                          ? "#FCA5A5"
-                          : zone.freshness.status === "expiring"
-                            ? palette.aspen[400]
-                            : palette.ink[200],
-                      marginTop: 2,
-                    }}
-                    numberOfLines={2}
-                  >
-                    {zone.freshness.expiresDate}
-                  </Text>
-                ) : null}
               </View>
 
               {/* RIGHT — weather column */}
@@ -270,6 +237,58 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                   {p.name}
                 </Text>
               ))}
+            </View>
+          ) : null}
+
+          {/* Forecast date range — full-width footer beneath the
+              problems. CURRENT/EXPIRED above gave the freshness
+              context; this is just the start → end window. */}
+          {zone.freshness.issueDate || zone.freshness.expiresDate ? (
+            <View
+              style={{
+                marginTop: 12,
+                paddingTop: 8,
+                borderTopWidth: 0.5,
+                borderColor: palette.ink[500] + "AA",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <Text
+                variant="mono"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: 0.6,
+                  color: palette.ink[200],
+                }}
+                numberOfLines={1}
+              >
+                {zone.freshness.issueDate ?? "—"}
+              </Text>
+              <Text
+                variant="mono"
+                style={{ fontSize: 10, color: palette.ink[400] }}
+              >
+                →
+              </Text>
+              <Text
+                variant="mono"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: 0.6,
+                  color:
+                    zone.freshness.status === "expired"
+                      ? "#FCA5A5"
+                      : zone.freshness.status === "expiring"
+                        ? palette.aspen[400]
+                        : palette.ink[200],
+                }}
+                numberOfLines={1}
+              >
+                {zone.freshness.expiresDate ?? "—"}
+              </Text>
             </View>
           ) : null}
         </View>
