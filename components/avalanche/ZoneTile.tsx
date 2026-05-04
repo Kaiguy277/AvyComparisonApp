@@ -12,6 +12,10 @@ import type {
 
 interface Props {
   zone: AvalancheZone;
+  // YYYY-MM-DD of the day the home grid is currently showing. Threaded
+  // into the detail route so the detail / sub screens look up the
+  // matching bundle in the snapshot, not the newest.
+  viewedDate: string;
 }
 
 const ELEVATIONS: (keyof ElevationDanger)[] = [
@@ -44,7 +48,7 @@ function freshnessColor(status: keyof typeof freshness): string {
 // at-a-glance signal the prior stacked card had: per-elevation
 // rating with number+word, freshness word, problem names listed
 // (not just counted), issued/expires dates.
-export function ZoneTile({ zone }: Props) {
+export function ZoneTile({ zone, viewedDate }: Props) {
   const router = useRouter();
   const today = zone.forecast?.[0];
   const fresh = freshness[zone.freshness.status];
@@ -53,7 +57,7 @@ export function ZoneTile({ zone }: Props) {
     Haptics.selectionAsync().catch(() => {});
     router.push({
       pathname: "/zone/[zoneId]" as never,
-      params: { zoneId: zone.id },
+      params: { zoneId: zone.id, date: viewedDate },
     });
   };
 

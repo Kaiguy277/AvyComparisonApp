@@ -31,7 +31,10 @@ import type { AvalancheZone } from "@/lib/api/avalanche";
 // rose/likelihood detail.
 
 export default function ZoneFullForecastScreen() {
-  const { zoneId } = useLocalSearchParams<{ zoneId: string }>();
+  const { zoneId, date } = useLocalSearchParams<{
+    zoneId: string;
+    date?: string;
+  }>();
   const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -41,7 +44,7 @@ export default function ZoneFullForecastScreen() {
     });
   }, []);
 
-  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
+  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId, date) : undefined;
   const session = getZoneSession(zoneId);
   const zone: AvalancheZone | undefined = bundle?.forecast ?? session?.forecast;
   const weatherBundle = bundle?.weather ?? session?.weather;

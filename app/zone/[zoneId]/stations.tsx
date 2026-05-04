@@ -13,7 +13,10 @@ import { getZoneSession } from "@/lib/zoneSession";
 import { ZoneScreenHeader, ZoneScreenContainer } from "@/components/avalanche/ZoneScreenChrome";
 
 export default function ZoneStationsScreen() {
-  const { zoneId } = useLocalSearchParams<{ zoneId: string }>();
+  const { zoneId, date } = useLocalSearchParams<{
+    zoneId: string;
+    date?: string;
+  }>();
   const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -23,7 +26,7 @@ export default function ZoneStationsScreen() {
     });
   }, []);
 
-  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
+  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId, date) : undefined;
   const session = getZoneSession(zoneId);
   const zone = bundle?.forecast ?? session?.forecast;
   const stations = bundle?.stations ?? session?.stations ?? [];

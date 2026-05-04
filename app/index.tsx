@@ -1473,7 +1473,7 @@ export default function Index() {
                         flexShrink: 0,
                       }}
                     >
-                      <ZoneTile zone={zone} />
+                      <ZoneTile zone={zone} viewedDate={viewedDate} />
                     </View>
                   ))}
                 </View>

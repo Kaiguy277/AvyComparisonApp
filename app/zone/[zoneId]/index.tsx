@@ -62,7 +62,10 @@ function ageColor(iso: string | undefined): string {
 
 export default function ZoneDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { zoneId } = useLocalSearchParams<{ zoneId: string }>();
+  const { zoneId, date } = useLocalSearchParams<{
+    zoneId: string;
+    date?: string;
+  }>();
   const router = useRouter();
 
   const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
@@ -74,9 +77,11 @@ export default function ZoneDetailScreen() {
     });
   }, []);
 
-  // Snapshot only persists favorites; ad-hoc zones fall through to the
-  // in-memory session cache so the detail screen still finds them.
-  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
+  // Snapshot is keyed by zoneId × date; pass the route-param date so we
+  // pull the bundle the user was looking at on the home grid (not the
+  // newest, which would jump them to today when scrolling archive).
+  // Ad-hoc zones (not favorites) fall through to the session cache.
+  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId, date) : undefined;
   const session = getZoneSession(zoneId);
   const zone: AvalancheZone | undefined = bundle?.forecast ?? session?.forecast;
   const stations = bundle?.stations ?? session?.stations;
@@ -90,7 +95,7 @@ export default function ZoneDetailScreen() {
     Haptics.selectionAsync().catch(() => {});
     router.push({
       pathname: `/zone/[zoneId]/${suffix}` as never,
-      params: { zoneId },
+      params: { zoneId, ...(date ? { date } : {}) },
     });
   };
 
