@@ -79,6 +79,7 @@ import {
   type ZoneWeatherForecast,
 } from "@/lib/api/avalanche";
 import { AVAILABLE_ZONES, DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
+import { setZoneSession } from "@/lib/zoneSession";
 
 interface WeatherForecastBundle {
   centerWeather: Record<string, NacWeatherProduct>;
@@ -105,10 +106,10 @@ const months = [
 export default function Index() {
   const insets = useSafeAreaInsets();
 
-  // Top-level collapse state. The picker and the matrix open by default
-  // (most users want to see selections + comparison at a glance); other
-  // sections inside open on tap.
-  const [pickerOpen, setPickerOpen] = useState(true);
+  // Top-level collapse state. Picker is collapsed by default — favorites
+  // already auto-load and the zone grid carries the daily-driver read,
+  // so the picker is admin and shouldn't take vertical space up front.
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // The unified visible zone list. Anything in here renders in the tray and
   // gets fetched. A subset of these are favorites (persisted across launches);
@@ -483,6 +484,35 @@ export default function Index() {
       }
     })();
   }, [summary, weatherForecastData, favoriteZoneIds, viewedDate, loadSource]);
+
+  // Fan every zone we have data for into the session-level in-memory
+  // cache so the detail / sub-screens can find them — including ad-hoc
+  // zones that aren't favorites and therefore aren't written to the
+  // persistent offline snapshot.
+  useEffect(() => {
+    if (!summary) return;
+    for (const z of summary.zones) {
+      const cid = ZONE_TO_CENTER[z.id];
+      const wf = weatherForecastData
+        ? {
+            nacWeather: cid
+              ? weatherForecastData.centerWeather[cid]
+              : undefined,
+            nwsForecast: weatherForecastData.zoneNwsForecasts[z.id],
+            avgDiscussion: cid
+              ? weatherForecastData.centerAvgDiscussions[cid]
+              : undefined,
+            avgLocations: weatherForecastData.zoneAvgLocations[z.id],
+          }
+        : undefined;
+      setZoneSession(z.id, {
+        forecast: z,
+        stations: z.weatherObservations,
+        weather: wf,
+        cachedAt: new Date().toISOString(),
+      });
+    }
+  }, [summary, weatherForecastData]);
 
   const fetchSnotel = useCallback(async (zoneIds: string[]) => {
     setIsSnotelLoading(true);
@@ -867,148 +897,239 @@ export default function Index() {
           </View>
         ) : null}
 
-        {/* HERO — slim status strip. The user already knows what app this
-            is and what they're here for; we just need a sense of place
-            (logo + wordmark) and a date stamp. ~50px instead of ~180px. */}
+        {/* HEADER — wordmark + date pager on the top row, status meta
+            (cached/live/offline + fetched time) on a small line below.
+            Carries every bit of session-context the page needs in one
+            block, so the area above the zone tiles is just header →
+            MANAGE ZONES → tiles. */}
         <View
           style={{
             paddingHorizontal: 20,
             paddingTop: 10,
-            paddingBottom: 12,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
+            paddingBottom: 10,
             borderBottomWidth: 0.5,
-            borderColor: palette.ink[700],
+            borderColor: palette.ink[500] + "AA",
           }}
         >
-          <Image
-            source={require("@/assets/images/wordmark.png")}
-            style={{ width: 18, height: 25 }}
-            resizeMode="contain"
-          />
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-frost-400"
-            style={{ fontSize: 10, letterSpacing: 2 }}
-          >
-            AVY · COMPARISON
-          </Text>
-          <View style={{ flex: 1 }} />
-          {/* Date pager — left arrow goes back, right arrow goes forward,
-              the label between shows what day's forecast is on screen. The
-              right arrow is hidden when already on today since "tomorrow's
-              forecast" doesn't exist in the archive. */}
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
+              gap: 10,
             }}
           >
-            <Pressable
-              onPress={() => stepDate(-1)}
-              hitSlop={10}
-              disabled={!canStepBack}
+            <Image
+              source={require("@/assets/images/wordmark.png")}
+              style={{ width: 18, height: 25 }}
+              resizeMode="contain"
+            />
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-frost-400"
+              style={{ fontSize: 10, letterSpacing: 2 }}
+            >
+              AVY · COMPARISON
+            </Text>
+            <View style={{ flex: 1 }} />
+            <View
               style={{
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-                opacity: canStepBack ? 1 : 0.25,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              <Ionicons
-                name="chevron-back"
-                size={14}
-                color={palette.ink[200]}
-              />
-            </Pressable>
-            <View style={{ alignItems: "center", minWidth: 110 }}>
+              <Pressable
+                onPress={() => stepDate(-1)}
+                hitSlop={10}
+                disabled={!canStepBack}
+                style={{
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                  opacity: canStepBack ? 1 : 0.25,
+                }}
+              >
+                <Ionicons
+                  name="chevron-back"
+                  size={14}
+                  color={palette.ink[200]}
+                />
+              </Pressable>
               <Text
                 variant="mono"
                 weight="medium"
                 className="text-ink-200"
-                style={{ fontSize: 11, letterSpacing: 1.4 }}
+                style={{ fontSize: 11, letterSpacing: 1.4, minWidth: 110, textAlign: "center" }}
               >
                 {isViewingToday
                   ? `${today.weekday.slice(0, 3)} · ${today.month.slice(0, 3)} ${today.day}`
                   : viewedDateLabel(viewedDate)}
               </Text>
-              {!isViewingToday ? (
+              <Pressable
+                onPress={() => stepDate(1)}
+                hitSlop={10}
+                disabled={!canStepForward}
+                style={{
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                  opacity: canStepForward ? 1 : 0.25,
+                }}
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={14}
+                  color={palette.ink[200]}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Status meta — colored dot + source + fetched time,
+              left-aligned under the wordmark. Plain text so it
+              doesn't compete with anything tappable. */}
+          {scrapedAt ? (
+            <View
+              style={{
+                marginTop: 6,
+                flexDirection: "row",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 6,
+              }}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: !isViewingToday
+                    ? palette.aspen[400]
+                    : loadSource === "offline"
+                      ? palette.aspen[400]
+                      : "#52BA4A",
+                }}
+              />
+              <Text
+                variant="mono"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  color: palette.ink[400],
+                }}
+              >
+                {!isViewingToday
+                  ? `ARCHIVE · ${formatDateLabel(viewedDate).toUpperCase()}`
+                  : loadSource === "cached"
+                    ? "CACHED"
+                    : loadSource === "offline"
+                      ? "OFFLINE"
+                      : "LIVE"}
+                {" · "}
+                {new Date(scrapedAt)
+                  .toLocaleString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                  .toUpperCase()}
+              </Text>
+              {isSnotelLoading || isWeatherForecastLoading ? (
                 <Text
                   variant="mono"
-                  weight="medium"
-                  className="text-aspen-400"
-                  style={{ fontSize: 8, letterSpacing: 1.6, marginTop: 1 }}
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                    color: palette.aspen[400],
+                  }}
                 >
-                  ARCHIVE
+                  · {isSnotelLoading ? "STATIONS…" : "WEATHER…"}
                 </Text>
               ) : null}
             </View>
-            <Pressable
-              onPress={() => stepDate(1)}
-              hitSlop={10}
-              disabled={!canStepForward}
-              style={{
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-                opacity: canStepForward ? 1 : 0.25,
-              }}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={14}
-                color={palette.ink[200]}
-              />
-            </Pressable>
-          </View>
+          ) : null}
         </View>
 
-        {/* ZONE PICKER — collapsible, default open. Tap the header to
-            tuck it away once selections are dialed in. */}
+        {/* MANAGE ZONES — tile-style pane matching the zone tiles +
+            sub-tiles. Bold 2px outline on a raised surface, with a
+            press-to-toggle header that says exactly what it does
+            ("Manage zones" + "tap to expand/collapse"). */}
         <View style={{ paddingHorizontal: 16 }}>
-          <Card>
+          <View
+            style={{
+              backgroundColor: palette.ink[800],
+              borderWidth: 2,
+              borderColor: palette.ink[700],
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
             <Pressable
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
                 setPickerOpen((v) => !v);
               }}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
-              <CardHeader>
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-baseline gap-3 flex-1">
-                    <CardEyebrow>VIEW FORECAST</CardEyebrow>
-                    {favoriteZoneIds.length > 0 ? (
-                      <Text
-                        variant="mono"
-                        weight="medium"
-                        className="text-aspen-400"
-                        style={{ fontSize: 12, letterSpacing: 1.4 }}
-                      >
-                        ★ {favoriteZoneIds.length} FAV
-                      </Text>
-                    ) : null}
-                    {!pickerOpen && displayedZoneIds.length > 0 ? (
-                      <Text
-                        variant="mono"
-                        className="text-ink-400"
-                        style={{ fontSize: 11, letterSpacing: 1.2 }}
-                      >
-                        {displayedZoneIds.length} ZONE
-                        {displayedZoneIds.length === 1 ? "" : "S"}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Ionicons
-                    name={pickerOpen ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={palette.ink[300]}
-                  />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  gap: 10,
+                }}
+              >
+                <Ionicons
+                  name="list"
+                  size={20}
+                  color={palette.aspen[400]}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="mono"
+                    weight="bold"
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: 1.4,
+                      color: palette.aspen[400],
+                    }}
+                  >
+                    MANAGE ZONES
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      lineHeight: 16,
+                      color: palette.ink[300],
+                      marginTop: 2,
+                    }}
+                  >
+                    {favoriteZoneIds.length} favorite
+                    {favoriteZoneIds.length === 1 ? "" : "s"}
+                    {displayedZoneIds.length !== favoriteZoneIds.length
+                      ? ` · ${displayedZoneIds.length} on screen`
+                      : ""}
+                    {" · tap to "}
+                    {pickerOpen ? "collapse" : "add or reorder"}
+                  </Text>
                 </View>
-              </CardHeader>
+                <Ionicons
+                  name={pickerOpen ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={palette.ink[300]}
+                />
+              </View>
             </Pressable>
             {!pickerOpen ? null : (
-            <CardContent>
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingBottom: 16,
+                borderTopWidth: 0.5,
+                borderColor: palette.ink[500] + "AA",
+              }}
+            >
               {/* Unified zone tray — favorites + ad-hoc rows in one drag-
                   reorderable list. Filled star = persists across launches,
                   outline star = session-only. × removes the row entirely. */}
@@ -1283,66 +1404,12 @@ export default function Index() {
                   </Button>
                 </View>
               ) : null}
-            </CardContent>
+            </View>
             )}
-          </Card>
+          </View>
         </View>
 
-        {/* STATUS BAR */}
-        {scrapedAt ? (
-          <View
-            style={{
-              marginTop: 24,
-              marginHorizontal: 16,
-              paddingVertical: 14,
-              paddingHorizontal: 18,
-              borderRadius: 14,
-              backgroundColor: palette.ink[900],
-              borderWidth: 0.5,
-              borderColor: palette.ink[700],
-            }}
-            className="flex-row items-center justify-between flex-wrap gap-2"
-          >
-            <View className="flex-row items-center gap-2.5">
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: palette.frost[400],
-                }}
-              />
-              <Text
-                variant="mono"
-                weight="medium"
-                className="text-ink-100"
-                style={{ fontSize: 13, letterSpacing: 1.2 }}
-              >
-                {new Date(scrapedAt)
-                  .toLocaleString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    month: "short",
-                    day: "numeric",
-                  })
-                  .toUpperCase()}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              {!isViewingToday ? (
-                <Badge variant="aspen">Archive · {formatDateLabel(viewedDate)}</Badge>
-              ) : loadSource === "cached" ? (
-                <Badge variant="frost">Cached</Badge>
-              ) : loadSource === "offline" ? (
-                <Badge variant="subtle">Offline</Badge>
-              ) : (
-                <Badge variant="aspen">Live</Badge>
-              )}
-              {isSnotelLoading ? <Badge variant="subtle">stations…</Badge> : null}
-              {isWeatherForecastLoading ? <Badge variant="subtle">weather…</Badge> : null}
-            </View>
-          </View>
-        ) : null}
+        {/* Status meta now lives in the header. */}
 
         {/* RESULTS */}
         {summary ? (

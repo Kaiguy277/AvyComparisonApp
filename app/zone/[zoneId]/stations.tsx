@@ -9,6 +9,7 @@ import {
   loadSnapshot,
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
+import { getZoneSession } from "@/lib/zoneSession";
 import { ZoneScreenHeader, ZoneScreenContainer } from "@/components/avalanche/ZoneScreenChrome";
 
 export default function ZoneStationsScreen() {
@@ -23,8 +24,9 @@ export default function ZoneStationsScreen() {
   }, []);
 
   const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
-  const zone = bundle?.forecast;
-  const stations = bundle?.stations ?? [];
+  const session = getZoneSession(zoneId);
+  const zone = bundle?.forecast ?? session?.forecast;
+  const stations = bundle?.stations ?? session?.stations ?? [];
 
   return (
     <ZoneScreenContainer>

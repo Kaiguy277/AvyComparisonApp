@@ -9,6 +9,7 @@ import { Text } from "@/components/ui/Text";
 import { MountainDanger } from "@/components/avalanche/MountainDanger";
 import { dangerColors, freshness, palette } from "@/constants/design";
 import { ZONE_TO_CENTER_NAME } from "@/lib/zones";
+import { getZoneSession } from "@/lib/zoneSession";
 import {
   ageHours,
   formatAge,
@@ -73,12 +74,17 @@ export default function ZoneDetailScreen() {
     });
   }, []);
 
+  // Snapshot only persists favorites; ad-hoc zones fall through to the
+  // in-memory session cache so the detail screen still finds them.
   const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
-  const zone: AvalancheZone | undefined = bundle?.forecast;
+  const session = getZoneSession(zoneId);
+  const zone: AvalancheZone | undefined = bundle?.forecast ?? session?.forecast;
+  const stations = bundle?.stations ?? session?.stations;
+  const weatherBundle = bundle?.weather ?? session?.weather;
   const today = zone?.forecast?.[0];
   const tomorrow = zone?.forecast?.[1];
   const fresh = zone ? freshness[zone.freshness.status] : null;
-  const fetchedAt = bundle?.cachedAt ?? snap?.fetchedAt;
+  const fetchedAt = bundle?.cachedAt ?? session?.cachedAt ?? snap?.fetchedAt;
 
   const navigateTo = (suffix: string) => {
     Haptics.selectionAsync().catch(() => {});
@@ -369,31 +375,29 @@ export default function ZoneDetailScreen() {
                 emptyText="Not published"
                 icon="newspaper-outline"
                 accent={palette.frost[400]}
-                disabled={!hasFullForecast(zone, bundle)}
+                disabled={!hasFullForecastFromParts(zone, weatherBundle)}
                 onPress={() => navigateTo("forecast")}
               />
               <SubTile
                 label="NWS forecast"
                 lines={
-                  bundle?.weather?.nwsForecast
-                    ? ["Read NWS zone forecast"]
-                    : []
+                  weatherBundle?.nwsForecast ? ["Read NWS zone forecast"] : []
                 }
                 emptyText="Not bundled"
                 icon="cloud-outline"
                 accent={palette.frost[500]}
-                disabled={!bundle?.weather?.nwsForecast}
+                disabled={!weatherBundle?.nwsForecast}
                 onPress={() => navigateTo("nws")}
               />
               <SubTile
                 label="WX stations"
                 lines={
-                  bundle?.stations?.map((s) => s.stationName ?? "Unnamed") ?? []
+                  stations?.map((s) => s.stationName ?? "Unnamed") ?? []
                 }
                 emptyText="No stations"
                 icon="thermometer-outline"
                 accent="#3D8A37"
-                disabled={!bundle?.stations?.length}
+                disabled={!stations?.length}
                 onPress={() => navigateTo("stations")}
               />
             </View>
@@ -701,18 +705,17 @@ function fullForecastLines(
   return out;
 }
 
-function hasFullForecast(
+function hasFullForecastFromParts(
   zone: AvalancheZone,
-  bundle: ZoneSnapshot | undefined,
+  weather: ZoneSnapshot["weather"] | undefined,
 ): boolean {
-  const w = bundle?.weather;
   return !!(
     (zone.travelAdvice && zone.travelAdvice.trim()) ||
     (zone.hazardDiscussion && zone.hazardDiscussion.trim()) ||
     (zone.weatherDiscussion && zone.weatherDiscussion.trim()) ||
     zone.announcement ||
-    w?.nacWeather ||
-    w?.avgDiscussion
+    weather?.nacWeather ||
+    weather?.avgDiscussion
   );
 }
 

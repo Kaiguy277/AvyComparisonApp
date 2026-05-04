@@ -10,6 +10,7 @@ import {
   loadSnapshot,
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
+import { getZoneSession } from "@/lib/zoneSession";
 import {
   ZoneScreenHeader,
   ZoneScreenContainer,
@@ -41,9 +42,11 @@ export default function ZoneFullForecastScreen() {
   }, []);
 
   const bundle = snap ? getZoneSnapshotForDate(snap, zoneId) : undefined;
-  const zone: AvalancheZone | undefined = bundle?.forecast;
+  const session = getZoneSession(zoneId);
+  const zone: AvalancheZone | undefined = bundle?.forecast ?? session?.forecast;
+  const weatherBundle = bundle?.weather ?? session?.weather;
 
-  const sections = collectSections(zone, bundle);
+  const sections = collectSections(zone, weatherBundle);
 
   return (
     <ZoneScreenContainer>
@@ -136,7 +139,7 @@ interface Section {
 
 function collectSections(
   zone: AvalancheZone | undefined,
-  bundle: ReturnType<typeof getZoneSnapshotForDate>,
+  weather: import("@/lib/api/avalanche").ZoneWeatherForecast | undefined,
 ): Section[] {
   if (!zone) return [];
   const out: Section[] = [];
@@ -165,11 +168,11 @@ function collectSections(
   // NAC's published mountain weather summary — only the human-readable
   // text part (ignore numeric tables here; those would need their own
   // dedicated render).
-  const nacText = extractNacText(bundle?.weather?.nacWeather);
+  const nacText = extractNacText(weather?.nacWeather);
   if (nacText) {
     out.push({ label: "MOUNTAIN WEATHER", body: nacText });
   }
-  const avg = extractAvgText(bundle?.weather?.avgDiscussion);
+  const avg = extractAvgText(weather?.avgDiscussion);
   if (avg) {
     out.push({ label: "AVALANCHE.ORG DISCUSSION", body: avg });
   }
