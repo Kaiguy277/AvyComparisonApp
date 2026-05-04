@@ -30,8 +30,11 @@ import { palette } from "@/constants/design";
 // Imported for their side effects: TaskManager.defineTask must run at module
 // load so iOS can dispatch into the headless JS runtime when the OS wakes
 // the app for either a scheduled BG fetch or a silent push delivery.
+// The push permission prompt itself is gated by the onboarding flow in
+// app/index.tsx — we don't want iOS asking for notifications cold at app
+// launch before the user has any context for the request.
 import { registerBackgroundRefresh } from "@/lib/backgroundRefresh";
-import { registerPushNotifications } from "@/lib/pushNotifications";
+import "@/lib/pushNotifications";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -76,11 +79,10 @@ export default function RootLayout() {
   // Register the background refresh task on every launch. iOS persists
   // registrations across launches but re-registering is a cheap no-op,
   // and it's the cleanest place to run after permissions/state are ready.
-  // Also register for silent push so the server can wake us when the
-  // stations cache lands a fresh tick.
+  // Push registration is deferred to the onboarding flow on first launch,
+  // and re-runs from index.tsx on later launches.
   useEffect(() => {
     registerBackgroundRefresh();
-    registerPushNotifications();
   }, []);
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;

@@ -59,8 +59,14 @@ import { FavoritesReorder } from "@/components/avalanche/FavoritesReorder";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
 import { ZoneMapPicker } from "@/components/avalanche/ZoneMapPicker";
 import { ZoneCard } from "@/components/avalanche/ZoneCard";
+import { PermissionsIntro } from "@/components/onboarding/PermissionsIntro";
 import { TopoBackground } from "@/components/visual/TopoBackground";
 import { freshness, palette } from "@/constants/design";
+import {
+  hasCompletedOnboarding,
+  markOnboardingComplete,
+} from "@/lib/onboarding";
+import { registerPushNotifications } from "@/lib/pushNotifications";
 import {
   avalancheApi,
   type AvalancheSummary,
@@ -144,6 +150,25 @@ export default function Index() {
   const [snapshot, setSnapshot] = useState<FavoritesSnapshot | null>(null);
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const lastBgFetchRef = useRef<number>(0);
+
+  // First-launch onboarding modal — explains why we need push + Background
+  // App Refresh, then triggers the iOS push permission prompt on tap.
+  // null = haven't checked yet (don't render anything during the gap so
+  // the modal doesn't flash). false = already onboarded. true = show.
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+  useEffect(() => {
+    (async () => {
+      const done = await hasCompletedOnboarding();
+      setShowOnboarding(!done);
+      // Quietly refresh the push token on every later launch — registration
+      // is idempotent and skips silently if the user denied permission.
+      if (done) registerPushNotifications();
+    })();
+  }, []);
+  const dismissOnboarding = useCallback(() => {
+    markOnboardingComplete().catch(() => {});
+    setShowOnboarding(false);
+  }, []);
 
   // Subtle reveal anim when results arrive
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -743,6 +768,10 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.ink[950] }}>
+      <PermissionsIntro
+        visible={showOnboarding === true}
+        onComplete={dismissOnboarding}
+      />
       <TopoBackground height={320} intensity="low" />
 
       <ScrollView
