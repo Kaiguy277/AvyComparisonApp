@@ -379,7 +379,18 @@ function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period })
 function PrecipBlock({ obs, period }: { obs: WeatherObservation; period: Period }) {
   const s = obs.snow;
   const series = period === 24 ? s.hourlyPrecip24hr : s.hourlyPrecip72hr;
-  const total = period === 24 ? s.precip24hr : s.precip72hr;
+  // Derive the period total from the bars so the headline number always
+  // matches what's plotted. The upstream `precip24hr` field is
+  // current_cumulative − value_24hr_ago, which can disagree with the bars
+  // when the cumulative gauge has any negative-diff hours (sensor resets,
+  // calibration corrections) — those get clamped to 0 in hourlyIncrements.
+  // Sum-of-positive-increments matches users' intuition for "precip in this
+  // window" anyway.
+  const seriesSum = series && series.length > 0
+    ? Math.round(series.reduce((acc, p) => acc + (p.value || 0), 0) * 100) / 100
+    : null;
+  const upstreamTotal = period === 24 ? s.precip24hr : s.precip72hr;
+  const total = seriesSum !== null ? seriesSum : upstreamTotal;
   const newSnow = period === 24 ? s.depth24hrChange : s.depth72hrChange;
   const density =
     newSnow !== null && newSnow > 0 && total !== null && total > 0

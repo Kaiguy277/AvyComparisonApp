@@ -58,11 +58,14 @@ const MONTH = [
 ];
 
 function formatRelativeDate(iso: string | undefined, offsetDays: number): string {
-  // Prefer the date the forecast says it's for; fall back to today + offset.
+  // Prefer the ISO date the forecast says it's for; fall back to today +
+  // offset. Some upstream sources (UAC) send literal "Today"/"Tomorrow"
+  // labels rather than real dates, so an unparseable iso must also use
+  // the offset, not just an absent one.
   let d: Date;
-  if (iso) {
-    const parsed = new Date(iso);
-    d = isNaN(parsed.getTime()) ? new Date() : parsed;
+  const parsed = iso ? new Date(iso) : null;
+  if (parsed && !isNaN(parsed.getTime())) {
+    d = parsed;
   } else {
     d = new Date();
     d.setDate(d.getDate() + offsetDays);
