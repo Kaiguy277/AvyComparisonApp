@@ -240,28 +240,25 @@ export function ZoneTile({ zone, viewedDate }: Props) {
             </View>
           ) : null}
 
-          {/* Forecast date range — full-width footer beneath the
-              problems. CURRENT/EXPIRED above gave the freshness
-              context; this is just the start → end window. */}
+          {/* Forecast date range — quiet single-line footer. Small
+              enough to fit one line on a square tile; no rule above
+              since the freshness word already labels the data. */}
           {zone.freshness.issueDate || zone.freshness.expiresDate ? (
             <View
               style={{
-                marginTop: 12,
-                paddingTop: 8,
-                borderTopWidth: 0.5,
-                borderColor: palette.ink[500] + "AA",
+                marginTop: 8,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 6,
+                gap: 4,
               }}
             >
               <Text
                 variant="mono"
                 style={{
-                  fontSize: 9,
-                  letterSpacing: 0.6,
-                  color: palette.ink[200],
+                  fontSize: 8,
+                  letterSpacing: 0.4,
+                  color: palette.ink[400],
                 }}
                 numberOfLines={1}
               >
@@ -269,21 +266,21 @@ export function ZoneTile({ zone, viewedDate }: Props) {
               </Text>
               <Text
                 variant="mono"
-                style={{ fontSize: 10, color: palette.ink[400] }}
+                style={{ fontSize: 8, color: palette.ink[500] }}
               >
                 →
               </Text>
               <Text
                 variant="mono"
                 style={{
-                  fontSize: 9,
-                  letterSpacing: 0.6,
+                  fontSize: 8,
+                  letterSpacing: 0.4,
                   color:
                     zone.freshness.status === "expired"
                       ? "#FCA5A5"
                       : zone.freshness.status === "expiring"
                         ? palette.aspen[400]
-                        : palette.ink[200],
+                        : palette.ink[400],
                 }}
                 numberOfLines={1}
               >
