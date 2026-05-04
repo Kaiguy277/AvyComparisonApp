@@ -73,6 +73,7 @@ import {
   requestAndRegister,
   type PushDiagnostic,
 } from "@/lib/pushNotifications";
+import { readLastRefresh, type LastRefreshRecord } from "@/lib/backgroundRefresh";
 import {
   avalancheApi,
   type AvalancheSummary,
@@ -2010,73 +2011,119 @@ export default function Index() {
   );
 }
 
-// Renders the most recent push registration outcome from
-// AsyncStorage. Hidden when registration succeeded ("ok") so it only
-// surfaces noise when there's something the user can act on.
-// Tap to manually retry registration.
+// Two-line diagnostic stack:
+//   1. Push registration outcome (when not ok) — tap to retry
+//   2. Last device-side BG refresh time + source — always shown when
+//      the device has ever woken in the background, gives hard proof
+//      the silent-push / BGTaskScheduler path is firing.
+// The displayed "CACHED · HH:MM" in the header above is the SERVER's
+// forecast cache time; this line is the DEVICE's wake time. Different
+// signals — both useful.
 function PushDiagnosticLine() {
   const [diag, setDiag] = useState<PushDiagnostic | null>(null);
-  const refresh = useCallback(() => {
+  const [lastRefresh, setLastRefresh] = useState<LastRefreshRecord | null>(null);
+  const reload = useCallback(() => {
     readPushDiagnostic().then(setDiag);
+    readLastRefresh().then(setLastRefresh);
   }, []);
   useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 5000);
+    reload();
+    const t = setInterval(reload, 5000);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [reload]);
 
-  if (!diag || diag.step === "ok") return null;
-
-  const tint =
-    diag.step === "permission-denied" ? palette.aspen[400] : "#FCA5A5";
+  const showPush = diag && diag.step !== "ok";
+  if (!showPush && !lastRefresh) return null;
 
   const onTap = async () => {
     Haptics.selectionAsync().catch(() => {});
     await requestAndRegister();
-    refresh();
+    reload();
   };
 
   return (
-    <Pressable
-      onPress={onTap}
-      style={{
-        marginTop: 6,
-        flexDirection: "row",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 6,
-      }}
-    >
-      <View
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: 3,
-          backgroundColor: tint,
-        }}
-      />
-      <Text
-        variant="mono"
-        style={{
-          fontSize: 10,
-          letterSpacing: 1.2,
-          color: tint,
-        }}
-      >
-        PUSH · {diag.step.toUpperCase()}
-        {diag.message ? ` · ${diag.message.slice(0, 60)}` : ""}
-      </Text>
-      <Text
-        variant="mono"
-        style={{
-          fontSize: 10,
-          letterSpacing: 1.2,
-          color: palette.ink[400],
-        }}
-      >
-        · TAP TO RETRY
-      </Text>
-    </Pressable>
+    <View style={{ marginTop: 6, gap: 4 }}>
+      {showPush ? (
+        <Pressable
+          onPress={onTap}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 6,
+          }}
+        >
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor:
+                diag!.step === "permission-denied"
+                  ? palette.aspen[400]
+                  : "#FCA5A5",
+            }}
+          />
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color:
+                diag!.step === "permission-denied"
+                  ? palette.aspen[400]
+                  : "#FCA5A5",
+            }}
+          >
+            PUSH · {diag!.step.toUpperCase()}
+            {diag!.message ? ` · ${diag!.message.slice(0, 60)}` : ""}
+          </Text>
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color: palette.ink[400],
+            }}
+          >
+            · TAP TO RETRY
+          </Text>
+        </Pressable>
+      ) : null}
+      {lastRefresh ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 6,
+          }}
+        >
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: palette.frost[500],
+            }}
+          />
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color: palette.ink[400],
+            }}
+          >
+            BG WAKE ·{" "}
+            {new Date(lastRefresh.at)
+              .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              .toUpperCase()}{" "}
+            VIA {lastRefresh.source.toUpperCase()}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 

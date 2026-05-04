@@ -2,6 +2,7 @@ import * as TaskManager from "expo-task-manager";
 import * as BackgroundTask from "expo-background-task";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
   loadFavorites,
@@ -13,6 +14,35 @@ import {
 } from "./offlineCache";
 import { avalancheApi } from "./api/avalanche";
 import { ZONE_TO_CENTER } from "./zones";
+
+// Track the last successful device-side refresh so the home screen can
+// surface "background wake fired Xm ago via push" — a deterministic
+// signal that the BG task / silent push pipeline actually executed.
+// Without this, a successful wake is invisible: the displayed "CACHED
+// · HH:MM" reads the server's forecast-cache time, which doesn't move
+// just because the device pulled a refresh.
+const LAST_REFRESH_KEY = "avy-last-bg-refresh-v1";
+
+export interface LastRefreshRecord {
+  at: string;
+  source: "bg-task" | "push" | "foreground";
+  zones: number;
+}
+
+export async function readLastRefresh(): Promise<LastRefreshRecord | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_REFRESH_KEY);
+    return raw ? (JSON.parse(raw) as LastRefreshRecord) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeLastRefresh(rec: LastRefreshRecord): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_REFRESH_KEY, JSON.stringify(rec));
+  } catch {}
+}
 
 // Task identifier persisted by iOS BGTaskScheduler. Must be a stable
 // string — changing it after release leaves orphaned scheduled tasks.
@@ -75,6 +105,11 @@ export async function refreshFavoritesSnapshot(
   }
   next = pruneSnapshot(next, favs);
   await saveSnapshot(next);
+  await writeLastRefresh({
+    at: new Date().toISOString(),
+    source,
+    zones: r.zones.length,
+  });
   console.log(`[${source}] cached ${r.zones.length} zones for ${date}`);
   return r.zones.length;
 }
