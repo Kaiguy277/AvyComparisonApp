@@ -597,7 +597,8 @@ function SubTile({
         onPress={disabled ? undefined : onPress}
         disabled={disabled}
         style={({ pressed }) => ({
-          flex: 1,
+          width: "100%",
+          height: "100%",
           padding: 14,
           opacity: pressed ? 0.7 : 1,
         })}
