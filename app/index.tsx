@@ -105,10 +105,10 @@ const months = [
 export default function Index() {
   const insets = useSafeAreaInsets();
 
-  // Top-level collapse state. The picker and the matrix open by default
-  // (most users want to see selections + comparison at a glance); other
-  // sections inside open on tap.
-  const [pickerOpen, setPickerOpen] = useState(true);
+  // Top-level collapse state. Picker is collapsed by default — favorites
+  // already auto-load and the zone grid carries the daily-driver read,
+  // so the picker is admin and shouldn't take vertical space up front.
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // The unified visible zone list. Anything in here renders in the tray and
   // gets fetched. A subset of these are favorites (persisted across launches);
