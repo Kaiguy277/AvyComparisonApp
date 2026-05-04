@@ -1325,59 +1325,68 @@ export default function Index() {
           </View>
         </View>
 
-        {/* STATUS BAR */}
+        {/* Status meta — plain inline text, no card chrome. The visual
+            weight is subordinate so it can't be confused with the
+            tappable panes around it (MANAGE ZONES / zone tiles). */}
         {scrapedAt ? (
           <View
             style={{
-              marginTop: 24,
-              marginHorizontal: 16,
-              paddingVertical: 14,
-              paddingHorizontal: 18,
-              borderRadius: 14,
-              backgroundColor: palette.ink[900],
-              borderWidth: 0.5,
-              borderColor: palette.ink[700],
+              marginTop: 18,
+              paddingHorizontal: 20,
+              flexDirection: "row",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
             }}
-            className="flex-row items-center justify-between flex-wrap gap-2"
           >
-            <View className="flex-row items-center gap-2.5">
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: palette.frost[400],
-                }}
-              />
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor:
+                  loadSource === "offline"
+                    ? palette.aspen[400]
+                    : !isViewingToday
+                      ? palette.aspen[400]
+                      : "#52BA4A",
+              }}
+            />
+            <Text
+              variant="mono"
+              style={{
+                fontSize: 11,
+                letterSpacing: 1.2,
+                color: palette.ink[400],
+              }}
+            >
+              {!isViewingToday
+                ? `ARCHIVE · ${formatDateLabel(viewedDate).toUpperCase()}`
+                : loadSource === "cached"
+                  ? "CACHED"
+                  : loadSource === "offline"
+                    ? "OFFLINE"
+                    : "LIVE"}
+              {" · "}
+              {new Date(scrapedAt)
+                .toLocaleString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+                .toUpperCase()}
+            </Text>
+            {isSnotelLoading || isWeatherForecastLoading ? (
               <Text
                 variant="mono"
-                weight="medium"
-                className="text-ink-100"
-                style={{ fontSize: 13, letterSpacing: 1.2 }}
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 1.2,
+                  color: palette.aspen[400],
+                }}
               >
-                {new Date(scrapedAt)
-                  .toLocaleString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    month: "short",
-                    day: "numeric",
-                  })
-                  .toUpperCase()}
+                · {isSnotelLoading ? "STATIONS…" : "WEATHER…"}
               </Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              {!isViewingToday ? (
-                <Badge variant="aspen">Archive · {formatDateLabel(viewedDate)}</Badge>
-              ) : loadSource === "cached" ? (
-                <Badge variant="frost">Cached</Badge>
-              ) : loadSource === "offline" ? (
-                <Badge variant="subtle">Offline</Badge>
-              ) : (
-                <Badge variant="aspen">Live</Badge>
-              )}
-              {isSnotelLoading ? <Badge variant="subtle">stations…</Badge> : null}
-              {isWeatherForecastLoading ? <Badge variant="subtle">weather…</Badge> : null}
-            </View>
+            ) : null}
           </View>
         ) : null}
 
