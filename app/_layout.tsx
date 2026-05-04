@@ -27,12 +27,11 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 
 import { palette } from "@/constants/design";
-// Imported for their side effects: TaskManager.defineTask must run at module
-// load so iOS can dispatch into the headless JS runtime when the OS wakes
-// the app for either a scheduled BG fetch or a silent push delivery.
-// The push permission prompt itself is gated by the onboarding flow in
-// app/index.tsx — we don't want iOS asking for notifications cold at app
-// launch before the user has any context for the request.
+// TaskManager.defineTask in both modules runs at import-time so iOS can
+// dispatch into the headless JS runtime when the OS wakes the app for
+// either a scheduled BG fetch or a silent push delivery. registerIfPermitted
+// runs every launch in no-prompt mode; the in-app onboarding modal is
+// what triggers the actual iOS permission request via requestAndRegister.
 import { registerBackgroundRefresh } from "@/lib/backgroundRefresh";
 import { registerIfPermitted } from "@/lib/pushNotifications";
 
