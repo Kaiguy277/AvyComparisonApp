@@ -83,10 +83,17 @@ serve(async (req) => {
     });
   }
 
+  // For silent pushes (content-available: 1) Apple REQUIRES priority 5
+  // (low/default). Priority 10 is for user-visible notifications and is
+  // dropped by APNs when paired with content-available. The Expo Push
+  // API maps "default" → APNs priority 5, which is what we want here.
+  // Empirically (see thread): with "high", only ~1 in 5 silent pushes
+  // actually wakes the device — Apple silently throttles the malformed
+  // ones. With "default", delivery is reliable.
   const messages: ExpoPushMessage[] = tokens.map((t) => ({
     to: t.token,
     _contentAvailable: true,
-    priority: "high",
+    priority: "default",
     data: { kind: "refresh-favorites", at: new Date().toISOString() },
   }));
 
