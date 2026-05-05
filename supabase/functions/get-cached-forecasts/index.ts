@@ -91,6 +91,12 @@ serve(async (req) => {
     }
 
     const zones: any[] = [];
+    // Zones with stations data but no forecast row in the lookback window —
+    // off-season, freshly added zones, or zones where the avalanche center
+    // has stopped issuing. The cron is still updating their station and
+    // weather data hourly; we surface that to the client so the device
+    // snapshot can keep showing fresh wx info even without a forecast.
+    const stationsOnlyZones: any[] = [];
     const centerWeather: Record<string, any> = {};
     const zoneNwsForecasts: Record<string, any> = {};
     const centerAvgDiscussions: Record<string, any> = {};
@@ -101,41 +107,76 @@ serve(async (req) => {
     let resolvedForecastDate: string | null = null;
     let resolvedStationsDate: string | null = null;
 
-    for (const row of newestForecastByZone.values()) {
-      const stations = newestStationsByZone.get(row.zone_id);
-      const zone = {
-        ...row.payload,
-        weatherObservations: stations?.payload?.stations || row.payload.weatherObservations,
-      };
-      zones.push(zone);
-      if (!mostRecentForecastFetched || row.fetched_at > mostRecentForecastFetched) {
-        mostRecentForecastFetched = row.fetched_at;
-      }
-      if (!resolvedForecastDate || row.forecast_date > resolvedForecastDate) {
-        resolvedForecastDate = row.forecast_date;
-      }
-      if (stations) {
-        if (!mostRecentStationsFetched || stations.fetched_at > mostRecentStationsFetched) {
-          mostRecentStationsFetched = stations.fetched_at;
+    // Helper: pull the weather bundle off a stations row into the response
+    // maps, keyed by center / zone the same way the live endpoint does.
+    const ingestStationsWeather = (
+      stationsRow: { center_id: string; zone_id: string; payload: any },
+    ): void => {
+      const w = stationsRow.payload?.weather || {};
+      if (w.nacWeather) centerWeather[stationsRow.center_id] = w.nacWeather;
+      if (w.nwsForecast) zoneNwsForecasts[stationsRow.zone_id] = w.nwsForecast;
+      if (w.avgDiscussion) centerAvgDiscussions[stationsRow.center_id] = w.avgDiscussion;
+      if (w.avgLocations) zoneAvgLocations[stationsRow.zone_id] = w.avgLocations;
+    };
+
+    // Iterate the union of zones that have either a forecast row or a
+    // stations row. Forecast rows carry full zone metadata; stations-only
+    // rows ship a minimal stub so the client can still surface fresh wx.
+    const unionZoneIds = new Set<string>([
+      ...newestForecastByZone.keys(),
+      ...newestStationsByZone.keys(),
+    ]);
+
+    for (const zoneId of unionZoneIds) {
+      const forecastRow = newestForecastByZone.get(zoneId);
+      const stationsRow = newestStationsByZone.get(zoneId);
+
+      if (forecastRow) {
+        const zone = {
+          ...forecastRow.payload,
+          weatherObservations: stationsRow?.payload?.stations || forecastRow.payload.weatherObservations,
+        };
+        zones.push(zone);
+        if (!mostRecentForecastFetched || forecastRow.fetched_at > mostRecentForecastFetched) {
+          mostRecentForecastFetched = forecastRow.fetched_at;
         }
-        if (!resolvedStationsDate || stations.snapshot_date > resolvedStationsDate) {
-          resolvedStationsDate = stations.snapshot_date;
+        if (!resolvedForecastDate || forecastRow.forecast_date > resolvedForecastDate) {
+          resolvedForecastDate = forecastRow.forecast_date;
         }
-        const w = stations.payload?.weather || {};
-        if (w.nacWeather) centerWeather[row.center_id] = w.nacWeather;
-        if (w.nwsForecast) zoneNwsForecasts[row.zone_id] = w.nwsForecast;
-        if (w.avgDiscussion) centerAvgDiscussions[row.center_id] = w.avgDiscussion;
-        if (w.avgLocations) zoneAvgLocations[row.zone_id] = w.avgLocations;
+        if (stationsRow) ingestStationsWeather(stationsRow);
+      } else if (stationsRow) {
+        // No forecast for this zone — emit a stations-only stub. The client
+        // already has the zone name in its catalog; we just need id +
+        // centerId + the actual observation array.
+        stationsOnlyZones.push({
+          id: stationsRow.zone_id,
+          centerId: stationsRow.center_id,
+          weatherObservations: stationsRow.payload?.stations || [],
+        });
+        ingestStationsWeather(stationsRow);
+      }
+
+      if (stationsRow) {
+        if (!mostRecentStationsFetched || stationsRow.fetched_at > mostRecentStationsFetched) {
+          mostRecentStationsFetched = stationsRow.fetched_at;
+        }
+        if (!resolvedStationsDate || stationsRow.snapshot_date > resolvedStationsDate) {
+          resolvedStationsDate = stationsRow.snapshot_date;
+        }
       }
     }
 
-    const presentZoneIds = new Set(zones.map((z) => z.id));
+    const presentZoneIds = new Set([
+      ...zones.map((z) => z.id),
+      ...stationsOnlyZones.map((z) => z.id),
+    ]);
     const missingZoneIds = zoneIds.filter((id) => !presentZoneIds.has(id));
 
     return new Response(
       JSON.stringify({
         success: true,
         zones,
+        stationsOnlyZones,
         missingZoneIds,
         forecastFetchedAt: mostRecentForecastFetched,
         stationsFetchedAt: mostRecentStationsFetched,

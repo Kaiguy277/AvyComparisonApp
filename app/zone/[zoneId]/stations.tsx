@@ -10,6 +10,7 @@ import {
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
 import { getZoneSession } from "@/lib/zoneSession";
+import { AVAILABLE_ZONES } from "@/lib/zones";
 import { ZoneScreenHeader, ZoneScreenContainer } from "@/components/avalanche/ZoneScreenChrome";
 
 export default function ZoneStationsScreen() {
@@ -30,13 +31,17 @@ export default function ZoneStationsScreen() {
   const session = getZoneSession(zoneId);
   const zone = bundle?.forecast ?? session?.forecast;
   const stations = bundle?.stations ?? session?.stations ?? [];
+  const displayName =
+    zone?.name ??
+    AVAILABLE_ZONES.find((z) => z.id === zoneId)?.name ??
+    "Zone";
 
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
       <ZoneScreenHeader
         eyebrow="STATIONS"
-        title={zone?.name ?? "Zone"}
+        title={displayName}
         count={stations.length}
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>

@@ -8,7 +8,7 @@ import * as Haptics from "expo-haptics";
 import { Text } from "@/components/ui/Text";
 import { MountainDanger } from "@/components/avalanche/MountainDanger";
 import { dangerColors, freshness, palette } from "@/constants/design";
-import { ZONE_TO_CENTER_NAME } from "@/lib/zones";
+import { AVAILABLE_ZONES, ZONE_TO_CENTER_NAME } from "@/lib/zones";
 import { getZoneSession } from "@/lib/zoneSession";
 import {
   ageHours,
@@ -90,6 +90,16 @@ export default function ZoneDetailScreen() {
   const tomorrow = zone?.forecast?.[1];
   const fresh = zone ? freshness[zone.freshness.status] : null;
   const fetchedAt = bundle?.cachedAt ?? session?.cachedAt ?? snap?.fetchedAt;
+  // Display name — fall back to the catalog when no forecast is cached.
+  const displayName =
+    zone?.name ??
+    AVAILABLE_ZONES.find((z) => z.id === zoneId)?.name ??
+    "Zone";
+  // Stations-only mode: no forecast, but we have stations or weather data.
+  // We still render a useful detail view so the user can see fresh wx info.
+  const hasStationsOnlyData =
+    !zone &&
+    ((stations && stations.length > 0) || !!weatherBundle);
 
   const navigateTo = (suffix: string) => {
     Haptics.selectionAsync().catch(() => {});
@@ -131,7 +141,7 @@ export default function ZoneDetailScreen() {
             style={{ fontSize: 20, lineHeight: 22 }}
             numberOfLines={2}
           >
-            {zone?.name ?? "Zone"}
+            {displayName}
           </Text>
           {zone?.author ? (
             <Text
@@ -159,21 +169,31 @@ export default function ZoneDetailScreen() {
             </Text>
           </View>
         ) : !zone || !today ? (
-          <View style={{ padding: 20 }}>
-            <Text
-              variant="display"
-              className="text-ink-100"
-              style={{ fontSize: 18, marginBottom: 8 }}
-            >
-              Forecast not cached yet
-            </Text>
-            <Text
-              className="text-ink-300"
-              style={{ fontSize: 14, lineHeight: 20 }}
-            >
-              Open this zone from the home grid while online to fetch and cache its forecast.
-            </Text>
-          </View>
+          hasStationsOnlyData ? (
+            <StationsOnlyDetail
+              zoneId={zoneId}
+              stations={stations}
+              weatherBundle={weatherBundle}
+              fetchedAt={fetchedAt}
+              navigateTo={navigateTo}
+            />
+          ) : (
+            <View style={{ padding: 20 }}>
+              <Text
+                variant="display"
+                className="text-ink-100"
+                style={{ fontSize: 18, marginBottom: 8 }}
+              >
+                Forecast not cached yet
+              </Text>
+              <Text
+                className="text-ink-300"
+                style={{ fontSize: 14, lineHeight: 20 }}
+              >
+                Open this zone from the home grid while online to fetch and cache its forecast.
+              </Text>
+            </View>
+          )
         ) : (
           <>
             {/* FRESHNESS STRIP — sits right at the top, framing the
@@ -730,4 +750,107 @@ function hostname(url: string): string {
   } catch {
     return "FORECAST";
   }
+}
+
+// Renders the zone detail when no avalanche forecast is cached but live
+// wx station / NWS / mountain-weather data is. Skips the danger pyramid
+// and problems block; surfaces only the WX-stations and NWS sub-tiles
+// so the user can still get useful data year-round.
+function StationsOnlyDetail({
+  zoneId,
+  stations,
+  weatherBundle,
+  fetchedAt,
+  navigateTo,
+}: {
+  zoneId: string;
+  stations: ZoneSnapshot["stations"];
+  weatherBundle: ZoneSnapshot["weather"];
+  fetchedAt: string | undefined;
+  navigateTo: (suffix: string) => void;
+}) {
+  return (
+    <>
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 4,
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 14,
+          alignItems: "baseline",
+        }}
+      >
+        <Text
+          variant="mono"
+          weight="bold"
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.4,
+            color: palette.ink[300],
+          }}
+        >
+          STATIONS ONLY
+        </Text>
+        {fetchedAt ? (
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 11,
+              letterSpacing: 0.8,
+              color: palette.ink[400],
+            }}
+          >
+            FETCHED{" "}
+            <Text style={{ fontSize: 11, color: ageColor(fetchedAt) }}>
+              {formatAge(fetchedAt).toUpperCase()}
+            </Text>
+          </Text>
+        ) : null}
+      </View>
+
+      <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+        <Text
+          className="text-ink-300"
+          style={{ fontSize: 14, lineHeight: 20 }}
+        >
+          No current avalanche forecast for this zone. Live weather
+          station data is still updating hourly via the background
+          refresh — open the WX or NWS tile below for the latest.
+        </Text>
+      </View>
+
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: 24,
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 10,
+        }}
+      >
+        <SubTile
+          label="NWS forecast"
+          lines={
+            weatherBundle?.nwsForecast ? ["Read NWS zone forecast"] : []
+          }
+          emptyText="Not bundled"
+          icon="cloud-outline"
+          accent={palette.frost[500]}
+          disabled={!weatherBundle?.nwsForecast}
+          onPress={() => navigateTo("nws")}
+        />
+        <SubTile
+          label="WX stations"
+          lines={stations?.map((s) => s.stationName ?? "Unnamed") ?? []}
+          emptyText="No stations"
+          icon="thermometer-outline"
+          accent="#3D8A37"
+          disabled={!stations?.length}
+          onPress={() => navigateTo("stations")}
+        />
+      </View>
+    </>
+  );
 }

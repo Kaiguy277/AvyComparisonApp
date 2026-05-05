@@ -11,6 +11,7 @@ import {
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
 import { getZoneSession } from "@/lib/zoneSession";
+import { AVAILABLE_ZONES } from "@/lib/zones";
 import {
   ZoneScreenHeader,
   ZoneScreenContainer,
@@ -43,11 +44,15 @@ export default function ZoneNwsScreen() {
   const zone = bundle?.forecast ?? session?.forecast;
   const nws: NwsForecast | undefined =
     bundle?.weather?.nwsForecast ?? session?.weather?.nwsForecast;
+  const displayName =
+    zone?.name ??
+    AVAILABLE_ZONES.find((z) => z.id === zoneId)?.name ??
+    "Zone";
 
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
-      <ZoneScreenHeader eyebrow="NWS FORECAST" title={zone?.name ?? "Zone"} />
+      <ZoneScreenHeader eyebrow="NWS FORECAST" title={displayName} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         {!loaded ? (
           <Text

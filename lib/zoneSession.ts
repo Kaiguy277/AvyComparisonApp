@@ -19,7 +19,9 @@ import type {
 // fetches a summary.
 
 export interface ZoneSessionEntry {
-  forecast: AvalancheZone;
+  // Optional so stations-only zones (no current avalanche forecast) can
+  // still be cached for the wx station screen.
+  forecast?: AvalancheZone;
   weather?: ZoneWeatherForecast;
   stations?: WeatherObservation[];
   cachedAt: string;
@@ -27,11 +29,19 @@ export interface ZoneSessionEntry {
 
 const cache = new Map<string, ZoneSessionEntry>();
 
+// Merge into any existing entry — a stations-only update should not
+// erase a previously cached forecast (and vice-versa).
 export function setZoneSession(
   id: string,
-  entry: ZoneSessionEntry,
+  entry: Partial<ZoneSessionEntry> & { cachedAt: string },
 ): void {
-  cache.set(id, entry);
+  const prev = cache.get(id);
+  cache.set(id, {
+    forecast: entry.forecast ?? prev?.forecast,
+    weather: entry.weather ?? prev?.weather,
+    stations: entry.stations ?? prev?.stations,
+    cachedAt: entry.cachedAt,
+  });
 }
 
 export function getZoneSession(id: string): ZoneSessionEntry | undefined {

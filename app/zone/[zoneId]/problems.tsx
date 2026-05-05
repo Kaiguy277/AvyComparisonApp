@@ -11,6 +11,7 @@ import {
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
 import { getZoneSession } from "@/lib/zoneSession";
+import { AVAILABLE_ZONES } from "@/lib/zones";
 import { ZoneScreenHeader, ZoneScreenContainer } from "@/components/avalanche/ZoneScreenChrome";
 
 export default function ZoneProblemsScreen() {
@@ -37,7 +38,11 @@ export default function ZoneProblemsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ZoneScreenHeader
         eyebrow="PROBLEMS"
-        title={zone?.name ?? "Zone"}
+        title={
+          zone?.name ??
+          AVAILABLE_ZONES.find((z) => z.id === zoneId)?.name ??
+          "Zone"
+        }
         count={problems.length}
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>

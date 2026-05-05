@@ -154,9 +154,21 @@ export interface AvalancheResponse {
   zonesScraped?: ScrapedZoneInfo[];
 }
 
+// Minimal stub returned for zones that have stations data but no
+// forecast row in the lookback window (off-season, freshly added zones,
+// zones a center has stopped issuing). Zone name + center name come
+// from the client-side catalog (ZONE_TO_CENTER_NAME etc.) — we don't
+// duplicate that on the wire.
+export interface StationsOnlyZone {
+  id: string;
+  centerId: string;
+  weatherObservations: WeatherObservation[];
+}
+
 export interface CachedForecastResponse {
   success: boolean;
   zones?: AvalancheZone[];
+  stationsOnlyZones?: StationsOnlyZone[];
   missingZoneIds?: string[];
   missingSummaryCenterIds?: string[];
   // The forecast issue date (YYYY-MM-DD) the response is for. May be older

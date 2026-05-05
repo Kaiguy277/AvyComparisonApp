@@ -59,6 +59,7 @@ import { FavoritesReorder } from "@/components/avalanche/FavoritesReorder";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
 import { ZoneMapPicker } from "@/components/avalanche/ZoneMapPicker";
 import { ZoneTile } from "@/components/avalanche/ZoneTile";
+import { StationsOnlyTile } from "@/components/avalanche/StationsOnlyTile";
 import { PermissionsIntro } from "@/components/onboarding/PermissionsIntro";
 import { TopoBackground } from "@/components/visual/TopoBackground";
 import { freshness, palette } from "@/constants/design";
@@ -83,6 +84,7 @@ import {
   type NacWeatherProduct,
   type NwsForecast,
   type ScrapedZoneInfo,
+  type StationsOnlyZone,
   type ZoneWeatherForecast,
 } from "@/lib/api/avalanche";
 import { AVAILABLE_ZONES, DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
@@ -152,6 +154,12 @@ export default function Index() {
   const [loadSource, setLoadSource] = useState<"cached" | "live" | "offline" | null>(null);
   const [weatherForecastData, setWeatherForecastData] =
     useState<WeatherForecastBundle | null>(null);
+  // Zones with no current avalanche forecast but live wx station data.
+  // Rendered as muted tiles below the main grid so the user can still
+  // see hourly station updates year-round.
+  const [stationsOnlyZones, setStationsOnlyZones] = useState<StationsOnlyZone[]>(
+    [],
+  );
 
   // Offline cache state — keeps the last-known-good bundle for favorite zones
   // available even when the phone has no service.
@@ -254,9 +262,11 @@ export default function Index() {
       const r = await avalancheApi.getCachedForecasts(favoriteZoneIds);
       if (!r.success || !r.zones) return;
       const date = r.forecastDate || todayIsoDate();
+      const stationsDate = r.stationsDate || todayIsoDate();
       let next: FavoritesSnapshot =
         (await loadSnapshot()) || { fetchedAt: "", zones: {} };
       const favSet = new Set(favoriteZoneIds);
+      const nowIso = new Date().toISOString();
       for (const z of r.zones) {
         if (!favSet.has(z.id)) continue;
         const cid = ZONE_TO_CENTER[z.id];
@@ -267,7 +277,7 @@ export default function Index() {
           avgLocations: r.zoneAvgLocations?.[z.id],
         };
         next = {
-          fetchedAt: new Date().toISOString(),
+          fetchedAt: nowIso,
           zones: {
             ...next.zones,
             [z.id]: {
@@ -276,7 +286,34 @@ export default function Index() {
                 forecast: z,
                 stations: z.weatherObservations,
                 weather,
-                cachedAt: new Date().toISOString(),
+                cachedAt: nowIso,
+              },
+            },
+          },
+        };
+      }
+      // Stations-only favorites — no forecast, just fresh wx.
+      for (const soz of r.stationsOnlyZones || []) {
+        if (!favSet.has(soz.id)) continue;
+        const cid = soz.centerId || ZONE_TO_CENTER[soz.id];
+        const weather = {
+          nacWeather: cid ? r.centerWeather?.[cid] : undefined,
+          nwsForecast: r.zoneNwsForecasts?.[soz.id],
+          avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
+          avgLocations: r.zoneAvgLocations?.[soz.id],
+        };
+        const existing = next.zones[soz.id]?.[stationsDate];
+        next = {
+          fetchedAt: nowIso,
+          zones: {
+            ...next.zones,
+            [soz.id]: {
+              ...(next.zones[soz.id] || {}),
+              [stationsDate]: {
+                forecast: existing?.forecast,
+                stations: soz.weatherObservations,
+                weather,
+                cachedAt: nowIso,
               },
             },
           },
@@ -288,7 +325,9 @@ export default function Index() {
       // Tick throttle only after a successful save — a failed fetch
       // shouldn't eat the next 30-minute retry window.
       lastBgFetchRef.current = now;
-      console.log(`[bg-refresh] cached ${r.zones.length} zones for ${date}`);
+      console.log(
+        `[bg-refresh] cached ${r.zones.length} forecast + ${r.stationsOnlyZones?.length || 0} stations-only`,
+      );
     } catch (err) {
       console.warn("[bg-refresh] failed", err);
     }
@@ -338,6 +377,7 @@ export default function Index() {
         return false;
       }
       const zones: AvalancheZone[] = [];
+      const stationsOnly: StationsOnlyZone[] = [];
       const bundle: WeatherForecastBundle = {
         centerWeather: {},
         zoneNwsForecasts: {},
@@ -356,9 +396,23 @@ export default function Index() {
           : dates[0];
         if (!pick) continue;
         const s = byDate[pick];
-        zones.push(s.forecast);
-        if (!resolvedDate || pick > resolvedDate) resolvedDate = pick;
         const cid = ZONE_TO_CENTER[zoneId];
+        if (s.forecast) {
+          zones.push(s.forecast);
+        } else if (s.stations && s.stations.length > 0) {
+          // No forecast cached for this zone but we have stations + maybe
+          // weather — surface as a stations-only entry so the home grid
+          // can render the muted tile and route the user into the detail
+          // / stations sub-screens.
+          stationsOnly.push({
+            id: zoneId,
+            centerId: cid ?? "",
+            weatherObservations: s.stations,
+          });
+        } else {
+          continue;
+        }
+        if (!resolvedDate || pick > resolvedDate) resolvedDate = pick;
         const w = s.weather;
         if (!w) continue;
         if (cid && w.nacWeather) bundle.centerWeather[cid] = w.nacWeather;
@@ -366,8 +420,9 @@ export default function Index() {
         if (cid && w.avgDiscussion) bundle.centerAvgDiscussions[cid] = w.avgDiscussion;
         if (w.avgLocations) bundle.zoneAvgLocations[zoneId] = w.avgLocations;
       }
-      if (zones.length === 0) return false;
+      if (zones.length === 0 && stationsOnly.length === 0) return false;
       setSummary({ quickTake: "", zones, weatherHighlights: "", bottomLine: "" });
+      setStationsOnlyZones(stationsOnly);
       setScrapedAt(snap.fetchedAt);
       setLoadSource("offline");
       setWeatherForecastData(bundle);
@@ -450,6 +505,7 @@ export default function Index() {
       let next: FavoritesSnapshot =
         (await loadSnapshot()) || { fetchedAt: "", zones: {} };
       let touched = false;
+      const nowIso = new Date().toISOString();
       for (const z of summary.zones) {
         if (!favSet.has(z.id)) continue;
         const centerId = ZONE_TO_CENTER[z.id];
@@ -467,7 +523,7 @@ export default function Index() {
           : undefined;
         const existing = next.zones[z.id]?.[viewedDate];
         next = {
-          fetchedAt: new Date().toISOString(),
+          fetchedAt: nowIso,
           zones: {
             ...next.zones,
             [z.id]: {
@@ -476,7 +532,42 @@ export default function Index() {
                 forecast: z,
                 stations: z.weatherObservations || existing?.stations,
                 weather: wf || existing?.weather,
-                cachedAt: new Date().toISOString(),
+                cachedAt: nowIso,
+              },
+            },
+          },
+        };
+        touched = true;
+      }
+      // Persist stations-only entries too — same date keying as the forecast
+      // entries above so all of today's bundles share a row.
+      for (const soz of stationsOnlyZones) {
+        if (!favSet.has(soz.id)) continue;
+        const centerId = soz.centerId || ZONE_TO_CENTER[soz.id];
+        const wf = weatherForecastData
+          ? {
+              nacWeather: centerId
+                ? weatherForecastData.centerWeather[centerId]
+                : undefined,
+              nwsForecast: weatherForecastData.zoneNwsForecasts[soz.id],
+              avgDiscussion: centerId
+                ? weatherForecastData.centerAvgDiscussions[centerId]
+                : undefined,
+              avgLocations: weatherForecastData.zoneAvgLocations[soz.id],
+            }
+          : undefined;
+        const existing = next.zones[soz.id]?.[viewedDate];
+        next = {
+          fetchedAt: nowIso,
+          zones: {
+            ...next.zones,
+            [soz.id]: {
+              ...(next.zones[soz.id] || {}),
+              [viewedDate]: {
+                forecast: existing?.forecast,
+                stations: soz.weatherObservations || existing?.stations,
+                weather: wf || existing?.weather,
+                cachedAt: nowIso,
               },
             },
           },
@@ -489,36 +580,61 @@ export default function Index() {
         setSnapshot(pruned);
       }
     })();
-  }, [summary, weatherForecastData, favoriteZoneIds, viewedDate, loadSource]);
+  }, [summary, stationsOnlyZones, weatherForecastData, favoriteZoneIds, viewedDate, loadSource]);
 
   // Fan every zone we have data for into the session-level in-memory
   // cache so the detail / sub-screens can find them — including ad-hoc
   // zones that aren't favorites and therefore aren't written to the
   // persistent offline snapshot.
   useEffect(() => {
-    if (!summary) return;
-    for (const z of summary.zones) {
-      const cid = ZONE_TO_CENTER[z.id];
+    if (!summary && stationsOnlyZones.length === 0) return;
+    const nowIso = new Date().toISOString();
+    if (summary) {
+      for (const z of summary.zones) {
+        const cid = ZONE_TO_CENTER[z.id];
+        const wf = weatherForecastData
+          ? {
+              nacWeather: cid
+                ? weatherForecastData.centerWeather[cid]
+                : undefined,
+              nwsForecast: weatherForecastData.zoneNwsForecasts[z.id],
+              avgDiscussion: cid
+                ? weatherForecastData.centerAvgDiscussions[cid]
+                : undefined,
+              avgLocations: weatherForecastData.zoneAvgLocations[z.id],
+            }
+          : undefined;
+        setZoneSession(z.id, {
+          forecast: z,
+          stations: z.weatherObservations,
+          weather: wf,
+          cachedAt: nowIso,
+        });
+      }
+    }
+    for (const soz of stationsOnlyZones) {
+      const cid = soz.centerId || ZONE_TO_CENTER[soz.id];
       const wf = weatherForecastData
         ? {
             nacWeather: cid
               ? weatherForecastData.centerWeather[cid]
               : undefined,
-            nwsForecast: weatherForecastData.zoneNwsForecasts[z.id],
+            nwsForecast: weatherForecastData.zoneNwsForecasts[soz.id],
             avgDiscussion: cid
               ? weatherForecastData.centerAvgDiscussions[cid]
               : undefined,
-            avgLocations: weatherForecastData.zoneAvgLocations[z.id],
+            avgLocations: weatherForecastData.zoneAvgLocations[soz.id],
           }
         : undefined;
-      setZoneSession(z.id, {
-        forecast: z,
-        stations: z.weatherObservations,
+      setZoneSession(soz.id, {
+        // Preserve any session forecast we may already have for this id;
+        // stations-only response shouldn't erase a known forecast.
+        stations: soz.weatherObservations,
         weather: wf,
-        cachedAt: new Date().toISOString(),
+        cachedAt: nowIso,
       });
     }
-  }, [summary, weatherForecastData]);
+  }, [summary, stationsOnlyZones, weatherForecastData]);
 
   const fetchSnotel = useCallback(async (zoneIds: string[]) => {
     setIsSnotelLoading(true);
@@ -621,20 +737,27 @@ export default function Index() {
         zoneIds,
         isToday ? undefined : targetDate,
       );
+      // The cache is "complete enough" if every requested zone is
+      // accounted for either by a forecast row OR a stations-only row.
+      // Stations-only zones still satisfy the request — the user wants
+      // wx station data even when no avalanche forecast exists.
+      const cachedHasAnyZones =
+        (cached.zones && cached.zones.length > 0) ||
+        (cached.stationsOnlyZones && cached.stationsOnlyZones.length > 0);
       if (
         cached.success &&
-        cached.zones &&
-        cached.zones.length > 0 &&
+        cachedHasAnyZones &&
         (!cached.missingZoneIds || cached.missingZoneIds.length === 0)
       ) {
         // Hydrate the same shape we get from live scrape so the UI is identical.
         setSummary({
           quickTake: "",
-          zones: cached.zones,
+          zones: cached.zones || [],
           weatherHighlights: "",
           bottomLine: "",
         });
-        setScrapedAt(cached.forecastFetchedAt || new Date().toISOString());
+        setStationsOnlyZones(cached.stationsOnlyZones || []);
+        setScrapedAt(cached.forecastFetchedAt || cached.stationsFetchedAt || new Date().toISOString());
         setLoadSource("cached");
         if (cached.forecastDate) setViewedDate(cached.forecastDate);
         // Cache also includes the weather bundle — feed it straight in so the
@@ -659,6 +782,7 @@ export default function Index() {
           // "no forecast cached for this date yet" notice instead of stale
           // data from whatever they were just viewing.
           setSummary(null);
+          setStationsOnlyZones([]);
           setWeatherForecastData(null);
           setScrapedAt(null);
           setLoadSource(null);
@@ -705,6 +829,9 @@ export default function Index() {
           weatherHighlights: "",
           bottomLine: "",
         });
+        // Live scrape returns only zones with active forecasts; stations-only
+        // entries come from the cached path.
+        setStationsOnlyZones([]);
         setScrapedAt(new Date().toISOString());
         setZonesScraped(allZonesScraped);
         setLoadSource("live");
@@ -782,6 +909,17 @@ export default function Index() {
       .filter((z) => idx.has(z.id))
       .sort((a, b) => (idx.get(a.id) ?? Infinity) - (idx.get(b.id) ?? Infinity));
   }, [summary, displayedZoneIds]);
+
+  // Stations-only rows — same filter / order rules as orderedZones.
+  // Renders below the main grid so the user can monitor wx station info
+  // year-round, even when no avalanche forecast is active.
+  const orderedStationsOnly = useMemo(() => {
+    if (stationsOnlyZones.length === 0) return [];
+    const idx = new Map(displayedZoneIds.map((id, i) => [id, i]));
+    return stationsOnlyZones
+      .filter((z) => idx.has(z.id))
+      .sort((a, b) => (idx.get(a.id) ?? Infinity) - (idx.get(b.id) ?? Infinity));
+  }, [stationsOnlyZones, displayedZoneIds]);
 
   const favoriteSet = useMemo(
     () => new Set(favoriteZoneIds),
@@ -1479,6 +1617,62 @@ export default function Index() {
                       }}
                     >
                       <ZoneTile zone={zone} viewedDate={viewedDate} />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {/* STATIONS-ONLY ROWS — favorited zones with no current avalanche
+                forecast but live wx station data still flowing through the
+                cron. Muted treatment, same layout grid. */}
+            {orderedStationsOnly.length > 0 ? (
+              <View style={{ marginTop: 24 }}>
+                <View
+                  style={{
+                    paddingHorizontal: 24,
+                    flexDirection: "row",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    marginBottom: 14,
+                  }}
+                >
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-ink-300"
+                    style={{ fontSize: 11, letterSpacing: 1.6 }}
+                  >
+                    STATIONS ONLY · NO CURRENT FORECAST
+                  </Text>
+                  <Text
+                    variant="mono"
+                    weight="medium"
+                    className="text-ink-400"
+                    style={{ fontSize: 13, letterSpacing: 1.4 }}
+                  >
+                    {orderedStationsOnly.length}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    paddingHorizontal: 12,
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 10,
+                  }}
+                >
+                  {orderedStationsOnly.map((soz) => (
+                    <View
+                      key={soz.id}
+                      style={{ width: "48.5%", flexShrink: 0 }}
+                    >
+                      <StationsOnlyTile
+                        zoneId={soz.id}
+                        centerId={soz.centerId}
+                        stations={soz.weatherObservations}
+                        viewedDate={viewedDate}
+                      />
                     </View>
                   ))}
                 </View>

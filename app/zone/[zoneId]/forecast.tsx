@@ -11,6 +11,7 @@ import {
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
 import { getZoneSession } from "@/lib/zoneSession";
+import { AVAILABLE_ZONES } from "@/lib/zones";
 import {
   ZoneScreenHeader,
   ZoneScreenContainer,
@@ -56,7 +57,11 @@ export default function ZoneFullForecastScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ZoneScreenHeader
         eyebrow="FULL FORECAST"
-        title={zone?.name ?? "Zone"}
+        title={
+          zone?.name ??
+          AVAILABLE_ZONES.find((z) => z.id === zoneId)?.name ??
+          "Zone"
+        }
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 22 }}>
         {!loaded ? (

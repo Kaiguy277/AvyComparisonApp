@@ -21,7 +21,10 @@ export const STALE_AFTER_HOURS = 72;
 export const OFFLINE_HISTORY_DAYS = 3;
 
 export interface ZoneSnapshot {
-  forecast: AvalancheZone;
+  // Optional: a zone with no current avalanche forecast (off-season, etc.)
+  // can still have stations + weather cached so the user can monitor
+  // weather conditions year-round.
+  forecast?: AvalancheZone;
   stations?: WeatherObservation[];
   weather?: ZoneWeatherForecast;
   cachedAt: string; // ISO 8601
@@ -151,7 +154,7 @@ export function upsertSnapshotZoneDate(
   next.zones[zoneId] = {
     ...(next.zones[zoneId] || {}),
     [date]: {
-      forecast: patch.forecast ?? existing?.forecast ?? ({} as AvalancheZone),
+      forecast: patch.forecast ?? existing?.forecast,
       stations: patch.stations ?? existing?.stations,
       weather: patch.weather ?? existing?.weather,
       cachedAt: new Date().toISOString(),

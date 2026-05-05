@@ -75,9 +75,14 @@ export async function refreshFavoritesSnapshot(
     return null;
   }
   const date = r.forecastDate || todayIsoDate();
+  // Stations-only zones are dated by the stations snapshot, which may not
+  // align with the forecast date — fall back to today.
+  const stationsDate = r.stationsDate || todayIsoDate();
   let next: FavoritesSnapshot =
     (await loadSnapshot()) || { fetchedAt: "", zones: {} };
   const favSet = new Set(favs);
+  const nowIso = new Date().toISOString();
+
   for (const z of r.zones) {
     if (!favSet.has(z.id)) continue;
     const cid = ZONE_TO_CENTER[z.id];
@@ -88,7 +93,7 @@ export async function refreshFavoritesSnapshot(
       avgLocations: r.zoneAvgLocations?.[z.id],
     };
     next = {
-      fetchedAt: new Date().toISOString(),
+      fetchedAt: nowIso,
       zones: {
         ...next.zones,
         [z.id]: {
@@ -97,21 +102,59 @@ export async function refreshFavoritesSnapshot(
             forecast: z,
             stations: z.weatherObservations,
             weather,
-            cachedAt: new Date().toISOString(),
+            cachedAt: nowIso,
           },
         },
       },
     };
   }
+
+  // Stations-only zones — no forecast, but the cron is still updating
+  // their station and weather data. Write into the snapshot so the
+  // detail screen can render fresh wx info even off-season.
+  for (const soz of r.stationsOnlyZones || []) {
+    if (!favSet.has(soz.id)) continue;
+    const cid = soz.centerId || ZONE_TO_CENTER[soz.id];
+    const weather = {
+      nacWeather: cid ? r.centerWeather?.[cid] : undefined,
+      nwsForecast: r.zoneNwsForecasts?.[soz.id],
+      avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
+      avgLocations: r.zoneAvgLocations?.[soz.id],
+    };
+    const existing = next.zones[soz.id]?.[stationsDate];
+    next = {
+      fetchedAt: nowIso,
+      zones: {
+        ...next.zones,
+        [soz.id]: {
+          ...(next.zones[soz.id] || {}),
+          [stationsDate]: {
+            // Preserve any pre-existing forecast (rare but possible: a
+            // stations-only response after we previously had a forecast
+            // on the same date should not erase it).
+            forecast: existing?.forecast,
+            stations: soz.weatherObservations,
+            weather,
+            cachedAt: nowIso,
+          },
+        },
+      },
+    };
+  }
+
   next = pruneSnapshot(next, favs);
   await saveSnapshot(next);
+  const totalCached =
+    r.zones.length + (r.stationsOnlyZones?.length || 0);
   await writeLastRefresh({
-    at: new Date().toISOString(),
+    at: nowIso,
     source,
-    zones: r.zones.length,
+    zones: totalCached,
   });
-  console.log(`[${source}] cached ${r.zones.length} zones for ${date}`);
-  return r.zones.length;
+  console.log(
+    `[${source}] cached ${r.zones.length} forecast + ${r.stationsOnlyZones?.length || 0} stations-only for ${date}`,
+  );
+  return totalCached;
 }
 
 // defineTask must be evaluated at module load (before app entry resolves)
