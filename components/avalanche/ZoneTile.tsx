@@ -49,6 +49,38 @@ function formatSnowDelta(v: number | null | undefined): string {
   return `${v}″`;
 }
 
+function formatStationTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    .replace(/\s?(AM|PM)/i, (_m, ap) => ap.toLowerCase());
+}
+
+// Compact likelihood for the cramped tile space. NAC ladder is
+// Unlikely → Possible → Likely → Very Likely → Almost Certain. We
+// shorten the long ones; the short ones already fit.
+function formatLikelihood(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s.includes("almost") || s.includes("certain")) return "CERTAIN";
+  if (s.includes("very")) return "V.LIKELY";
+  if (s.includes("unlikely")) return "UNLIKELY";
+  if (s.includes("possible")) return "POSSIBLE";
+  if (s.includes("likely")) return "LIKELY";
+  return raw.toUpperCase();
+}
+
+// Likelihood color ramp — ink for low end, aspen for the alarming end.
+// Keeps the eye drawn to the cells that matter.
+function likelihoodColor(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s.includes("almost") || s.includes("certain")) return "#DC2626";
+  if (s.includes("very")) return palette.aspen[400];
+  if (s.includes("likely") && !s.includes("unlikely")) return palette.aspen[400];
+  if (s.includes("possible")) return palette.frost[400];
+  return palette.ink[400];
+}
+
 export function ZoneTile({ zone, viewedDate }: Props) {
   const router = useRouter();
   const today = zone.forecast?.[0];
@@ -151,11 +183,37 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                         letterSpacing: 0.6,
                         color: palette.ink[400],
                         marginTop: 1,
-                        marginBottom: 6,
                       }}
                     >
                       {station.elevation.toLocaleString()}′
                     </Text>
+                  ) : null}
+                  {station.timestamp ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 3,
+                        marginTop: 2,
+                        marginBottom: 6,
+                      }}
+                    >
+                      <Ionicons
+                        name="time-outline"
+                        size={10}
+                        color={palette.ink[400]}
+                      />
+                      <Text
+                        variant="mono"
+                        style={{
+                          fontSize: 9,
+                          letterSpacing: 0.4,
+                          color: palette.ink[400],
+                        }}
+                      >
+                        {formatStationTime(station.timestamp)}
+                      </Text>
+                    </View>
                   ) : (
                     <View style={{ height: 6 }} />
                   )}
@@ -209,9 +267,10 @@ export function ZoneTile({ zone, viewedDate }: Props) {
             </View>
           )}
 
-          {/* Problem names listed. */}
+          {/* Problem names listed with likelihood. Name on the left
+              (truncates), short likelihood tag on the right. */}
           {zone.problems && zone.problems.length > 0 ? (
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 6 }}>
               <Text
                 variant="mono"
                 weight="bold"
@@ -225,17 +284,41 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                 PROBLEMS
               </Text>
               {zone.problems.map((p, i) => (
-                <Text
+                <View
                   key={i}
                   style={{
-                    fontSize: 11,
-                    lineHeight: 15,
-                    color: palette.ink[200],
+                    flexDirection: "row",
+                    alignItems: "baseline",
+                    gap: 6,
                   }}
-                  numberOfLines={1}
                 >
-                  {p.name}
-                </Text>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      lineHeight: 15,
+                      color: palette.ink[200],
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {p.name}
+                  </Text>
+                  {p.likelihood ? (
+                    <Text
+                      variant="mono"
+                      weight="bold"
+                      style={{
+                        fontSize: 8,
+                        letterSpacing: 0.8,
+                        color: likelihoodColor(p.likelihood),
+                      }}
+                      numberOfLines={1}
+                    >
+                      {formatLikelihood(p.likelihood)}
+                    </Text>
+                  ) : null}
+                </View>
               ))}
             </View>
           ) : null}

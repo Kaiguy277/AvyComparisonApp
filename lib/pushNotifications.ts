@@ -51,6 +51,7 @@ export interface PushDiagnostic {
   step:
     | "skipped-unsupported"
     | "skipped-not-device"
+    | "skipped-offline"
     | "permission-denied"
     | "no-project-id"
     | "expo-token-error"
@@ -58,6 +59,20 @@ export interface PushDiagnostic {
     | "ok";
   message?: string;
   tokenPrefix?: string;
+}
+
+// True when the failure looks like "device is offline, retry later"
+// rather than a real registration bug. Used to demote noisy network
+// failures to a quiet "skipped-offline" diagnostic instead of yelling
+// at the user when they reasonably can't be online.
+function looksLikeNetworkError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("network") ||
+    m.includes("failed to fetch") ||
+    m.includes("offline") ||
+    m.includes("could not connect")
+  );
 }
 
 async function writeDiagnostic(d: PushDiagnostic): Promise<void> {
@@ -134,8 +149,14 @@ async function runRegistration(
     } catch (err) {
       const message =
         err instanceof Error ? err.message : String(err);
-      await writeDiagnostic({ at, step: "expo-token-error", message });
-      console.warn("[push] expo token error", err);
+      // Network failures fetching the Expo token are expected when
+      // offline — demote to a quiet "skipped-offline" so we don't
+      // alarm the user. The next online launch retries.
+      const step = looksLikeNetworkError(message)
+        ? "skipped-offline"
+        : "expo-token-error";
+      await writeDiagnostic({ at, step, message });
+      console.warn(`[push] ${step}`, err);
       return null;
     }
 
@@ -161,13 +182,16 @@ async function runRegistration(
       );
 
     if (upsertError) {
+      const step = looksLikeNetworkError(upsertError.message)
+        ? "skipped-offline"
+        : "supabase-upsert-error";
       await writeDiagnostic({
         at,
-        step: "supabase-upsert-error",
+        step,
         message: upsertError.message,
         tokenPrefix: token.slice(0, 24),
       });
-      console.warn("[push] supabase upsert error", upsertError);
+      console.warn(`[push] ${step}`, upsertError);
       return null;
     }
 
@@ -180,12 +204,15 @@ async function runRegistration(
     return token;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const step = looksLikeNetworkError(message)
+      ? "skipped-offline"
+      : "expo-token-error";
     await writeDiagnostic({
       at,
-      step: "expo-token-error",
-      message: `unexpected: ${message}`,
+      step,
+      message: step === "expo-token-error" ? `unexpected: ${message}` : message,
     });
-    console.warn("[push] register failed", err);
+    console.warn(`[push] ${step}`, err);
     return null;
   }
 }

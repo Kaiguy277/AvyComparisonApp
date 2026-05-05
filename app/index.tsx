@@ -736,7 +736,12 @@ export default function Index() {
     if (favoriteZoneIds.length === 0) return;
     if (isOnline === null) return;
     autoLoadedRef.current = true;
-    fetchSummary(favoriteZoneIds, todayIsoDate());
+    // No target date here — let the offline path pick the newest cached
+    // bundle for each zone. Passing todayIsoDate() (UTC) breaks for any
+    // user whose local date is behind UTC: when UTC has rolled over but
+    // the snapshot was written under the previous UTC date, the exact
+    // match in loadFromSnapshot fails and the cards never render.
+    fetchSummary(favoriteZoneIds);
   }, [prefsLoaded, favoriteZoneIds, isOnline, fetchSummary]);
 
   // Step viewedDate forward/back. The arrow handler does the fetch — keep
@@ -2032,7 +2037,12 @@ function PushDiagnosticLine() {
     return () => clearInterval(t);
   }, [reload]);
 
-  const showPush = diag && diag.step !== "ok";
+  // Hide the line for "ok" (registered successfully) and for the
+  // soft "skipped-offline" state (network was unreachable, retries
+  // automatically next launch). Only surface real errors that need
+  // user action.
+  const showPush =
+    diag && diag.step !== "ok" && diag.step !== "skipped-offline";
   if (!showPush && !lastRefresh) return null;
 
   const onTap = async () => {

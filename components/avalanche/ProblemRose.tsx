@@ -6,10 +6,10 @@ import type { AspectElevation } from "@/lib/api/avalanche";
 // Standard avalanche rose: 8 aspect octants × 3 elevation rings = 24 cells.
 // Filled cells = problem exists in that aspect/elevation combination.
 //
-// Convention (matches NAC, Canadian Avalanche Centre, etc.):
-// - Outer ring  → above treeline / alpine
+// Convention (matches Utah Avalanche Center / UAC):
+// - Inner ring  → above treeline / alpine
 // - Middle ring → near treeline
-// - Inner ring  → below treeline
+// - Outer ring  → below treeline
 // - Octants run clockwise from north: N, NE, E, SE, S, SW, W, NW
 
 const ASPECTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
@@ -27,8 +27,8 @@ const ASPECT_BASE_ANGLE: Record<string, number> = {
 
 function elevationToRingIndex(elev: string): number {
   const e = elev.toLowerCase();
-  if (e.includes("alpine") || e.includes("above")) return 2; // outer
-  if (e.includes("below")) return 0; // inner
+  if (e.includes("alpine") || e.includes("above")) return 0; // inner
+  if (e.includes("below")) return 2; // outer
   return 1; // treeline / middle
 }
 
@@ -45,11 +45,11 @@ export function ProblemRose({ aspects, size = 96, fillColor }: Props) {
   const R = size / 2 - 10; // leave room for the cardinal letter labels
   const fill = fillColor || palette.aspen[400];
 
-  // Three concentric ring boundaries: 0 → r1 (below), r1 → r2 (treeline),
-  // r2 → R (alpine). Tuning the inner ring slightly larger than R/3 makes
-  // the segments easier to see at small sizes.
-  const r1 = R * 0.38;
-  const r2 = R * 0.7;
+  // Three concentric ring boundaries: 0 → r1 (alpine center), r1 → r2
+  // (treeline), r2 → R (below treeline outer). Inner alpine band is the
+  // largest so its octants stay readable — that matches how UAC draws it.
+  const r1 = R * 0.5;
+  const r2 = R * 0.78;
 
   // Build a quick lookup of which ring/aspect cells are active.
   const active = new Set<string>();
