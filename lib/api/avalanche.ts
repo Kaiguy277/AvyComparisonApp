@@ -252,6 +252,40 @@ export interface ZoneWeatherForecast {
   avgLocations?: AvgLocation[];
 }
 
+export interface ObservationSummary {
+  id: string;
+  zoneId: string | null;
+  zoneName: string | null;
+  centerId: string | null;
+  startDate: string | null;
+  observerType: "public" | "forecaster" | "professional" | string | null;
+  obsSource: string | null;
+  observerName: string | null;
+  organization: string | null;
+  locationName: string | null;
+  locationPoint: { lat: number; lng: number } | null;
+  // observation_summary is HTML on the wire — let the screen strip tags.
+  summaryHtml: string | null;
+  instabilitySummary: string | null;
+  avalanchesSummary: string | null;
+  instabilityFlags: {
+    cracking: boolean;
+    collapsing: boolean;
+    avalanchesCaught: boolean;
+    avalanchesObserved: boolean;
+    avalanchesTriggered: boolean;
+  };
+  hasAvalanches: boolean;
+  thumbnails: string[];
+  viewerUrl: string;
+}
+
+export interface ObservationsResponse {
+  success: boolean;
+  observations?: Record<string, ObservationSummary[]>;
+  error?: string;
+}
+
 export interface QuickTakeResponse {
   success: boolean;
   quickTake?: string;
@@ -323,6 +357,21 @@ export const avalancheApi = {
     });
     if (error) {
       console.warn("Error calling get-weather-forecast:", error);
+      return { success: false, error: error.message };
+    }
+    return data;
+  },
+
+  async getCachedObservations(
+    zoneIds: string[],
+    limit = 50,
+  ): Promise<ObservationsResponse> {
+    const { data, error } = await supabase.functions.invoke(
+      "get-cached-observations",
+      { body: { zoneIds, limit } },
+    );
+    if (error) {
+      console.warn("Error calling get-cached-observations:", error);
       return { success: false, error: error.message };
     }
     return data;

@@ -9,7 +9,8 @@ import { Text } from "@/components/ui/Text";
 import { MountainDanger } from "@/components/avalanche/MountainDanger";
 import { dangerColors, freshness, palette } from "@/constants/design";
 import { AVAILABLE_ZONES, ZONE_TO_CENTER_NAME } from "@/lib/zones";
-import { getZoneSession } from "@/lib/zoneSession";
+import { avalancheApi } from "@/lib/api/avalanche";
+import { getZoneSession, setZoneSession } from "@/lib/zoneSession";
 import {
   ageHours,
   formatAge,
@@ -22,6 +23,7 @@ import type {
   AvalancheZone,
   DangerRating,
   ElevationDanger,
+  ObservationSummary,
 } from "@/lib/api/avalanche";
 
 const RATING_ORDER: DangerRating[] = [
@@ -76,6 +78,31 @@ export default function ZoneDetailScreen() {
       setLoaded(true);
     });
   }, []);
+
+  // Observations live outside the offline snapshot — they're cheap to
+  // pull on demand and only matter when the user taps into a zone. The
+  // session cache survives this screen → /observations → back without
+  // re-fetching.
+  const [obs, setObs] = useState<ObservationSummary[] | null>(
+    () => getZoneSession(zoneId)?.observations ?? null,
+  );
+  useEffect(() => {
+    if (!zoneId) return;
+    if (getZoneSession(zoneId)?.observations) return;
+    let cancelled = false;
+    avalancheApi.getCachedObservations([zoneId], 50).then((r) => {
+      if (cancelled) return;
+      const list = r.success ? r.observations?.[zoneId] ?? [] : [];
+      setObs(list);
+      setZoneSession(zoneId, {
+        observations: list,
+        cachedAt: new Date().toISOString(),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [zoneId]);
 
   // Snapshot is keyed by zoneId × date; pass the route-param date so we
   // pull the bundle the user was looking at on the home grid (not the
@@ -425,6 +452,15 @@ export default function ZoneDetailScreen() {
                 disabled={!stations?.length}
                 onPress={() => navigateTo("stations")}
               />
+              <SubTile
+                label="Observations"
+                lines={observationLines(obs)}
+                emptyText={obs === null ? "Loading…" : "None recently"}
+                icon="eye-outline"
+                accent="#4FB3C9"
+                disabled={obs !== null && obs.length === 0}
+                onPress={() => navigateTo("observations")}
+              />
             </View>
 
             {/* Issued / expires / fetched moved to the freshness strip
@@ -742,6 +778,25 @@ function hasFullForecastFromParts(
     weather?.nacWeather ||
     weather?.avgDiscussion
   );
+}
+
+function observationLines(obs: ObservationSummary[] | null): string[] {
+  if (obs === null) return [];
+  if (obs.length === 0) return [];
+  const total = obs.length;
+  const since = new Date();
+  since.setDate(since.getDate() - 7);
+  const sinceStr = since.toISOString().slice(0, 10);
+  const last7 = obs.filter((o) => (o.startDate ?? "") >= sinceStr).length;
+  const avys = obs.filter((o) => o.hasAvalanches).length;
+  const headline = last7 > 0
+    ? `${last7} in last 7d`
+    : `${total} since Mar 15`;
+  const lines = [headline];
+  if (avys > 0) lines.push(`${avys} w/ avalanche`);
+  const newest = obs[0];
+  if (newest?.startDate) lines.push(`Latest ${newest.startDate}`);
+  return lines;
 }
 
 function hostname(url: string): string {

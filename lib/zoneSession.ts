@@ -1,5 +1,6 @@
 import type {
   AvalancheZone,
+  ObservationSummary,
   WeatherObservation,
   ZoneWeatherForecast,
 } from "./api/avalanche";
@@ -24,6 +25,7 @@ export interface ZoneSessionEntry {
   forecast?: AvalancheZone;
   weather?: ZoneWeatherForecast;
   stations?: WeatherObservation[];
+  observations?: ObservationSummary[];
   cachedAt: string;
 }
 
@@ -40,6 +42,7 @@ export function setZoneSession(
     forecast: entry.forecast ?? prev?.forecast,
     weather: entry.weather ?? prev?.weather,
     stations: entry.stations ?? prev?.stations,
+    observations: entry.observations ?? prev?.observations,
     cachedAt: entry.cachedAt,
   });
 }
