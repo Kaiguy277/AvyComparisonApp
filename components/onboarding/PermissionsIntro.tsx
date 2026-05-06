@@ -10,17 +10,19 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
+import * as Location from "expo-location";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { registerPushNotifications } from "@/lib/pushNotifications";
+import { requestAndRegisterLocationWake } from "@/lib/locationWake";
 
 interface Props {
   visible: boolean;
   onComplete: () => void;
 }
 
-type PushState = "idle" | "granted" | "denied";
+type PermState = "idle" | "granted" | "denied";
 
 // First-launch intro that asks for the two permissions the app needs to
 // keep the offline snapshot fresh. Only push notifications can be granted
@@ -28,7 +30,8 @@ type PushState = "idle" | "granted" | "denied";
 // for that we deep-link the user there and trust them to flip it.
 export function PermissionsIntro({ visible, onComplete }: Props) {
   const insets = useSafeAreaInsets();
-  const [pushState, setPushState] = useState<PushState>("idle");
+  const [pushState, setPushState] = useState<PermState>("idle");
+  const [locationState, setLocationState] = useState<PermState>("idle");
   const [busy, setBusy] = useState(false);
 
   const handleEnableNotifications = async () => {
@@ -42,6 +45,23 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
       const perms = await Notifications.getPermissionsAsync();
       setPushState(perms.granted ? "granted" : "denied");
       if (granted) console.log("[onboarding] push token registered");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleEnableLocation = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      // requestAndRegisterLocationWake walks foreground → background and
+      // starts the task. It returns true only if the user granted both
+      // and the task started. We re-query at the end so a partial grant
+      // (foreground only) still surfaces as "denied" for the wake path.
+      await requestAndRegisterLocationWake();
+      const bg = await Location.getBackgroundPermissionsAsync();
+      setLocationState(bg.granted ? "granted" : "denied");
+      if (bg.granted) console.log("[onboarding] location wake registered");
     } finally {
       setBusy(false);
     }
@@ -128,7 +148,8 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
           >
             This app keeps avalanche + weather data fresh in the background
             so you have the latest forecast even when you drop out of
-            service. Two iOS settings need to be on for that to work.
+            service. Three iOS settings stack together to make that
+            reliable — the more you grant, the fresher your offline cache.
           </Text>
 
           <PermissionRow
@@ -142,6 +163,13 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
             icon="refresh-outline"
             title="Background App Refresh"
             body="Lets iOS run a backup refresh task on its own schedule. Belt-and-suspenders for when the silent push gets held back."
+          />
+
+          <PermissionRow
+            icon="location-outline"
+            title="Location · Always"
+            body="The only iOS mechanism that keeps refreshing data even after you force-quit the app. We never read or store your location — registering it is just how iOS lets us wake to update the cache."
+            state={locationState}
           />
 
           <Pressable
@@ -178,6 +206,55 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
                   : busy
                     ? "REQUESTING…"
                     : "ENABLE NOTIFICATIONS"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleEnableLocation}
+            disabled={busy || locationState === "granted"}
+            style={({ pressed }) => ({
+              marginTop: 10,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderWidth: 2,
+              borderColor: palette.ink[700],
+              backgroundColor:
+                locationState === "granted"
+                  ? palette.ink[800]
+                  : pressed
+                    ? palette.frost[500]
+                    : palette.frost[400],
+              opacity: busy ? 0.6 : 1,
+            })}
+          >
+            <Text
+              variant="display"
+              style={{
+                fontSize: 14,
+                letterSpacing: 1.4,
+                color: palette.ink[700],
+                textAlign: "center",
+              }}
+            >
+              {locationState === "granted"
+                ? "✓ ALWAYS LOCATION ENABLED"
+                : locationState === "denied"
+                  ? "DENIED — OPEN SETTINGS TO ENABLE"
+                  : busy
+                    ? "REQUESTING…"
+                    : "ENABLE ALWAYS LOCATION"}
+            </Text>
+            <Text
+              variant="mono"
+              style={{
+                fontSize: 10,
+                letterSpacing: 1,
+                color: palette.ink[800],
+                textAlign: "center",
+                marginTop: 4,
+              }}
+            >
+              CHOOSE “ALWAYS” WHEN iOS PROMPTS
             </Text>
           </Pressable>
 
@@ -255,7 +332,7 @@ function PermissionRow({
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   body: string;
-  state?: PushState;
+  state?: PermState;
 }) {
   return (
     <View

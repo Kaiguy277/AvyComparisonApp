@@ -25,7 +25,7 @@ const LAST_REFRESH_KEY = "avy-last-bg-refresh-v1";
 
 export interface LastRefreshRecord {
   at: string;
-  source: "bg-task" | "push" | "foreground";
+  source: "bg-task" | "push" | "foreground" | "location";
   zones: number;
 }
 
@@ -72,7 +72,7 @@ const isExpoGo = Constants.appOwnership === "expo";
 // silent-push notification handler, and the in-app foreground refresh.
 // Returns the count of zones written, or null if nothing was attempted.
 export async function refreshFavoritesSnapshot(
-  source: "bg-task" | "push" | "foreground" = "bg-task",
+  source: LastRefreshRecord["source"] = "bg-task",
 ): Promise<number | null> {
   const favs = await loadFavorites();
   if (!favs || favs.length === 0) return 0;

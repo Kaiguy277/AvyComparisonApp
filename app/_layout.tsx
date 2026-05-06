@@ -27,13 +27,15 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 
 import { palette } from "@/constants/design";
-// TaskManager.defineTask in both modules runs at import-time so iOS can
-// dispatch into the headless JS runtime when the OS wakes the app for
-// either a scheduled BG fetch or a silent push delivery. registerIfPermitted
-// runs every launch in no-prompt mode; the in-app onboarding modal is
-// what triggers the actual iOS permission request via requestAndRegister.
+// TaskManager.defineTask in all three modules runs at import-time so
+// iOS can dispatch into the headless JS runtime when the OS wakes the
+// app for a BG fetch, silent push delivery, or significant location
+// change. registerIfPermitted / registerLocationWakeIfPermitted run
+// every launch in no-prompt mode; the in-app onboarding modal is what
+// triggers the actual iOS permission requests.
 import { registerBackgroundRefresh } from "@/lib/backgroundRefresh";
 import { registerIfPermitted } from "@/lib/pushNotifications";
+import { registerLocationWakeIfPermitted } from "@/lib/locationWake";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -88,6 +90,11 @@ export default function RootLayout() {
   useEffect(() => {
     registerBackgroundRefresh();
     registerIfPermitted();
+    // Location-driven wake — only kicks in if the user has already
+    // granted Always location permission. The onboarding modal is
+    // what asks; this is the backstop that re-arms the monitor on
+    // every launch.
+    registerLocationWakeIfPermitted();
   }, []);
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;
