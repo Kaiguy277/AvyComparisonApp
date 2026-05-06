@@ -86,34 +86,13 @@ export default function ZoneObservationsScreen() {
         count={obs?.length}
       />
 
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 8,
-          paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: 4,
-        }}
-      >
-        <FilterChip
-          label={`ALL ${centerName.toUpperCase()}`}
-          count={obs?.length}
-          active={filter === "all"}
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            setFilter("all");
-          }}
-        />
-        <FilterChip
-          label="THIS ZONE"
-          count={inZoneCount}
-          active={filter === "zone"}
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            setFilter("zone");
-          }}
-        />
-      </View>
+      <FilterToggle
+        filter={filter}
+        onChange={setFilter}
+        allLabel={`ALL ${centerName.toUpperCase()}`}
+        allCount={obs?.length}
+        zoneCount={inZoneCount}
+      />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 48 }}
@@ -160,31 +139,80 @@ export default function ZoneObservationsScreen() {
   );
 }
 
-function FilterChip({
+function FilterToggle({
+  filter,
+  onChange,
+  allLabel,
+  allCount,
+  zoneCount,
+}: {
+  filter: Filter;
+  onChange: (f: Filter) => void;
+  allLabel: string;
+  allCount: number | undefined;
+  zoneCount: number;
+}) {
+  const select = (next: Filter) => {
+    if (next === filter) return;
+    Haptics.selectionAsync().catch(() => {});
+    onChange(next);
+  };
+  return (
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 4,
+        flexDirection: "row",
+        backgroundColor: palette.ink[800],
+        borderWidth: 0.5,
+        borderColor: palette.ink[700],
+        borderRadius: 8,
+        padding: 3,
+      }}
+    >
+      <ToggleHalf
+        active={filter === "all"}
+        label={allLabel}
+        count={allCount}
+        onPress={() => select("all")}
+      />
+      <ToggleHalf
+        active={filter === "zone"}
+        label="THIS ZONE"
+        count={zoneCount}
+        onPress={() => select("zone")}
+      />
+    </View>
+  );
+}
+
+function ToggleHalf({
+  active,
   label,
   count,
-  active,
   onPress,
 }: {
+  active: boolean;
   label: string;
   count: number | undefined;
-  active: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+        flex: 1,
+        paddingVertical: 8,
+        paddingHorizontal: 8,
         borderRadius: 6,
-        borderWidth: 0.5,
-        borderColor: active ? "#4FB3C9" : palette.ink[600],
         backgroundColor: active
           ? "#4FB3C922"
           : pressed
             ? palette.ink[700]
-            : palette.ink[800],
+            : "transparent",
+        alignItems: "center",
+        justifyContent: "center",
       })}
     >
       <Text
