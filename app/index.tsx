@@ -863,13 +863,23 @@ export default function Index() {
     if (favoriteZoneIds.length === 0) return;
     if (isOnline === null) return;
     autoLoadedRef.current = true;
-    // No target date here — let the offline path pick the newest cached
-    // bundle for each zone. Passing todayIsoDate() (UTC) breaks for any
-    // user whose local date is behind UTC: when UTC has rolled over but
-    // the snapshot was written under the previous UTC date, the exact
-    // match in loadFromSnapshot fails and the cards never render.
+    // Offline at launch: skip fetchSummary (which pins to viewedDate =
+    // today UTC) and call loadFromSnapshot() directly so we pick the
+    // newest cached bundle per zone. fetchSummary's offline branch does
+    // an exact-match lookup on today's UTC date — when the device's UTC
+    // has rolled over since the last bg-wake, the snapshot is keyed
+    // under yesterday UTC and the lookup silently returns nothing.
+    // Skip if no snapshot was hydrated — loadFromSnapshot() with no
+    // target date would otherwise pop a "No cached forecast" alert on
+    // a fresh install opened offline.
+    if (isOnline === false) {
+      if (snapshot && Object.keys(snapshot.zones).length > 0) {
+        loadFromSnapshot().catch(() => {});
+      }
+      return;
+    }
     fetchSummary(favoriteZoneIds);
-  }, [prefsLoaded, favoriteZoneIds, isOnline, fetchSummary]);
+  }, [prefsLoaded, favoriteZoneIds, isOnline, fetchSummary, loadFromSnapshot, snapshot]);
 
   // Step viewedDate forward/back. The arrow handler does the fetch — keep
   // the boundary checks here so the press is a no-op rather than burying
