@@ -783,18 +783,28 @@ function hasFullForecastFromParts(
 function observationLines(obs: ObservationSummary[] | null): string[] {
   if (obs === null) return [];
   if (obs.length === 0) return [];
-  const total = obs.length;
+  // Tile communicates in-zone signal — center-wide count goes on the
+  // screen instead, behind the "All center" filter chip.
+  const inZone = obs.filter((o) => o.inZone);
   const since = new Date();
   since.setDate(since.getDate() - 7);
   const sinceStr = since.toISOString().slice(0, 10);
-  const last7 = obs.filter((o) => (o.startDate ?? "") >= sinceStr).length;
-  const avys = obs.filter((o) => o.hasAvalanches).length;
-  const headline = last7 > 0
-    ? `${last7} in last 7d`
-    : `${total} since Mar 15`;
-  const lines = [headline];
-  if (avys > 0) lines.push(`${avys} w/ avalanche`);
-  const newest = obs[0];
+  const inZoneLast7 = inZone.filter(
+    (o) => (o.startDate ?? "") >= sinceStr,
+  ).length;
+  const inZoneAvys = inZone.filter((o) => o.hasAvalanches).length;
+
+  if (inZone.length === 0) {
+    return [`${obs.length} nearby`, "None in zone"];
+  }
+  const lines: string[] = [];
+  lines.push(
+    inZoneLast7 > 0
+      ? `${inZoneLast7} in last 7d`
+      : `${inZone.length} since Mar 15`,
+  );
+  if (inZoneAvys > 0) lines.push(`${inZoneAvys} w/ avalanche`);
+  const newest = inZone[0];
   if (newest?.startDate) lines.push(`Latest ${newest.startDate}`);
   return lines;
 }

@@ -252,32 +252,59 @@ export interface ZoneWeatherForecast {
   avgLocations?: AvgLocation[];
 }
 
+export interface ObservationMedia {
+  id: string | number | null;
+  type: string;
+  thumbnail: string;
+  full: string;
+  caption: string | null;
+  title: string | null;
+}
+
 export interface ObservationSummary {
   id: string;
+  // zoneId is what the NAC API returned for THIS obs (mapped to our slug
+  // when known) — distinct from the requested zone. Use `inZone` to tell
+  // whether this obs landed in the zone the user is currently viewing.
   zoneId: string | null;
   zoneName: string | null;
   centerId: string | null;
+  inZone: boolean;
   startDate: string | null;
+  endDate: string | null;
+  createdAt: string | null;
+  lastUpdated: string | null;
   observerType: "public" | "forecaster" | "professional" | string | null;
   obsSource: string | null;
   observerName: string | null;
   organization: string | null;
+  organizationUrl: string | null;
+  activity: string[];
+  route: string | null;
   locationName: string | null;
   locationPoint: { lat: number; lng: number } | null;
-  // observation_summary is HTML on the wire — let the screen strip tags.
+  // observation_summary is HTML on the wire — strip tags client-side.
   summaryHtml: string | null;
   instabilitySummary: string | null;
   avalanchesSummary: string | null;
-  instabilityFlags: {
+  instability: {
     cracking: boolean;
     collapsing: boolean;
     avalanchesCaught: boolean;
     avalanchesObserved: boolean;
     avalanchesTriggered: boolean;
+    crackingDescription: string | null;
+    collapsingDescription: string | null;
   };
+  // NAC's nested "advanced fields" — observed terrain, weather and
+  // snowpack notes. Passed through verbatim because shapes vary.
+  advancedFields: Record<string, unknown> | null;
+  // Avalanche records — full nested objects (trigger, type, size,
+  // depth/width/vertical, aspect, elevation, comments). Passed through.
+  avalanches: Array<Record<string, unknown>>;
   hasAvalanches: boolean;
+  media: ObservationMedia[];
   thumbnails: string[];
-  viewerUrl: string;
 }
 
 export interface ObservationsResponse {
