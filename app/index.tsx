@@ -74,6 +74,11 @@ import {
   requestAndRegister,
   type PushDiagnostic,
 } from "@/lib/pushNotifications";
+import {
+  readLocationDiagnostic,
+  requestAndRegisterLocationWake,
+  type LocationDiagnostic,
+} from "@/lib/locationWake";
 import { readLastRefresh, type LastRefreshRecord } from "@/lib/backgroundRefresh";
 import {
   avalancheApi,
@@ -1073,6 +1078,13 @@ export default function Index() {
             </View>
           </View>
         ) : null}
+
+        {/* Location-wake nudge — shows whenever the always-location
+            background wake isn't running. Lets users who skipped the
+            modal (or declined initially) enable it later without
+            digging through Settings. Hides itself once registration
+            completes. */}
+        <LocationWakeBanner />
 
         {/* HEADER — wordmark + date pager on the top row, status meta
             (cached/live/offline + fetched time) on a small line below.
@@ -2361,6 +2373,96 @@ function PushDiagnosticLine() {
         </View>
       ) : null}
     </View>
+  );
+}
+
+// Inline nudge to enable Always Location after onboarding has been
+// completed. The onboarding modal only fires once per install (gated
+// by an AsyncStorage flag), so users who declined location during
+// onboarding — or upgraded from a build that didn't ask — would have
+// no path to enable it short of digging through Settings. This banner
+// auto-hides once the diagnostic reports "ok".
+function LocationWakeBanner() {
+  const [diag, setDiag] = useState<LocationDiagnostic | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const reload = useCallback(() => {
+    readLocationDiagnostic().then(setDiag);
+  }, []);
+
+  useEffect(() => {
+    reload();
+    // Re-check periodically so the banner disappears the moment
+    // registration completes (e.g., right after the user grants
+    // permission via the Settings → app → Location escalation).
+    const t = setInterval(reload, 5000);
+    return () => clearInterval(t);
+  }, [reload]);
+
+  if (!diag || diag.step === "ok") return null;
+
+  const onTap = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await requestAndRegisterLocationWake();
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Pressable
+      onPress={onTap}
+      disabled={busy}
+      style={({ pressed }) => ({
+        marginTop: 8,
+        marginHorizontal: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 0.5,
+        borderColor: palette.frost[500],
+        backgroundColor: pressed
+          ? palette.frost[500] + "26"
+          : palette.frost[500] + "1A",
+        opacity: busy ? 0.6 : 1,
+      })}
+    >
+      <View className="flex-row items-center gap-2">
+        <Ionicons
+          name="location-outline"
+          size={16}
+          color={palette.frost[400]}
+        />
+        <View style={{ flex: 1 }}>
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{
+              fontSize: 11,
+              letterSpacing: 1.4,
+              color: palette.frost[400],
+            }}
+          >
+            BACKGROUND REFRESH LIMITED
+          </Text>
+          <Text
+            className="text-ink-200"
+            style={{ fontSize: 12, lineHeight: 16, marginTop: 2 }}
+          >
+            Tap to enable Always Location — the only iOS hook that keeps
+            data fresh after you force-quit the app.
+          </Text>
+        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={palette.frost[400]}
+        />
+      </View>
+    </Pressable>
   );
 }
 
