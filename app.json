@@ -42,7 +42,7 @@
           }
         }
       ],
-      "expo-background-task",
+      "expo-background-fetch",
       [
         "expo-notifications",
         {

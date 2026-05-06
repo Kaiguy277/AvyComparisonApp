@@ -1,5 +1,5 @@
 import * as TaskManager from "expo-task-manager";
-import * as BackgroundTask from "expo-background-task";
+import * as BackgroundFetch from "expo-background-fetch";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -48,17 +48,24 @@ async function writeLastRefresh(rec: LastRefreshRecord): Promise<void> {
 // string — changing it after release leaves orphaned scheduled tasks.
 export const BG_TASK_NAME = "avy.refresh-favorites";
 
-// 15 minutes is the floor iOS will respect; the OS schedules less often
-// based on usage patterns, battery, network, and the user's per-app
-// Background App Refresh setting. There is no guarantee about cadence —
-// this is a hint, not a contract.
-const MIN_INTERVAL_MINUTES = 15;
+// expo-background-fetch wraps iOS's legacy
+// `application:performFetchWithCompletionHandler:` API, which routes to
+// BGAppRefreshTask under iOS 13+. This is the right primitive for "keep
+// cached content fresh" per Apple's Background Tasks doc — short
+// runtime (~30s), fires opportunistically every tens of minutes when
+// iOS thinks the user is about to open the app.
+//
+// (We previously used expo-background-task, which uses
+// BGProcessingTaskRequest — meant for long-running idle work like DB
+// maintenance, fires far less often, and was the wrong tool for a
+// 200ms cache pull.)
+const MIN_INTERVAL_SECONDS = 15 * 60;
 
-// Expo Go doesn't include the native side of expo-background-task;
-// calling defineTask / registerTaskAsync there throws. Detect and no-op
-// so the visual preview on phone (via Expo Go) doesn't crash. In a
-// production build (TestFlight / standalone), this is false and the
-// task wires up normally.
+// Expo Go ships without the native background-fetch module; calling
+// defineTask / registerTaskAsync there throws. Detect and no-op so the
+// visual preview via Expo Go doesn't crash. In a production build
+// (TestFlight / standalone), this is false and the task wires up
+// normally.
 const isExpoGo = Constants.appOwnership === "expo";
 
 // Shared refresh body — reusable across the BGTaskScheduler wake-up, the
@@ -165,26 +172,30 @@ if (!isExpoGo) {
   TaskManager.defineTask(BG_TASK_NAME, async () => {
     try {
       const n = await refreshFavoritesSnapshot("bg-task");
-      return n === null
-        ? BackgroundTask.BackgroundTaskResult.Failed
-        : BackgroundTask.BackgroundTaskResult.Success;
+      // NewData / NoData / Failed are signals to iOS about whether
+      // the fetch produced anything useful — informs the OS's
+      // scheduling heuristic for the next fire.
+      if (n === null) return BackgroundFetch.BackgroundFetchResult.Failed;
+      return n > 0
+        ? BackgroundFetch.BackgroundFetchResult.NewData
+        : BackgroundFetch.BackgroundFetchResult.NoData;
     } catch (err) {
       console.warn("[bg-task] threw", err);
-      return BackgroundTask.BackgroundTaskResult.Failed;
+      return BackgroundFetch.BackgroundFetchResult.Failed;
     }
   });
 }
 
-// Web has no native background scheduler; Expo Go ships without
-// expo-background-task. Calls become no-ops so the dev preview doesn't error.
+// Web has no native background scheduler; Expo Go ships without the
+// native module. Calls become no-ops so the dev preview doesn't error.
 const isSupported =
   !isExpoGo && (Platform.OS === "ios" || Platform.OS === "android");
 
 export async function registerBackgroundRefresh(): Promise<void> {
   if (!isSupported) return;
   try {
-    const status = await BackgroundTask.getStatusAsync();
-    if (status === BackgroundTask.BackgroundTaskStatus.Restricted) {
+    const status = await BackgroundFetch.getStatusAsync();
+    if (status === BackgroundFetch.BackgroundFetchStatus.Restricted) {
       console.warn(
         "[bg-task] restricted — user has Background App Refresh disabled",
       );
@@ -192,10 +203,12 @@ export async function registerBackgroundRefresh(): Promise<void> {
     }
     const isRegistered = await TaskManager.isTaskRegisteredAsync(BG_TASK_NAME);
     if (isRegistered) return;
-    await BackgroundTask.registerTaskAsync(BG_TASK_NAME, {
-      minimumInterval: MIN_INTERVAL_MINUTES,
+    await BackgroundFetch.registerTaskAsync(BG_TASK_NAME, {
+      minimumInterval: MIN_INTERVAL_SECONDS,
+      stopOnTerminate: false,
+      startOnBoot: true,
     });
-    console.log(`[bg-task] registered (>= ${MIN_INTERVAL_MINUTES}min)`);
+    console.log(`[bg-task] registered (>= ${MIN_INTERVAL_SECONDS / 60}min)`);
   } catch (err) {
     console.warn("[bg-task] register failed", err);
   }
@@ -205,6 +218,6 @@ export async function unregisterBackgroundRefresh(): Promise<void> {
   if (!isSupported) return;
   try {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(BG_TASK_NAME);
-    if (isRegistered) await BackgroundTask.unregisterTaskAsync(BG_TASK_NAME);
+    if (isRegistered) await BackgroundFetch.unregisterTaskAsync(BG_TASK_NAME);
   } catch {}
 }

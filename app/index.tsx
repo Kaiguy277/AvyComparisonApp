@@ -912,6 +912,24 @@ export default function Index() {
   // display order. summary.zones may include zones from a previous fetch
   // that the user has since removed from the tray — filtering here drops
   // them without forcing a refetch.
+  // Per-zone fetched-at lookup used by the home tiles. Tries the
+  // currently-viewed date first; falls back to the newest snapshot
+  // entry for that zone so a UTC-vs-local date mismatch doesn't hide
+  // the freshness signal (the snapshot can be keyed under yesterday
+  // UTC while viewedDate is today UTC).
+  const cachedAtFor = useCallback(
+    (zoneId: string): string | undefined => {
+      const byDate = snapshot?.zones?.[zoneId];
+      if (!byDate) return undefined;
+      const exact = byDate[viewedDate]?.cachedAt;
+      if (exact) return exact;
+      const dates = Object.keys(byDate).sort();
+      const latest = dates[dates.length - 1];
+      return latest ? byDate[latest]?.cachedAt : undefined;
+    },
+    [snapshot, viewedDate],
+  );
+
   const orderedZones = useMemo(() => {
     if (!summary?.zones) return [];
     const idx = new Map(displayedZoneIds.map((id, i) => [id, i]));
@@ -1626,7 +1644,11 @@ export default function Index() {
                         flexShrink: 0,
                       }}
                     >
-                      <ZoneTile zone={zone} viewedDate={viewedDate} />
+                      <ZoneTile
+                        zone={zone}
+                        viewedDate={viewedDate}
+                        cachedAt={cachedAtFor(zone.id)}
+                      />
                     </View>
                   ))}
                 </View>
@@ -1682,6 +1704,7 @@ export default function Index() {
                         centerId={soz.centerId}
                         stations={soz.weatherObservations}
                         viewedDate={viewedDate}
+                        cachedAt={cachedAtFor(soz.id)}
                       />
                     </View>
                   ))}

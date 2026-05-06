@@ -14,6 +14,9 @@ interface Props {
   // YYYY-MM-DD of the day the home grid is currently showing — threaded
   // into the detail route the same way ZoneTile does.
   viewedDate: string;
+  // ISO timestamp the snapshot bundle was last rewritten — surfaced as
+  // a "FETCHED HH:MM" footer so a wake-driven refresh is visible.
+  cachedAt?: string;
 }
 
 // Highest-elevation station — the one a backcountry user wants at-a-glance.
@@ -45,7 +48,21 @@ function formatStationTime(iso: string): string {
 // Shows the zone name + highest-station snapshot + a "STATIONS ONLY"
 // eyebrow so the user understands why the danger pyramid is missing.
 // Tappable to the same zone detail route as ZoneTile.
-export function StationsOnlyTile({ zoneId, stations, viewedDate }: Props) {
+function formatFetchedClock(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    .replace(/\s?(AM|PM)/i, (_m, ap) => ap.toLowerCase());
+}
+
+export function StationsOnlyTile({
+  zoneId,
+  stations,
+  viewedDate,
+  cachedAt,
+}: Props) {
   const router = useRouter();
   const station = highestStation(stations);
   const zoneName =
@@ -209,6 +226,23 @@ export function StationsOnlyTile({ zoneId, stations, viewedDate }: Props) {
               No station data yet
             </Text>
           )}
+
+          {formatFetchedClock(cachedAt) ? (
+            <Text
+              variant="mono"
+              weight="medium"
+              style={{
+                marginTop: 8,
+                fontSize: 8,
+                letterSpacing: 1,
+                color: palette.ink[500],
+                textAlign: "center",
+              }}
+              numberOfLines={1}
+            >
+              FETCHED {formatFetchedClock(cachedAt)}
+            </Text>
+          ) : null}
         </View>
       </Pressable>
     </View>

@@ -16,6 +16,11 @@ interface Props {
   // into the detail route so the detail / sub screens look up the
   // matching bundle in the snapshot, not the newest.
   viewedDate: string;
+  // ISO timestamp the bundle for this zone was last refreshed. Surfaced
+  // as a small "FETCHED HH:MM" footer so a bg-wake or push-driven
+  // update is immediately visible per zone — without this, users can't
+  // tell whether a wake actually rewrote the cache.
+  cachedAt?: string;
 }
 
 // Color the freshness word by status. Green for current is intentionally
@@ -81,7 +86,16 @@ function likelihoodColor(raw: string): string {
   return palette.ink[400];
 }
 
-export function ZoneTile({ zone, viewedDate }: Props) {
+function formatFetchedClock(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    .replace(/\s?(AM|PM)/i, (_m, ap) => ap.toLowerCase());
+}
+
+export function ZoneTile({ zone, viewedDate, cachedAt }: Props) {
   const router = useRouter();
   const today = zone.forecast?.[0];
   const fresh = freshness[zone.freshness.status];
@@ -370,6 +384,27 @@ export function ZoneTile({ zone, viewedDate }: Props) {
                 {zone.freshness.expiresDate ?? "—"}
               </Text>
             </View>
+          ) : null}
+
+          {/* Per-zone wake/refresh time. Different from the forecast
+              issue/expiry above — this is when the snapshot for this
+              specific zone was last rewritten, so a bg-wake or push
+              shows up here immediately. */}
+          {formatFetchedClock(cachedAt) ? (
+            <Text
+              variant="mono"
+              weight="medium"
+              style={{
+                marginTop: 4,
+                fontSize: 8,
+                letterSpacing: 1,
+                color: palette.ink[500],
+                textAlign: "center",
+              }}
+              numberOfLines={1}
+            >
+              FETCHED {formatFetchedClock(cachedAt)}
+            </Text>
           ) : null}
         </View>
       </Pressable>
