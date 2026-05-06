@@ -38,12 +38,18 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
     if (busy) return;
     setBusy(true);
     try {
+      // If the user denied previously and iOS will no longer show the
+      // prompt, deep-link them to Settings. Without this branch a
+      // "DENIED · TAP TO RETRY" tap silently no-ops because
+      // requestPermissionsAsync just returns the existing denial.
+      const existing = await Notifications.getPermissionsAsync();
+      if (!existing.granted && !existing.canAskAgain) {
+        Linking.openSettings().catch(() => {});
+        return;
+      }
       const granted = await registerPushNotifications();
-      // registerPushNotifications returns the token on success or null if
-      // the user denied / on web / on simulator. We can also re-query
-      // permissions to give the user clearer status.
-      const perms = await Notifications.getPermissionsAsync();
-      setPushState(perms.granted ? "granted" : "denied");
+      const after = await Notifications.getPermissionsAsync();
+      setPushState(after.granted ? "granted" : "denied");
       if (granted) console.log("[onboarding] push token registered");
     } finally {
       setBusy(false);
@@ -54,14 +60,21 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
     if (busy) return;
     setBusy(true);
     try {
-      // requestAndRegisterLocationWake walks foreground → background and
-      // starts the task. It returns true only if the user granted both
-      // and the task started. We re-query at the end so a partial grant
-      // (foreground only) still surfaces as "denied" for the wake path.
-      await requestAndRegisterLocationWake();
+      // Same Settings-redirect rule as notifications. iOS shows the
+      // foreground prompt once and the background ("Always") prompt
+      // once; after either is dismissed the only path is Settings.
+      const fg = await Location.getForegroundPermissionsAsync();
       const bg = await Location.getBackgroundPermissionsAsync();
-      setLocationState(bg.granted ? "granted" : "denied");
-      if (bg.granted) console.log("[onboarding] location wake registered");
+      const fgBlocked = !fg.granted && !fg.canAskAgain;
+      const bgBlocked = !bg.granted && !bg.canAskAgain;
+      if (fgBlocked || bgBlocked) {
+        Linking.openSettings().catch(() => {});
+        return;
+      }
+      await requestAndRegisterLocationWake();
+      const after = await Location.getBackgroundPermissionsAsync();
+      setLocationState(after.granted ? "granted" : "denied");
+      if (after.granted) console.log("[onboarding] location wake registered");
     } finally {
       setBusy(false);
     }
@@ -157,12 +170,23 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
             title="Push Notifications"
             body="Lets the server wake the app to refresh the snapshot every time the cache updates. We never send banners or sounds — only silent wake-ups."
             state={pushState}
+            busy={busy && pushState === "idle"}
+            ctaHint="TAP TO ENABLE"
+            onPress={handleEnableNotifications}
           />
 
           <PermissionRow
             icon="refresh-outline"
             title="Background App Refresh"
             body="Lets iOS run a backup refresh task on its own schedule. Belt-and-suspenders for when the silent push gets held back."
+            ctaHint={
+              Platform.OS === "ios"
+                ? "TAP TO OPEN iOS SETTINGS · GENERAL → BACKGROUND APP REFRESH"
+                : undefined
+            }
+            onPress={
+              Platform.OS === "ios" ? handleOpenSettings : undefined
+            }
           />
 
           <PermissionRow
@@ -170,131 +194,10 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
             title="Location · Always"
             body="The only iOS mechanism that keeps refreshing data even after you force-quit the app. We never read or store your location — registering it is just how iOS lets us wake to update the cache."
             state={locationState}
-          />
-
-          <Pressable
-            onPress={handleEnableNotifications}
-            disabled={busy || pushState === "granted"}
-            style={({ pressed }) => ({
-              marginTop: 20,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              borderWidth: 2,
-              borderColor: palette.ink[700],
-              backgroundColor:
-                pushState === "granted"
-                  ? palette.ink[800]
-                  : pressed
-                    ? palette.aspen[500]
-                    : palette.aspen[400],
-              opacity: busy ? 0.6 : 1,
-            })}
-          >
-            <Text
-              variant="display"
-              style={{
-                fontSize: 14,
-                letterSpacing: 1.4,
-                color: palette.ink[700],
-                textAlign: "center",
-              }}
-            >
-              {pushState === "granted"
-                ? "✓ NOTIFICATIONS ENABLED"
-                : pushState === "denied"
-                  ? "DENIED — OPEN SETTINGS TO ENABLE"
-                  : busy
-                    ? "REQUESTING…"
-                    : "ENABLE NOTIFICATIONS"}
-            </Text>
-          </Pressable>
-
-          <Pressable
+            busy={busy && locationState === "idle"}
+            ctaHint="TAP TO ENABLE · CHOOSE “ALWAYS” WHEN iOS PROMPTS"
             onPress={handleEnableLocation}
-            disabled={busy || locationState === "granted"}
-            style={({ pressed }) => ({
-              marginTop: 10,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              borderWidth: 2,
-              borderColor: palette.ink[700],
-              backgroundColor:
-                locationState === "granted"
-                  ? palette.ink[800]
-                  : pressed
-                    ? palette.frost[500]
-                    : palette.frost[400],
-              opacity: busy ? 0.6 : 1,
-            })}
-          >
-            <Text
-              variant="display"
-              style={{
-                fontSize: 14,
-                letterSpacing: 1.4,
-                color: palette.ink[700],
-                textAlign: "center",
-              }}
-            >
-              {locationState === "granted"
-                ? "✓ ALWAYS LOCATION ENABLED"
-                : locationState === "denied"
-                  ? "DENIED — OPEN SETTINGS TO ENABLE"
-                  : busy
-                    ? "REQUESTING…"
-                    : "ENABLE ALWAYS LOCATION"}
-            </Text>
-            <Text
-              variant="mono"
-              style={{
-                fontSize: 10,
-                letterSpacing: 1,
-                color: palette.ink[800],
-                textAlign: "center",
-                marginTop: 4,
-              }}
-            >
-              CHOOSE “ALWAYS” WHEN iOS PROMPTS
-            </Text>
-          </Pressable>
-
-          {Platform.OS === "ios" ? (
-            <Pressable
-              onPress={handleOpenSettings}
-              style={({ pressed }) => ({
-                marginTop: 10,
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                borderWidth: 2,
-                borderColor: palette.ink[700],
-                backgroundColor: pressed ? palette.ink[800] : "transparent",
-              })}
-            >
-              <Text
-                variant="display"
-                style={{
-                  fontSize: 14,
-                  letterSpacing: 1.4,
-                  color: palette.ink[100],
-                  textAlign: "center",
-                }}
-              >
-                OPEN iOS SETTINGS
-              </Text>
-              <Text
-                variant="mono"
-                className="text-ink-400"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: 1,
-                  textAlign: "center",
-                  marginTop: 4,
-                }}
-              >
-                THEN: GENERAL → BACKGROUND APP REFRESH → ON
-              </Text>
-            </Pressable>
-          ) : null}
+          />
 
           <Pressable
             onPress={onComplete}
@@ -328,13 +231,30 @@ function PermissionRow({
   title,
   body,
   state,
+  busy,
+  ctaHint,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   body: string;
   state?: PermState;
+  busy?: boolean;
+  // Small all-caps line below the body explaining the action — only
+  // shows while the row is still actionable. Disappears once granted.
+  ctaHint?: string;
+  // When provided, the entire card becomes tappable. The big card
+  // shape already reads as a button, so this matches user expectation
+  // — they tap the card, not a small button below it.
+  onPress?: () => void;
 }) {
-  return (
+  const granted = state === "granted";
+  const denied = state === "denied";
+  // The card stays interactive when "denied" so the user can re-trigger
+  // (e.g., the iOS Settings deep link from a denied notification grant).
+  const interactive = !!onPress && !granted && !busy;
+
+  const body_view = (
     <View
       style={{
         flexDirection: "row",
@@ -342,8 +262,15 @@ function PermissionRow({
         marginBottom: 16,
         padding: 14,
         borderWidth: 1.5,
-        borderColor: palette.ink[700],
+        borderColor: granted
+          ? "#52BA4A"
+          : denied
+            ? "#DC2626"
+            : interactive
+              ? palette.frost[500]
+              : palette.ink[700],
         backgroundColor: palette.ink[900],
+        opacity: busy ? 0.6 : 1,
       }}
     >
       <View
@@ -354,22 +281,17 @@ function PermissionRow({
           borderColor: palette.ink[700],
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor:
-            state === "granted"
-              ? "#52BA4A"
-              : state === "denied"
-                ? "#DC2626"
-                : palette.ink[800],
+          backgroundColor: granted
+            ? "#52BA4A"
+            : denied
+              ? "#DC2626"
+              : palette.ink[800],
         }}
       >
         <Ionicons
-          name={state === "granted" ? "checkmark" : icon}
+          name={granted ? "checkmark" : icon}
           size={18}
-          color={
-            state === "granted" || state === "denied"
-              ? palette.ink[700]
-              : palette.ink[100]
-          }
+          color={granted || denied ? palette.ink[700] : palette.ink[100]}
         />
       </View>
       <View style={{ flex: 1 }}>
@@ -390,7 +312,41 @@ function PermissionRow({
         >
           {body}
         </Text>
+        {!granted && ctaHint ? (
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color: denied ? "#DC2626" : palette.frost[400],
+              marginTop: 8,
+            }}
+          >
+            {busy ? "REQUESTING…" : denied ? "DENIED · TAP TO RETRY" : ctaHint}
+          </Text>
+        ) : null}
       </View>
+      {interactive ? (
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={palette.ink[400]}
+          style={{ alignSelf: "center" }}
+        />
+      ) : null}
     </View>
+  );
+
+  if (!onPress) return body_view;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!interactive}
+      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+    >
+      {body_view}
+    </Pressable>
   );
 }

@@ -80,6 +80,7 @@ import {
   type LocationDiagnostic,
 } from "@/lib/locationWake";
 import { readLastRefresh, type LastRefreshRecord } from "@/lib/backgroundRefresh";
+import { toggleDebugMode, useDebugMode } from "@/lib/debugMode";
 import {
   avalancheApi,
   type AvalancheSummary,
@@ -1007,8 +1008,11 @@ export default function Index() {
           />
         }
       >
-        {/* OFFLINE BANNER — appears the moment the network drops. If we have
-            a cached snapshot for favorites, offer a one-tap load. */}
+        {/* OFFLINE BANNER — passive status pill. The on-launch effect
+            already loads the newest cached bundle when offline, so the
+            previous "Load" button is no longer needed. The banner just
+            tells the user "you're offline; what's on screen is local"
+            and turns red once the cache itself ages out (isStale). */}
         {isOnline === false ? (
           <View
             style={{
@@ -1026,55 +1030,44 @@ export default function Index() {
                 : palette.aspen[500] + "1A",
             }}
           >
-            <View className="flex-row items-center justify-between gap-3">
-              <View className="flex-row items-center gap-2 flex-1">
-                <Ionicons
-                  name="cloud-offline-outline"
-                  size={16}
-                  color={
-                    snapshot && isStale(snapshot.fetchedAt)
-                      ? "#DC2626"
-                      : palette.aspen[400]
-                  }
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="mono"
-                    weight="medium"
-                    style={{
-                      fontSize: 11,
-                      letterSpacing: 1.4,
-                      color:
-                        snapshot && isStale(snapshot.fetchedAt)
-                          ? "#DC2626"
-                          : palette.aspen[400],
-                    }}
-                  >
-                    {snapshot && isStale(snapshot.fetchedAt) ? "STALE" : "OFFLINE"}
-                  </Text>
-                  <Text
-                    className="text-ink-200"
-                    style={{ fontSize: 12, marginTop: 2 }}
-                  >
-                    {snapshot
-                      ? `Cached ${formatAge(snapshot.fetchedAt)} · ${
-                          Object.keys(snapshot.zones).length
-                        } favorite${
-                          Object.keys(snapshot.zones).length === 1 ? "" : "s"
-                        }`
-                      : "No cache available. Favorite zones to enable offline mode."}
-                  </Text>
-                </View>
-              </View>
-              {snapshot && Object.keys(snapshot.zones).length > 0 ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onPress={() => loadFromSnapshot()}
+            <View className="flex-row items-center gap-2">
+              <Ionicons
+                name="cloud-offline-outline"
+                size={16}
+                color={
+                  snapshot && isStale(snapshot.fetchedAt)
+                    ? "#DC2626"
+                    : palette.aspen[400]
+                }
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  variant="mono"
+                  weight="medium"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 1.4,
+                    color:
+                      snapshot && isStale(snapshot.fetchedAt)
+                        ? "#DC2626"
+                        : palette.aspen[400],
+                  }}
                 >
-                  Load
-                </Button>
-              ) : null}
+                  {snapshot && isStale(snapshot.fetchedAt) ? "STALE" : "OFFLINE"}
+                </Text>
+                <Text
+                  className="text-ink-200"
+                  style={{ fontSize: 12, marginTop: 2 }}
+                >
+                  {snapshot
+                    ? `Cached ${formatAge(snapshot.fetchedAt)} · ${
+                        Object.keys(snapshot.zones).length
+                      } favorite${
+                        Object.keys(snapshot.zones).length === 1 ? "" : "s"
+                      }`
+                    : "No cache available. Favorite zones to enable offline mode."}
+                </Text>
+              </View>
             </View>
           </View>
         ) : null}
@@ -1107,19 +1100,33 @@ export default function Index() {
               gap: 10,
             }}
           >
-            <Image
-              source={require("@/assets/images/wordmark.png")}
-              style={{ width: 18, height: 25 }}
-              resizeMode="contain"
-            />
-            <Text
-              variant="mono"
-              weight="medium"
-              className="text-frost-400"
-              style={{ fontSize: 10, letterSpacing: 2 }}
+            <Pressable
+              onLongPress={async () => {
+                const next = await toggleDebugMode();
+                Haptics.notificationAsync(
+                  next
+                    ? Haptics.NotificationFeedbackType.Success
+                    : Haptics.NotificationFeedbackType.Warning,
+                ).catch(() => {});
+              }}
+              delayLongPress={800}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              hitSlop={6}
             >
-              AVY · COMPARISON
-            </Text>
+              <Image
+                source={require("@/assets/images/wordmark.png")}
+                style={{ width: 18, height: 25 }}
+                resizeMode="contain"
+              />
+              <Text
+                variant="mono"
+                weight="medium"
+                className="text-frost-400"
+                style={{ fontSize: 10, letterSpacing: 2 }}
+              >
+                AVY · COMPARISON
+              </Text>
+            </Pressable>
             <View style={{ flex: 1 }} />
             <View
               style={{
@@ -2266,6 +2273,7 @@ export default function Index() {
 function PushDiagnosticLine() {
   const [diag, setDiag] = useState<PushDiagnostic | null>(null);
   const [lastRefresh, setLastRefresh] = useState<LastRefreshRecord | null>(null);
+  const debug = useDebugMode();
   const reload = useCallback(() => {
     readPushDiagnostic().then(setDiag);
     readLastRefresh().then(setLastRefresh);
@@ -2282,7 +2290,14 @@ function PushDiagnosticLine() {
   // user action.
   const showPush =
     diag && diag.step !== "ok" && diag.step !== "skipped-offline";
-  if (!showPush && !lastRefresh) return null;
+  // The "BG WAKE · HH:MM VIA …" line is a diagnostic — useful while
+  // we're verifying the wake pipeline, noise once it's trusted. Gated
+  // behind a hidden long-press-the-wordmark debug toggle so the
+  // average user never sees it but a developer can flip it on at any
+  // time. Push errors stay visible regardless because they require
+  // user action.
+  const showBgWake = !!lastRefresh && debug;
+  if (!showPush && !showBgWake) return null;
 
   const onTap = async () => {
     Haptics.selectionAsync().catch(() => {});
@@ -2339,7 +2354,7 @@ function PushDiagnosticLine() {
           </Text>
         </Pressable>
       ) : null}
-      {lastRefresh ? (
+      {showBgWake ? (
         <View
           style={{
             flexDirection: "row",
