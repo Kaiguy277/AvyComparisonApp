@@ -101,10 +101,14 @@ export function PhotoLightbox({
           <GestureDetector gesture={pan}>
             <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
               <Image
+                // Keying on URL forces a fresh mount when index changes —
+                // expo-image's transition prop otherwise occasionally
+                // freezes on the prior frame when sources swap fast.
+                key={current.full}
                 source={{ uri: current.full }}
                 placeholder={{ uri: current.thumbnail }}
                 contentFit="contain"
-                transition={200}
+                transition={150}
                 style={StyleSheet.absoluteFill}
               />
             </Animated.View>

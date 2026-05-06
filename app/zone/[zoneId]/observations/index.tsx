@@ -89,10 +89,22 @@ export default function ZoneObservationsScreen() {
       <FilterToggle
         filter={filter}
         onChange={setFilter}
-        allLabel={`ALL ${centerName.toUpperCase()}`}
         allCount={obs?.length}
         zoneCount={inZoneCount}
       />
+      <Text
+        variant="mono"
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.0,
+          color: palette.ink[400],
+          paddingHorizontal: 16,
+          paddingTop: 6,
+        }}
+        numberOfLines={1}
+      >
+        {centerName.toUpperCase()}
+      </Text>
 
       <ScrollView
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 48 }}
@@ -142,13 +154,11 @@ export default function ZoneObservationsScreen() {
 function FilterToggle({
   filter,
   onChange,
-  allLabel,
   allCount,
   zoneCount,
 }: {
   filter: Filter;
   onChange: (f: Filter) => void;
-  allLabel: string;
   allCount: number | undefined;
   zoneCount: number;
 }) {
@@ -162,7 +172,7 @@ function FilterToggle({
       style={{
         marginHorizontal: 16,
         marginTop: 12,
-        marginBottom: 4,
+        marginBottom: 0,
         flexDirection: "row",
         backgroundColor: palette.ink[800],
         borderWidth: 0.5,
@@ -173,13 +183,13 @@ function FilterToggle({
     >
       <ToggleHalf
         active={filter === "all"}
-        label={allLabel}
+        label="ALL"
         count={allCount}
         onPress={() => select("all")}
       />
       <ToggleHalf
         active={filter === "zone"}
-        label="THIS ZONE"
+        label="IN ZONE"
         count={zoneCount}
         onPress={() => select("zone")}
       />
@@ -219,10 +229,11 @@ function ToggleHalf({
         variant="mono"
         weight="bold"
         style={{
-          fontSize: 10,
+          fontSize: 11,
           letterSpacing: 1.2,
           color: active ? "#4FB3C9" : palette.ink[300],
         }}
+        numberOfLines={1}
       >
         {label}
         {typeof count === "number" ? ` · ${count}` : ""}
