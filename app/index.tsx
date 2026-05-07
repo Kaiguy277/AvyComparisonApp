@@ -95,6 +95,7 @@ import {
   type ZoneWeatherForecast,
 } from "@/lib/api/avalanche";
 import { AVAILABLE_ZONES, DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
+import { listDrafts as listObservationDrafts } from "@/lib/observation/submitFlow";
 import { setZoneSession } from "@/lib/zoneSession";
 
 interface WeatherForecastBundle {
@@ -1080,6 +1081,11 @@ export default function Index() {
             digging through Settings. Hides itself once registration
             completes. */}
         <LocationWakeBanner />
+
+        {/* Unsent observation drafts — shown when the user submitted
+            while offline and the form was queued locally. Tap goes
+            back to the form so they can retry. */}
+        <ObservationDraftsBanner />
 
         {/* HEADER — wordmark + date pager on the top row, status meta
             (cached/live/offline + fetched time) on a small line below.
@@ -2441,6 +2447,85 @@ function PushDiagnosticLine() {
 // onboarding — or upgraded from a build that didn't ask — would have
 // no path to enable it short of digging through Settings. This banner
 // auto-hides once the diagnostic reports "ok".
+// Banner that surfaces locally-queued observation drafts. Drafts get
+// created when the user submits while offline (or hits a 5xx).
+// Tapping the banner walks them back to the submit form so they can
+// retry. Banner self-hides when the queue empties.
+function ObservationDraftsBanner() {
+  const [count, setCount] = useState(0);
+  const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      listObservationDrafts().then((drafts) => {
+        if (!cancelled) setCount(drafts.length);
+      });
+    };
+    refresh();
+    // Re-check on focus + periodic — the form on submit may add a
+    // draft while we're not watching.
+    const t = setInterval(refresh, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  if (count === 0) return null;
+
+  return (
+    <Pressable
+      onPress={() => router.push("/observation/new" as never)}
+      style={({ pressed }) => ({
+        marginHorizontal: 16,
+        marginTop: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: pressed
+          ? palette.aspen[400] + "22"
+          : palette.aspen[400] + "15",
+        borderWidth: 0.5,
+        borderColor: palette.aspen[400] + "88",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      })}
+    >
+      <Ionicons
+        name="cloud-offline-outline"
+        size={16}
+        color={palette.aspen[400]}
+      />
+      <View style={{ flex: 1 }}>
+        <Text
+          variant="mono"
+          weight="medium"
+          style={{
+            fontSize: 10,
+            letterSpacing: 1.3,
+            color: palette.aspen[400],
+          }}
+        >
+          UNSENT · {count} OBSERVATION{count === 1 ? "" : "S"}
+        </Text>
+        <Text
+          className="text-ink-200"
+          style={{ fontSize: 12, lineHeight: 17, marginTop: 2 }}
+        >
+          Tap to retry sending — the network was down when you submitted.
+        </Text>
+      </View>
+      <Ionicons
+        name="chevron-forward"
+        size={14}
+        color={palette.aspen[400]}
+      />
+    </Pressable>
+  );
+}
+
 function LocationWakeBanner() {
   const [diag, setDiag] = useState<LocationDiagnostic | null>(null);
   const [busy, setBusy] = useState(false);

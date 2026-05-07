@@ -160,7 +160,8 @@ export function AvalancheEntryCard({
         <FieldLabel
           label="Trigger"
           required
-          hint={HELP_COPY.trigger}
+          hint="What set this slide off?"
+          help={{ title: "Trigger", body: HELP_COPY.trigger }}
         />
         <ChipPicker
           options={AVALANCHE_TRIGGER_COMMON}
@@ -231,7 +232,12 @@ export function AvalancheEntryCard({
 
       {/* D-size */}
       <View>
-        <FieldLabel label="Destructive size" required hint={HELP_COPY.d_size} />
+        <FieldLabel
+          label="Destructive size"
+          required
+          hint="How big was the slide?"
+          help={{ title: "Destructive size (D-scale)", body: HELP_COPY.d_size }}
+        />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

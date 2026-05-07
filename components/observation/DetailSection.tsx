@@ -175,7 +175,8 @@ export function DetailSection({
             {/* Cracking */}
             <YesNoQuestion
               label="Cracking?"
-              hint={HELP_COPY.cracking}
+              hint="Shooting cracks in the snow as you traveled."
+              help={{ title: "Cracking", body: HELP_COPY.cracking }}
               value={form.instability.cracking}
               onChange={(v) => {
                 updateInstability("cracking", v);
@@ -210,7 +211,8 @@ export function DetailSection({
             {/* Collapsing */}
             <YesNoQuestion
               label="Collapsing / 'whumpfing'?"
-              hint={HELP_COPY.collapsing}
+              hint="Felt the snow settle under you with a thump."
+              help={{ title: "Collapsing", body: HELP_COPY.collapsing }}
               value={form.instability.collapsing}
               onChange={(v) => {
                 updateInstability("collapsing", v);
@@ -399,17 +401,19 @@ export function DetailSection({
 function YesNoQuestion({
   label,
   hint,
+  help,
   value,
   onChange,
 }: {
   label: string;
   hint?: string;
+  help?: { title: string; body: string };
   value: boolean;
   onChange: (next: boolean) => void;
 }) {
   return (
     <View style={{ gap: 8 }}>
-      <FieldLabel label={label} hint={hint} />
+      <FieldLabel label={label} hint={hint} help={help} />
       <YesNoSwitch value={value} onChange={onChange} />
     </View>
   );

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import {
+  Modal,
   Pressable,
   TextInput,
   type TextInputProps,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
@@ -16,19 +18,20 @@ import { palette } from "@/constants/design";
 
 // ─────────────────────────── Section / Label / Hint ─────────────────────
 
-export function FormSection({
-  eyebrow,
-  title,
-  children,
-  hint,
-}: {
-  eyebrow: string;
-  title?: string;
-  children: React.ReactNode;
-  hint?: string;
-}) {
+// Forward the underlying View ref so the screen can measureLayout on
+// validation errors and scroll to the offending section.
+export const FormSection = forwardRef<
+  View,
+  {
+    eyebrow: string;
+    title?: string;
+    children: React.ReactNode;
+    hint?: string;
+  }
+>(function FormSection({ eyebrow, title, children, hint }, ref) {
   return (
     <View
+      ref={ref}
       style={{
         marginBottom: 12,
         padding: 14,
@@ -70,33 +73,40 @@ export function FormSection({
       <View style={{ gap: 14 }}>{children}</View>
     </View>
   );
-}
+});
 
 export function FieldLabel({
   label,
   required,
   hint,
+  help,
 }: {
   label: string;
   required?: boolean;
   hint?: string;
+  // Optional longer explanation behind a "?" button. Useful for
+  // jargon-heavy fields (cracking, collapsing, D-size, trigger).
+  help?: { title: string; body: string };
 }) {
   return (
     <View style={{ gap: 2, marginBottom: 6 }}>
-      <Text
-        variant="mono"
-        weight="medium"
-        style={{
-          fontSize: 10,
-          letterSpacing: 1.3,
-          color: palette.ink[300],
-        }}
-      >
-        {label.toUpperCase()}
-        {required ? (
-          <Text style={{ color: palette.aspen[400] }}> *</Text>
-        ) : null}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Text
+          variant="mono"
+          weight="medium"
+          style={{
+            fontSize: 10,
+            letterSpacing: 1.3,
+            color: palette.ink[300],
+          }}
+        >
+          {label.toUpperCase()}
+          {required ? (
+            <Text style={{ color: palette.aspen[400] }}> *</Text>
+          ) : null}
+        </Text>
+        {help ? <HelpButton title={help.title} body={help.body} /> : null}
+      </View>
       {hint ? (
         <Text
           className="text-ink-400"
@@ -106,6 +116,108 @@ export function FieldLabel({
         </Text>
       ) : null}
     </View>
+  );
+}
+
+// Small "?" pill that pops a modal with a longer explanation. Used on
+// technical fields where the inline hint isn't enough.
+export function HelpButton({
+  title,
+  body,
+}: {
+  title: string;
+  body: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`Help: ${title}`}
+        style={({ pressed }) => ({
+          width: 16,
+          height: 16,
+          borderRadius: 8,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: pressed
+            ? palette.frost[400] + "44"
+            : palette.frost[400] + "22",
+          borderWidth: 0.5,
+          borderColor: palette.frost[400] + "88",
+        })}
+      >
+        <Text
+          variant="mono"
+          weight="bold"
+          style={{
+            fontSize: 9,
+            color: palette.frost[400],
+            lineHeight: 11,
+          }}
+        >
+          ?
+        </Text>
+      </Pressable>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable
+          onPress={() => setOpen(false)}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(15,13,11,0.55)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              backgroundColor: palette.ink[800],
+              borderRadius: 14,
+              padding: 22,
+              borderWidth: 0.5,
+              borderColor: palette.ink[500] + "55",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                variant="display"
+                className="text-ink-100"
+                style={{ fontSize: 18, lineHeight: 22 }}
+              >
+                {title}
+              </Text>
+              <Pressable onPress={() => setOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={palette.ink[300]} />
+              </Pressable>
+            </View>
+            <Text
+              className="text-ink-200"
+              style={{ fontSize: 14, lineHeight: 20 }}
+            >
+              {body}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 

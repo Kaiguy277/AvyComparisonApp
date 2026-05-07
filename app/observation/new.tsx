@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  findNodeHandle,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -42,6 +43,39 @@ import {
 } from "@/lib/observation/schema";
 import { useObserverProfile } from "@/lib/observerProfile";
 import { AVAILABLE_ZONES, ZONE_TO_CENTER } from "@/lib/zones";
+
+// Section keys used for "scroll to first error" + ref tracking. Order
+// matters — sectionForPath returns the first one that owns a given
+// error path, so list more-specific keys before generic ones.
+type SectionKey =
+  | "about"
+  | "when"
+  | "activity"
+  | "where"
+  | "observation"
+  | "photos"
+  | "detail";
+
+function sectionForPath(path: string): SectionKey {
+  if (path === "name" || path === "email") return "about";
+  if (path === "start_date") return "when";
+  if (path === "activity") return "activity";
+  if (
+    path === "location_name" ||
+    path === "center_id" ||
+    path.startsWith("location_point")
+  )
+    return "where";
+  if (path === "observation_summary") return "observation";
+  if (path === "images") return "photos";
+  // Everything else (instability.*, avalanches.*, private, photoUsage,
+  // show_name, phone) lives inside the detail expansion.
+  return "detail";
+}
+
+function firstName(full: string): string {
+  return (full.trim().split(/\s+/)[0] ?? "").slice(0, 24);
+}
 
 // Submit observation. Hybrid form: essential fields are always visible
 // (name/email, when, activity, location, what you saw, photos). The
@@ -105,6 +139,27 @@ export default function ObservationNewScreen() {
   const [progressVisible, setProgressVisible] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Section refs — for "scroll to first error" on submit failure.
+  const scrollViewRef = useRef<ScrollView>(null);
+  const sectionRefs = useRef<Partial<Record<SectionKey, View | null>>>({});
+  const setSectionRef = (key: SectionKey) => (node: View | null) => {
+    sectionRefs.current[key] = node;
+  };
+  const scrollToSection = useCallback((key: SectionKey) => {
+    const node = sectionRefs.current[key];
+    const sv = scrollViewRef.current;
+    if (!node || !sv) return;
+    const handle = findNodeHandle(sv);
+    if (handle == null) return;
+    node.measureLayout(
+      handle,
+      (_x, y) => sv.scrollTo({ y: Math.max(0, y - 12), animated: true }),
+      () => {
+        /* measure failed — silent fallback */
+      },
+    );
+  }, []);
+
   const inFlight =
     submitStep?.kind === "validating" ||
     submitStep?.kind === "uploading-photo" ||
@@ -144,22 +199,25 @@ export default function ObservationNewScreen() {
         if (!next[path]) next[path] = issue.message;
       }
       setErrors(next);
-      // If any failure lives inside the detail expansion, auto-open it
-      // so the user can see + fix the field. Otherwise they'd be stuck
-      // with an alert pointing at fields they can't see.
-      if (
-        Object.keys(next).some(
-          (k) =>
-            k.startsWith("instability") ||
-            k.startsWith("avalanches") ||
-            k === "private" ||
-            k === "photoUsage" ||
-            k === "show_name" ||
-            k === "phone",
-        )
-      ) {
+
+      // Map error paths → which section they live in. Used for both
+      // "open the detail expansion" and "scroll to the first error".
+      const errorKeys = Object.keys(next);
+      const isDetailKey = (k: string) =>
+        k.startsWith("instability") ||
+        k.startsWith("avalanches") ||
+        k === "private" ||
+        k === "photoUsage" ||
+        k === "show_name" ||
+        k === "phone";
+      if (errorKeys.some(isDetailKey)) {
         setDetailOpen(true);
       }
+      const firstSection = sectionForPath(errorKeys[0] ?? "");
+      // Defer scroll a tick so the detail expansion has a chance to
+      // render (it ships its sub-views into the layout first).
+      setTimeout(() => scrollToSection(firstSection), 60);
+
       Alert.alert(
         "A few fields need attention",
         Object.values(next).slice(0, 4).join("\n"),
@@ -168,7 +226,7 @@ export default function ObservationNewScreen() {
     }
     setErrors({});
     void runSubmit();
-  }, [form, runSubmit]);
+  }, [form, runSubmit, scrollToSection]);
 
   const onCancelSubmission = useCallback(() => {
     abortRef.current?.abort();
@@ -234,11 +292,47 @@ export default function ObservationNewScreen() {
         keyboardVerticalOffset={0}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Welcome-back row — only shown when we have a saved profile.
+              Quietly acknowledges that the user has reported before so
+              the form feels less like a stranger asking for everything
+              from scratch. */}
+          {profile?.lastSubmittedAt && profile.name ? (
+            <View
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                marginBottom: 10,
+                borderRadius: 10,
+                backgroundColor: palette.frost[400] + "15",
+                borderWidth: 0.5,
+                borderColor: palette.frost[400] + "55",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={16}
+                color={palette.frost[400]}
+              />
+              <Text
+                className="text-ink-200"
+                style={{ fontSize: 12, lineHeight: 17, flex: 1 }}
+              >
+                Welcome back, {firstName(profile.name)} — thanks for sending
+                another one.
+              </Text>
+            </View>
+          ) : null}
+
           {/* WHO */}
           <FormSection
+            ref={setSectionRef("about")}
             eyebrow="ABOUT YOU"
             hint="Stored on this device so you don't have to type it again next time."
           >
@@ -268,7 +362,11 @@ export default function ObservationNewScreen() {
           </FormSection>
 
           {/* WHEN */}
-          <FormSection eyebrow="WHEN" hint="When did the observation happen?">
+          <FormSection
+            ref={setSectionRef("when")}
+            eyebrow="WHEN"
+            hint="When did the observation happen?"
+          >
             <DateStrip
               value={form.start_date}
               onChange={(d) => update("start_date", d)}
@@ -277,6 +375,7 @@ export default function ObservationNewScreen() {
 
           {/* WHAT YOU WERE DOING */}
           <FormSection
+            ref={setSectionRef("activity")}
             eyebrow="ACTIVITY"
             hint="Pick one or more — helps the forecaster picture the conditions you saw."
           >
@@ -299,7 +398,7 @@ export default function ObservationNewScreen() {
           </FormSection>
 
           {/* WHERE */}
-          <FormSection eyebrow="WHERE">
+          <FormSection ref={setSectionRef("where")} eyebrow="WHERE">
             <LocationField
               value={form.location_point}
               onChange={(p) => update("location_point", p)}
@@ -326,6 +425,7 @@ export default function ObservationNewScreen() {
 
           {/* WHAT YOU SAW */}
           <FormSection
+            ref={setSectionRef("observation")}
             eyebrow="OBSERVATION"
             hint="What did the snow look like? Any signs of instability? What was your impression of stability?"
           >
@@ -348,7 +448,7 @@ export default function ObservationNewScreen() {
           </FormSection>
 
           {/* PHOTOS */}
-          <FormSection eyebrow="PHOTOS">
+          <FormSection ref={setSectionRef("photos")} eyebrow="PHOTOS">
             <PhotoPicker
               value={form.images}
               onChange={(imgs) => update("images", imgs)}
@@ -356,13 +456,15 @@ export default function ObservationNewScreen() {
           </FormSection>
 
           {/* Detail expansion — instability, avalanche records, privacy */}
-          <DetailSection
-            open={detailOpen}
-            onToggle={() => setDetailOpen((o) => !o)}
-            form={form}
-            onChange={setForm}
-            errors={errors}
-          />
+          <View ref={setSectionRef("detail")} collapsable={false}>
+            <DetailSection
+              open={detailOpen}
+              onToggle={() => setDetailOpen((o) => !o)}
+              form={form}
+              onChange={setForm}
+              errors={errors}
+            />
+          </View>
 
           {/* SUBMIT */}
           <Pressable
