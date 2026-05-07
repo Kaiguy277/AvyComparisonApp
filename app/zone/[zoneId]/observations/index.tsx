@@ -69,10 +69,6 @@ export default function ZoneObservationsScreen() {
   const centerName = ZONE_TO_CENTER_NAME[zoneId] ?? "Center";
   const centerAbbr = ZONE_TO_CENTER[zoneId] ?? "CENTER";
 
-  const inZoneCount = useMemo(
-    () => (obs ?? []).filter((o) => o.inZone).length,
-    [obs],
-  );
   const filtered = useMemo(() => {
     if (!obs) return [];
     return filter === "zone" ? obs.filter((o) => o.inZone) : obs;
@@ -84,15 +80,12 @@ export default function ZoneObservationsScreen() {
       <ZoneScreenHeader
         eyebrow="OBSERVATIONS"
         title={displayName}
-        count={obs?.length}
       />
 
       <FilterToggle
         filter={filter}
         onChange={setFilter}
         allLabel={centerAbbr}
-        allCount={obs?.length}
-        zoneCount={inZoneCount}
       />
 
       <ScrollView
@@ -144,14 +137,10 @@ function FilterToggle({
   filter,
   onChange,
   allLabel,
-  allCount,
-  zoneCount,
 }: {
   filter: Filter;
   onChange: (f: Filter) => void;
   allLabel: string;
-  allCount: number | undefined;
-  zoneCount: number;
 }) {
   const select = (next: Filter) => {
     if (next === filter) return;
@@ -175,13 +164,11 @@ function FilterToggle({
       <ToggleHalf
         active={filter === "all"}
         label={allLabel}
-        count={allCount}
         onPress={() => select("all")}
       />
       <ToggleHalf
         active={filter === "zone"}
         label="THIS ZONE"
-        count={zoneCount}
         onPress={() => select("zone")}
       />
     </View>
@@ -191,12 +178,10 @@ function FilterToggle({
 function ToggleHalf({
   active,
   label,
-  count,
   onPress,
 }: {
   active: boolean;
   label: string;
-  count: number | undefined;
   onPress: () => void;
 }) {
   return (
@@ -224,7 +209,6 @@ function ToggleHalf({
         numberOfLines={1}
       >
         {label}
-        {typeof count === "number" ? ` · ${count}` : ""}
       </Text>
     </Pressable>
   );
