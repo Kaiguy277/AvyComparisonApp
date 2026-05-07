@@ -80,6 +80,44 @@ export default function ZoneObservationsScreen() {
       <ZoneScreenHeader
         eyebrow="OBSERVATIONS"
         title={displayName}
+        rightAction={
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              router.push({
+                pathname: "/observation/new" as never,
+                params: { zoneId },
+              });
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Report a new observation"
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 999,
+              borderWidth: 0.5,
+              borderColor: palette.frost[400],
+              backgroundColor: pressed ? palette.frost[400] + "33" : "transparent",
+            })}
+          >
+            <Ionicons name="add" size={14} color={palette.frost[400]} />
+            <Text
+              variant="mono"
+              weight="medium"
+              style={{
+                fontSize: 10,
+                letterSpacing: 1.4,
+                color: palette.frost[400],
+              }}
+            >
+              REPORT
+            </Text>
+          </Pressable>
+        }
       />
 
       <FilterToggle

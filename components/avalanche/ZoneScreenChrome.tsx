@@ -29,10 +29,13 @@ export function ZoneScreenHeader({
   eyebrow,
   title,
   count,
+  rightAction,
 }: {
   eyebrow: string;
   title: string;
   count?: number;
+  // Optional trailing action (e.g. a "+ Report" button on the obs list).
+  rightAction?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -77,6 +80,7 @@ export function ZoneScreenHeader({
           {title}
         </Text>
       </View>
+      {rightAction}
     </View>
   );
 }

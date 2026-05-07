@@ -115,6 +115,7 @@ export default function RootLayout() {
             <Stack.Screen name="zone/[zoneId]/forecast" />
             <Stack.Screen name="zone/[zoneId]/nws" />
             <Stack.Screen name="zone/[zoneId]/stations" />
+            <Stack.Screen name="observation/new" />
           </Stack>
           <StatusBar style="dark" />
         </ThemeProvider>

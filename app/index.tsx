@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
@@ -119,6 +120,7 @@ const months = [
 ];
 
 export default function Index() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   // Top-level collapse state. Picker is collapsed by default — favorites
@@ -2135,6 +2137,48 @@ export default function Index() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Floating "report observation" button. Discoverable from any
+          home-screen state, never blocked by the scrollable content,
+          and lifts above the home-indicator on iOS via insets.bottom. */}
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          router.push("/observation/new" as never);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Report a new observation"
+        style={({ pressed }) => ({
+          position: "absolute",
+          right: 16,
+          bottom: insets.bottom + 16,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          borderRadius: 999,
+          backgroundColor: pressed ? palette.frost[500] : palette.frost[400],
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 6,
+        })}
+      >
+        <Ionicons name="add" size={16} color={palette.ink[950]} />
+        <Text
+          variant="mono"
+          weight="bold"
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.4,
+            color: palette.ink[950],
+          }}
+        >
+          REPORT OBS
+        </Text>
+      </Pressable>
 
       <Modal
         visible={mapModalOpen}
