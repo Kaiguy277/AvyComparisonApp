@@ -277,20 +277,20 @@ export function TextField({
         placeholderTextColor={palette.ink[400] + "AA"}
         style={{
           fontFamily: "InstrumentSans_400Regular",
-          fontSize: 14,
-          lineHeight: 19,
+          fontSize: 16,
+          lineHeight: 22,
           color: palette.ink[100],
           backgroundColor: palette.ink[900],
-          borderWidth: 0.5,
+          borderWidth: focused ? 1 : 0.5,
           borderColor: error
             ? palette.aspen[400]
             : focused
               ? palette.frost[400]
               : palette.ink[500] + "66",
-          borderRadius: 8,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          minHeight: multiline ? Math.max(72, rows * 19 + 24) : 44,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 14,
+          minHeight: multiline ? Math.max(96, rows * 22 + 28) : 52,
           textAlignVertical: multiline ? "top" : "center",
         }}
       />
@@ -376,28 +376,34 @@ export function Chip({
   onPress: () => void;
   size?: "sm" | "md";
 }) {
+  // Tap targets sized for gloved use — minimum 44pt high. "sm" is the
+  // smaller variant for dense pickers (aspect, D-size); even that
+  // exceeds Apple's HIG minimum.
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={4}
+      hitSlop={6}
       style={({ pressed }) => ({
-        paddingHorizontal: size === "sm" ? 10 : 12,
-        paddingVertical: size === "sm" ? 6 : 8,
+        paddingHorizontal: size === "sm" ? 14 : 18,
+        paddingVertical: size === "sm" ? 10 : 12,
+        minHeight: size === "sm" ? 40 : 48,
         borderRadius: 999,
-        borderWidth: 0.5,
-        borderColor: selected ? palette.frost[400] : palette.ink[500] + "55",
+        borderWidth: selected ? 1 : 0.5,
+        borderColor: selected ? palette.frost[400] : palette.ink[500] + "66",
         backgroundColor: selected
-          ? palette.frost[400] + "22"
+          ? palette.frost[400] + "26"
           : pressed
             ? palette.ink[900]
             : "transparent",
+        alignItems: "center",
+        justifyContent: "center",
       })}
     >
       <Text
         variant="mono"
-        weight="medium"
+        weight={selected ? "bold" : "medium"}
         style={{
-          fontSize: size === "sm" ? 10 : 11,
+          fontSize: size === "sm" ? 12 : 13,
           letterSpacing: 1.1,
           color: selected ? palette.frost[400] : palette.ink[200],
         }}
@@ -428,9 +434,9 @@ export function YesNoSwitch({
         flexDirection: "row",
         backgroundColor: palette.ink[900],
         borderWidth: 0.5,
-        borderColor: palette.ink[500] + "55",
+        borderColor: palette.ink[500] + "66",
         borderRadius: 999,
-        padding: 2,
+        padding: 4,
       }}
     >
       {[
@@ -442,10 +448,10 @@ export function YesNoSwitch({
           <Pressable
             key={String(v)}
             onPress={() => onChange(v)}
-            hitSlop={4}
+            hitSlop={6}
             style={{
               flex: 1,
-              paddingVertical: 8,
+              paddingVertical: 14,
               alignItems: "center",
               borderRadius: 999,
               backgroundColor: active ? palette.ink[100] : "transparent",
@@ -453,10 +459,10 @@ export function YesNoSwitch({
           >
             <Text
               variant="mono"
-              weight="medium"
+              weight={active ? "bold" : "medium"}
               style={{
-                fontSize: 11,
-                letterSpacing: 1.2,
+                fontSize: 13,
+                letterSpacing: 1.4,
                 color: active ? palette.ink[800] : palette.ink[300],
               }}
             >

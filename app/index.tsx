@@ -2144,9 +2144,9 @@ export default function Index() {
         </View>
       </ScrollView>
 
-      {/* Floating "report observation" button. Discoverable from any
-          home-screen state, never blocked by the scrollable content,
-          and lifts above the home-indicator on iOS via insets.bottom. */}
+      {/* Extended FAB — explicit height so it can't collapse on
+          devices where the auto-sized version was rendering as a thin
+          strip. Big enough for a gloved tap (56pt tall, ≥120pt wide). */}
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -2157,32 +2157,34 @@ export default function Index() {
         style={({ pressed }) => ({
           position: "absolute",
           right: 16,
-          bottom: insets.bottom + 16,
+          bottom: insets.bottom + 24,
+          height: 56,
+          minWidth: 140,
+          paddingHorizontal: 22,
           flexDirection: "row",
           alignItems: "center",
-          gap: 6,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          borderRadius: 999,
+          justifyContent: "center",
+          gap: 10,
+          borderRadius: 28,
           backgroundColor: pressed ? palette.frost[500] : palette.frost[400],
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 6,
+          shadowOpacity: 0.3,
+          shadowRadius: 10,
+          elevation: 8,
         })}
       >
-        <Ionicons name="add" size={16} color={palette.ink[950]} />
+        <Ionicons name="add" size={24} color={palette.ink[950]} />
         <Text
           variant="mono"
           weight="bold"
           style={{
-            fontSize: 11,
-            letterSpacing: 1.4,
+            fontSize: 13,
+            letterSpacing: 1.5,
             color: palette.ink[950],
           }}
         >
-          REPORT OBS
+          REPORT
         </Text>
       </Pressable>
 
