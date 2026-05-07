@@ -17,7 +17,7 @@ import {
   type ObservationMedia,
   type ObservationSummary,
 } from "@/lib/api/avalanche";
-import { AVAILABLE_ZONES, ZONE_TO_CENTER_NAME } from "@/lib/zones";
+import { AVAILABLE_ZONES, ZONE_TO_CENTER, ZONE_TO_CENTER_NAME } from "@/lib/zones";
 import { getZoneSession, setZoneSession } from "@/lib/zoneSession";
 import { stripObservationHtml } from "@/lib/observationText";
 
@@ -67,6 +67,7 @@ export default function ZoneObservationsScreen() {
   const displayName =
     AVAILABLE_ZONES.find((z) => z.id === zoneId)?.name ?? "Zone";
   const centerName = ZONE_TO_CENTER_NAME[zoneId] ?? "Center";
+  const centerAbbr = ZONE_TO_CENTER[zoneId] ?? "CENTER";
 
   const inZoneCount = useMemo(
     () => (obs ?? []).filter((o) => o.inZone).length,
@@ -89,22 +90,10 @@ export default function ZoneObservationsScreen() {
       <FilterToggle
         filter={filter}
         onChange={setFilter}
+        allLabel={centerAbbr}
         allCount={obs?.length}
         zoneCount={inZoneCount}
       />
-      <Text
-        variant="mono"
-        style={{
-          fontSize: 10,
-          letterSpacing: 1.0,
-          color: palette.ink[400],
-          paddingHorizontal: 16,
-          paddingTop: 6,
-        }}
-        numberOfLines={1}
-      >
-        {centerName.toUpperCase()}
-      </Text>
 
       <ScrollView
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 48 }}
@@ -154,11 +143,13 @@ export default function ZoneObservationsScreen() {
 function FilterToggle({
   filter,
   onChange,
+  allLabel,
   allCount,
   zoneCount,
 }: {
   filter: Filter;
   onChange: (f: Filter) => void;
+  allLabel: string;
   allCount: number | undefined;
   zoneCount: number;
 }) {
@@ -177,19 +168,19 @@ function FilterToggle({
         backgroundColor: palette.ink[800],
         borderWidth: 0.5,
         borderColor: palette.ink[700],
-        borderRadius: 8,
-        padding: 3,
+        borderRadius: 999,
+        padding: 2,
       }}
     >
       <ToggleHalf
         active={filter === "all"}
-        label="ALL"
+        label={allLabel}
         count={allCount}
         onPress={() => select("all")}
       />
       <ToggleHalf
         active={filter === "zone"}
-        label="IN ZONE"
+        label="THIS ZONE"
         count={zoneCount}
         onPress={() => select("zone")}
       />
@@ -211,27 +202,24 @@ function ToggleHalf({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => ({
+      hitSlop={4}
+      style={{
         flex: 1,
-        paddingVertical: 8,
-        paddingHorizontal: 8,
-        borderRadius: 6,
-        backgroundColor: active
-          ? "#4FB3C922"
-          : pressed
-            ? palette.ink[700]
-            : "transparent",
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        backgroundColor: active ? palette.ink[50] : "transparent",
         alignItems: "center",
         justifyContent: "center",
-      })}
+      }}
     >
       <Text
         variant="mono"
-        weight="bold"
+        weight="medium"
         style={{
           fontSize: 11,
           letterSpacing: 1.2,
-          color: active ? "#4FB3C9" : palette.ink[300],
+          color: active ? palette.ink[950] : palette.ink[300],
         }}
         numberOfLines={1}
       >

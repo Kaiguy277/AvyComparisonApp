@@ -1,4 +1,5 @@
-import { View } from "react-native";
+import { useState } from "react";
+import { Linking, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import { Badge } from "@/components/ui/Badge";
@@ -10,12 +11,15 @@ function formatSize(value: number): string {
   return `D${value}`;
 }
 
+const PROBLEM_DESC_SOURCE_URL = "https://avalanche.org/avalanche-encyclopedia/";
+
 interface Props {
   problem: AvalancheProblem;
 }
 
 export function AvalancheProblemCard({ problem }: Props) {
   const hasAspects = problem.aspects && problem.aspects.length > 0;
+  const [aboutOpen, setAboutOpen] = useState(false);
   return (
     <View
       className="rounded-xl"
@@ -138,21 +142,62 @@ export function AvalancheProblemCard({ problem }: Props) {
             borderColor: palette.ink[700],
           }}
         >
-          <Text
-            variant="mono"
-            weight="medium"
-            className="text-ink-400"
-            style={{ fontSize: 9, letterSpacing: 1.4, marginBottom: 6 }}
+          <Pressable
+            onPress={() => setAboutOpen((v) => !v)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: aboutOpen }}
+            accessibilityLabel={
+              aboutOpen
+                ? "Collapse about this problem"
+                : "Expand about this problem"
+            }
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
           >
-            ABOUT THIS PROBLEM
-          </Text>
-          <Text
-            variant="display-italic"
-            className="text-ink-300"
-            style={{ fontSize: 13, lineHeight: 19 }}
-          >
-            {problem.problemDescription}
-          </Text>
+            <Text
+              variant="mono"
+              weight="medium"
+              className="text-ink-400"
+              style={{ fontSize: 9, letterSpacing: 1.4 }}
+            >
+              ABOUT THIS PROBLEM
+            </Text>
+            <Ionicons
+              name={aboutOpen ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={palette.ink[400]}
+            />
+          </Pressable>
+          {aboutOpen ? (
+            <View style={{ marginTop: 8 }}>
+              <Text
+                variant="display-italic"
+                className="text-ink-300"
+                style={{ fontSize: 13, lineHeight: 19 }}
+              >
+                {problem.problemDescription}
+              </Text>
+              <Pressable
+                onPress={() => Linking.openURL(PROBLEM_DESC_SOURCE_URL)}
+                hitSlop={6}
+                accessibilityRole="link"
+                style={{ marginTop: 8 }}
+              >
+                <Text
+                  variant="mono"
+                  className="text-ink-500"
+                  style={{ fontSize: 9, letterSpacing: 1.2 }}
+                >
+                  SOURCE · AVALANCHE.ORG
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
