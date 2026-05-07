@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -26,6 +26,11 @@ import { DateStrip } from "@/components/observation/DateStrip";
 import { DetailSection } from "@/components/observation/DetailSection";
 import { LocationField } from "@/components/observation/LocationField";
 import { PhotoPicker } from "@/components/observation/PhotoPicker";
+import { SubmitProgress } from "@/components/observation/SubmitProgress";
+import {
+  submitObservationFlow,
+  type SubmitStep,
+} from "@/lib/observation/submitFlow";
 import {
   ACTIVITY_OPTIONS,
   type ActivityValue,
@@ -95,6 +100,16 @@ export default function ObservationNewScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [detailOpen, setDetailOpen] = useState(false);
 
+  // Submission state.
+  const [submitStep, setSubmitStep] = useState<SubmitStep | null>(null);
+  const [progressVisible, setProgressVisible] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const inFlight =
+    submitStep?.kind === "validating" ||
+    submitStep?.kind === "uploading-photo" ||
+    submitStep?.kind === "submitting";
+
   const update = <K extends keyof ObservationForm>(
     key: K,
     value: ObservationForm[K],
@@ -106,7 +121,21 @@ export default function ObservationNewScreen() {
 
   // The form-level validate runs at submit time. We surface field-level
   // errors via the `errors` map, keyed by the path the schema reports.
-  const onSubmit = () => {
+  const runSubmit = useCallback(async () => {
+    // Abort any prior in-flight attempt before starting a new one.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setProgressVisible(true);
+    setSubmitStep({ kind: "validating" });
+    await submitObservationFlow({
+      form,
+      onProgress: setSubmitStep,
+      signal: controller.signal,
+    });
+  }, [form]);
+
+  const onSubmit = useCallback(() => {
     const result = observationFormSchema.safeParse(form);
     if (!result.success) {
       const next: Record<string, string> = {};
@@ -137,12 +166,54 @@ export default function ObservationNewScreen() {
       );
       return;
     }
-    // Slice 7 wires this to the upload pipeline.
-    Alert.alert(
-      "Form valid",
-      "All required fields look good. Submission pipeline lands in slice 7.",
-    );
-  };
+    setErrors({});
+    void runSubmit();
+  }, [form, runSubmit]);
+
+  const onCancelSubmission = useCallback(() => {
+    abortRef.current?.abort();
+    setProgressVisible(false);
+    setSubmitStep(null);
+  }, []);
+
+  const onRetry = useCallback(() => {
+    void runSubmit();
+  }, [runSubmit]);
+
+  const onSubmitAnother = useCallback(() => {
+    setProgressVisible(false);
+    setSubmitStep(null);
+    // Keep observer fields, blank the obs-specific bits.
+    setForm((prev) => ({
+      ...prev,
+      start_date: new Date(),
+      activity: [],
+      location_name: "",
+      observation_summary: "",
+      avalanches: [],
+      avalanches_summary: undefined,
+      images: [],
+      instability: {
+        avalanches_observed: false,
+        avalanches_triggered: false,
+        avalanches_caught: false,
+        cracking: false,
+        collapsing: false,
+      },
+    }));
+    setDetailOpen(false);
+  }, []);
+
+  const onBackToHome = useCallback(() => {
+    setProgressVisible(false);
+    setSubmitStep(null);
+    router.back();
+  }, [router]);
+
+  const onDismissError = useCallback(() => {
+    setProgressVisible(false);
+    setSubmitStep(null);
+  }, []);
 
   const headerTitle = useMemo(() => {
     if (initialZone) return initialZone.name;
@@ -296,15 +367,19 @@ export default function ObservationNewScreen() {
           {/* SUBMIT */}
           <Pressable
             onPress={onSubmit}
+            disabled={inFlight}
             style={({ pressed }) => ({
               paddingVertical: 14,
               borderRadius: 999,
-              backgroundColor: pressed
-                ? palette.frost[500]
-                : palette.frost[400],
+              backgroundColor: inFlight
+                ? palette.ink[600]
+                : pressed
+                  ? palette.frost[500]
+                  : palette.frost[400],
               alignItems: "center",
               justifyContent: "center",
               marginTop: 8,
+              opacity: inFlight ? 0.7 : 1,
             })}
           >
             <Text
@@ -316,7 +391,7 @@ export default function ObservationNewScreen() {
                 color: palette.ink[950],
               }}
             >
-              SUBMIT OBSERVATION
+              {inFlight ? "SENDING…" : "SUBMIT OBSERVATION"}
             </Text>
           </Pressable>
 
@@ -352,6 +427,17 @@ export default function ObservationNewScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <SubmitProgress
+        visible={progressVisible}
+        step={submitStep}
+        centerLabel={form.center_id || initialCenter}
+        onCancel={onCancelSubmission}
+        onRetry={onRetry}
+        onSubmitAnother={onSubmitAnother}
+        onBackToHome={onBackToHome}
+        onDismissError={onDismissError}
+      />
     </ZoneScreenContainer>
   );
 }
