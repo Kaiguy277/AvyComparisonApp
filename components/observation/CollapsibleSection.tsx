@@ -83,19 +83,26 @@ export const CollapsibleSection = forwardRef<View, Props>(
             backgroundColor: pressed ? palette.ink[900] : "transparent",
           })}
         >
-          {/* Status dot */}
+          {/* Status indicator: filled checkmark when complete, hollow
+              ring when open (in-progress), empty ring when untouched. */}
           <View
             style={{
-              width: 10,
-              height: 10,
-              borderRadius: 5,
-              backgroundColor: complete
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              borderWidth: complete ? 0 : 1.5,
+              borderColor: open
                 ? palette.frost[400]
-                : open
-                  ? palette.frost[400] + "55"
-                  : palette.ink[500] + "55",
+                : palette.ink[500] + "AA",
+              backgroundColor: complete ? palette.frost[400] : "transparent",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-          />
+          >
+            {complete ? (
+              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+            ) : null}
+          </View>
           <View style={{ flex: 1 }}>
             <Text
               variant="mono"

@@ -2144,49 +2144,69 @@ export default function Index() {
         </View>
       </ScrollView>
 
-      {/* Extended FAB — explicit height so it can't collapse on
-          devices where the auto-sized version was rendering as a thin
-          strip. Big enough for a gloved tap (56pt tall, ≥120pt wide). */}
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-          router.push("/observation/new" as never);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Report a new observation"
-        style={({ pressed }) => ({
+      {/* Floating "REPORT" button. Wrapped in an absolute-fill overlay
+          with pointerEvents="box-none" so the FAB always renders above
+          siblings (TopoBackground, ScrollView, etc.) and never gets
+          clipped by overflow on any iOS device. The overlay itself
+          ignores touches except where the Pressable lives. */}
+      <View
+        pointerEvents="box-none"
+        style={{
           position: "absolute",
-          right: 16,
-          bottom: insets.bottom + 24,
-          height: 56,
-          minWidth: 140,
-          paddingHorizontal: 22,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 10,
-          borderRadius: 28,
-          backgroundColor: pressed ? palette.frost[500] : palette.frost[400],
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 10,
-          elevation: 8,
-        })}
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: "flex-end",
+          alignItems: "flex-end",
+          paddingRight: 16,
+          paddingBottom: insets.bottom + 24,
+          zIndex: 1000,
+          elevation: 1000,
+        }}
       >
-        <Ionicons name="add" size={24} color={palette.ink[950]} />
-        <Text
-          variant="mono"
-          weight="bold"
-          style={{
-            fontSize: 13,
-            letterSpacing: 1.5,
-            color: palette.ink[950],
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+              () => {},
+            );
+            router.push("/observation/new" as never);
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Report a new observation"
+          style={({ pressed }) => ({
+            height: 56,
+            minWidth: 140,
+            paddingHorizontal: 22,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            borderRadius: 28,
+            backgroundColor: pressed
+              ? palette.frost[500]
+              : palette.frost[400],
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 10,
+            elevation: 8,
+          })}
         >
-          REPORT
-        </Text>
-      </Pressable>
+          <Ionicons name="add" size={24} color="#FFFFFF" />
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{
+              fontSize: 13,
+              letterSpacing: 1.5,
+              color: "#FFFFFF",
+            }}
+          >
+            REPORT
+          </Text>
+        </Pressable>
+      </View>
 
       <Modal
         visible={mapModalOpen}

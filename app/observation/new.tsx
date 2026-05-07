@@ -21,14 +21,16 @@ import { AvalancheEntryCard } from "@/components/observation/AvalancheEntry";
 import { CollapsibleSection } from "@/components/observation/CollapsibleSection";
 import { DateStrip } from "@/components/observation/DateStrip";
 import {
-  ChipPicker,
   FieldLabel,
-  MultiChipPicker,
   TextField,
   YesNoSwitch,
 } from "@/components/observation/formPrimitives";
 import { LocationField } from "@/components/observation/LocationField";
 import { PhotoPicker } from "@/components/observation/PhotoPicker";
+import {
+  MultiSelectField,
+  SelectField,
+} from "@/components/observation/SelectField";
 import { SubmitProgress } from "@/components/observation/SubmitProgress";
 import {
   ACTIVITY_OPTIONS,
@@ -157,22 +159,35 @@ export default function ObservationNewScreen() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Section state — one open at a time, with a set of completed keys.
-  // First open section: the first that's not already implicitly complete.
-  const [openSection, setOpenSection] = useState<SectionKey | null>(null);
+  // Section state — every section starts open, then closes when the
+  // user taps "Done" on it. Re-tapping a completed header re-opens it
+  // for editing. This way the form reads top-down and nothing's hidden
+  // behind a tap; completing a section feels like checking off a list.
+  const [openSections, setOpenSections] = useState<Set<SectionKey>>(
+    () => new Set<SectionKey>(SECTION_ORDER),
+  );
   const [completed, setCompleted] = useState<Set<SectionKey>>(
     () => new Set<SectionKey>(),
   );
-  // Open the first incomplete section once profile load resolves
-  // (so users with a saved profile skip "About you" automatically).
+  // Once the profile loads, mark "about" as complete if name+email are
+  // already filled in (returning user). They can still tap to edit.
   useEffect(() => {
     if (!profileLoaded) return;
-    setOpenSection((current) => {
-      if (current !== null) return current;
-      const next = firstIncompleteSection(form, completed);
-      return next;
-    });
-  }, [profileLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (form.name && form.email) {
+      setCompleted((c) => {
+        if (c.has("about")) return c;
+        const next = new Set(c);
+        next.add("about");
+        return next;
+      });
+      setOpenSections((s) => {
+        if (!s.has("about")) return s;
+        const next = new Set(s);
+        next.delete("about");
+        return next;
+      });
+    }
+  }, [profileLoaded, form.name, form.email]);
 
   // Submission state.
   const [submitStep, setSubmitStep] = useState<SubmitStep | null>(null);
@@ -217,21 +232,26 @@ export default function ObservationNewScreen() {
     value: ObservationForm["instability"][K],
   ) => update("instability", { ...form.instability, [key]: value });
 
-  // Section toggle + advance.
+  // Section toggle + complete.
   const toggleSection = (key: SectionKey) => {
-    setOpenSection((cur) => (cur === key ? null : key));
+    setOpenSections((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
   const completeSection = (key: SectionKey) => {
-    const nextCompleted = new Set(completed);
-    nextCompleted.add(key);
-    setCompleted(nextCompleted);
-    const nextOpen = nextSectionAfter(form, nextCompleted, key);
-    setOpenSection(nextOpen);
-    if (nextOpen) {
-      // Defer scroll a frame so the layout settles after the previous
-      // section collapses.
-      setTimeout(() => scrollToSection(nextOpen), 80);
-    }
+    setCompleted((c) => {
+      const next = new Set(c);
+      next.add(key);
+      return next;
+    });
+    setOpenSections((s) => {
+      const next = new Set(s);
+      next.delete(key);
+      return next;
+    });
   };
 
   // Submission.
@@ -260,7 +280,13 @@ export default function ObservationNewScreen() {
       const firstSection = sectionForPath(
         Object.keys(next)[0] ?? "",
       ) as SectionKey;
-      setOpenSection(firstSection);
+      // Make sure the offending section is open so the user can see
+      // the error highlight.
+      setOpenSections((s) => {
+        const out = new Set(s);
+        out.add(firstSection);
+        return out;
+      });
       setTimeout(() => scrollToSection(firstSection), 80);
       Alert.alert(
         "A few fields need attention",
@@ -301,7 +327,7 @@ export default function ObservationNewScreen() {
       },
     }));
     setCompleted(new Set());
-    setOpenSection("when");
+    setOpenSections(new Set<SectionKey>(SECTION_ORDER));
   }, []);
   const onBackToHome = useCallback(() => {
     setProgressVisible(false);
@@ -370,7 +396,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("about")}
             eyebrow="ABOUT YOU"
             summary={summarizeAbout(form)}
-            open={openSection === "about"}
+            open={openSections.has("about")}
             complete={completed.has("about")}
             onToggle={() => toggleSection("about")}
             onDone={() => completeSection("about")}
@@ -412,7 +438,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("when")}
             eyebrow="WHEN"
             summary={summarizeWhen(form)}
-            open={openSection === "when"}
+            open={openSections.has("when")}
             complete={completed.has("when")}
             onToggle={() => toggleSection("when")}
             onDone={() => completeSection("when")}
@@ -434,33 +460,21 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("activity")}
             eyebrow="ACTIVITY"
             summary={summarizeActivity(form)}
-            open={openSection === "activity"}
+            open={openSections.has("activity")}
             complete={completed.has("activity")}
             onToggle={() => toggleSection("activity")}
             onDone={() => completeSection("activity")}
           >
-            <Text
-              className="text-ink-300"
-              style={{ fontSize: 12, lineHeight: 17 }}
-            >
-              Pick one or more — helps the forecaster picture the conditions.
-            </Text>
-            <MultiChipPicker
+            <MultiSelectField
+              label="What were you doing?"
+              required
+              hint="Pick one or more — helps the forecaster picture the conditions."
+              pickerTitle="Activity"
               options={ACTIVITY_OPTIONS}
-              selected={form.activity as ActivityValue[]}
+              value={form.activity as ActivityValue[]}
               onChange={(v) => update("activity", v)}
+              error={errors.activity}
             />
-            {errors.activity ? (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: palette.aspen[400],
-                  marginTop: 4,
-                }}
-              >
-                {errors.activity}
-              </Text>
-            ) : null}
           </CollapsibleSection>
 
           {/* WHERE */}
@@ -468,7 +482,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("where")}
             eyebrow="WHERE"
             summary={summarizeWhere(form)}
-            open={openSection === "where"}
+            open={openSections.has("where")}
             complete={completed.has("where")}
             onToggle={() => toggleSection("where")}
             onDone={() => completeSection("where")}
@@ -502,7 +516,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("observation")}
             eyebrow="WHAT YOU SAW"
             summary={summarizeObservation(form)}
-            open={openSection === "observation"}
+            open={openSections.has("observation")}
             complete={completed.has("observation")}
             onToggle={() => toggleSection("observation")}
             onDone={() => completeSection("observation")}
@@ -530,7 +544,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("photos")}
             eyebrow="PHOTOS"
             summary={summarizePhotos(form)}
-            open={openSection === "photos"}
+            open={openSections.has("photos")}
             complete={completed.has("photos")}
             onToggle={() => toggleSection("photos")}
             onDone={() => completeSection("photos")}
@@ -546,7 +560,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("instability")}
             eyebrow="SIGNS OF INSTABILITY"
             summary={summarizeInstability(form)}
-            open={openSection === "instability"}
+            open={openSections.has("instability")}
             complete={completed.has("instability")}
             onToggle={() => toggleSection("instability")}
             onDone={() => completeSection("instability")}
@@ -595,26 +609,15 @@ export default function ObservationNewScreen() {
             />
             {form.instability.cracking ? (
               <View style={{ paddingLeft: 8 }}>
-                <FieldLabel
-                  label="How widespread was the cracking?"
+                <SelectField
+                  label="How widespread?"
                   required
-                />
-                <ChipPicker
+                  pickerTitle="Cracking distribution"
                   options={INSTABILITY_DISTRIBUTION_OPTIONS}
-                  selected={form.instability.cracking_description}
-                  onSelect={(v) => updateInstability("cracking_description", v)}
+                  value={form.instability.cracking_description}
+                  onChange={(v) => updateInstability("cracking_description", v)}
+                  error={errors["instability.cracking_description"]}
                 />
-                {errors["instability.cracking_description"] ? (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: palette.aspen[400],
-                      marginTop: 6,
-                    }}
-                  >
-                    {errors["instability.cracking_description"]}
-                  </Text>
-                ) : null}
               </View>
             ) : null}
 
@@ -630,28 +633,17 @@ export default function ObservationNewScreen() {
             />
             {form.instability.collapsing ? (
               <View style={{ paddingLeft: 8 }}>
-                <FieldLabel
-                  label="How widespread was the collapsing?"
+                <SelectField
+                  label="How widespread?"
                   required
-                />
-                <ChipPicker
+                  pickerTitle="Collapsing distribution"
                   options={INSTABILITY_DISTRIBUTION_OPTIONS}
-                  selected={form.instability.collapsing_description}
-                  onSelect={(v) =>
+                  value={form.instability.collapsing_description}
+                  onChange={(v) =>
                     updateInstability("collapsing_description", v)
                   }
+                  error={errors["instability.collapsing_description"]}
                 />
-                {errors["instability.collapsing_description"] ? (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: palette.aspen[400],
-                      marginTop: 6,
-                    }}
-                  >
-                    {errors["instability.collapsing_description"]}
-                  </Text>
-                ) : null}
               </View>
             ) : null}
           </CollapsibleSection>
@@ -661,7 +653,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("avalanches")}
             eyebrow="AVALANCHE DETAILS"
             summary={summarizeAvalanches(form)}
-            open={openSection === "avalanches"}
+            open={openSections.has("avalanches")}
             complete={completed.has("avalanches")}
             disabled={!form.instability.avalanches_observed}
             onToggle={() => toggleSection("avalanches")}
@@ -772,7 +764,7 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("privacy")}
             eyebrow="PRIVACY & CONTACT"
             summary={summarizePrivacy(form)}
-            open={openSection === "privacy"}
+            open={openSections.has("privacy")}
             complete={completed.has("privacy")}
             onToggle={() => toggleSection("privacy")}
             onDone={() => completeSection("privacy")}
@@ -783,14 +775,14 @@ export default function ObservationNewScreen() {
               value={form.private}
               onChange={(v) => update("private", v)}
             />
-            <View>
-              <FieldLabel label="Photo usage" required />
-              <ChipPicker
-                options={PHOTO_USAGE_OPTIONS}
-                selected={form.photoUsage}
-                onSelect={(v) => update("photoUsage", v)}
-              />
-            </View>
+            <SelectField
+              label="Photo usage"
+              required
+              pickerTitle="How can the center use your photos?"
+              options={PHOTO_USAGE_OPTIONS}
+              value={form.photoUsage}
+              onChange={(v) => update("photoUsage", v)}
+            />
             <YesNoQuestion
               label="Show your name publicly?"
               hint="If no, your observation appears as 'Anonymous'. Email is always private."
@@ -888,70 +880,6 @@ export default function ObservationNewScreen() {
   );
 }
 
-// ───────────────────────────── helpers ──────────────────────────────────
-
-// "Implicit complete" — sections that have valid defaults so they don't
-// block submit just because the user didn't tap into them. Privacy and
-// instability default to public/no-signs respectively.
-const IMPLICITLY_COMPLETE: Set<SectionKey> = new Set(["instability", "privacy"]);
-
-function firstIncompleteSection(
-  form: ObservationForm,
-  completed: Set<SectionKey>,
-): SectionKey {
-  for (const key of SECTION_ORDER) {
-    if (completed.has(key)) continue;
-    if (sectionEmpty(form, key)) return key;
-  }
-  // Everything's filled — open the first one anyway as a fallback.
-  return SECTION_ORDER[0];
-}
-
-function nextSectionAfter(
-  form: ObservationForm,
-  completed: Set<SectionKey>,
-  justCompleted: SectionKey,
-): SectionKey | null {
-  const idx = SECTION_ORDER.indexOf(justCompleted);
-  for (let i = idx + 1; i < SECTION_ORDER.length; i++) {
-    const key = SECTION_ORDER[i];
-    if (completed.has(key)) continue;
-    // Skip avalanches if user said no avalanches observed.
-    if (key === "avalanches" && !form.instability.avalanches_observed) continue;
-    if (sectionEmpty(form, key) || !IMPLICITLY_COMPLETE.has(key)) return key;
-  }
-  return null;
-}
-
-function sectionEmpty(form: ObservationForm, key: SectionKey): boolean {
-  switch (key) {
-    case "about":
-      return !(form.name && form.email);
-    case "when":
-      return false; // always has a default
-    case "activity":
-      return form.activity.length === 0;
-    case "where":
-      return (
-        !form.location_name ||
-        (form.location_point.lat === 0 && form.location_point.lng === 0) ||
-        !form.center_id
-      );
-    case "observation":
-      return form.observation_summary.trim().length === 0;
-    case "photos":
-      return form.images.length === 0;
-    case "instability":
-      return false; // defaults are valid
-    case "avalanches":
-      return (
-        form.instability.avalanches_observed && form.avalanches.length === 0
-      );
-    case "privacy":
-      return false; // defaults are valid
-  }
-}
-
 // ───────────────────────────── small UI bits ────────────────────────────
 
 function YesNoQuestion({
@@ -997,35 +925,15 @@ function CenterPicker({
   }, []);
 
   return (
-    <View>
-      <FieldLabel
-        label="Which avalanche center?"
-        required
-        hint="Pick the center that covers the area you observed."
-      />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
-      >
-        <ChipPicker
-          options={centers}
-          selected={value || undefined}
-          onSelect={onChange}
-          size="sm"
-        />
-      </ScrollView>
-      {error ? (
-        <Text
-          style={{
-            fontSize: 12,
-            color: palette.aspen[400],
-            marginTop: 6,
-          }}
-        >
-          {error}
-        </Text>
-      ) : null}
-    </View>
+    <SelectField
+      label="Avalanche center"
+      required
+      hint="Pick the center that covers the area you observed."
+      pickerTitle="Choose avalanche center"
+      options={centers}
+      value={value || undefined}
+      onChange={onChange}
+      error={error}
+    />
   );
 }
