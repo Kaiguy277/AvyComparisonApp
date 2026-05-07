@@ -327,6 +327,22 @@ export function toSubmitPayload(args: {
   };
 }
 
+// Default for a fresh avalanche entry. Date defaults to the parent
+// observation date; the screen passes that in.
+export function emptyAvalancheEntry(date: Date): AvalancheEntryForm {
+  return {
+    date,
+    location: "",
+    trigger: "N",
+    aspect: "N",
+    d_size: "1",
+    elevation: "",
+    number: "1",
+    comments: "",
+    images: [],
+  };
+}
+
 // Helper to build an empty form state with sane defaults. The submit
 // screen pre-fills name/email/phone from the observer profile, and
 // center_id + zone hint from the entry context.

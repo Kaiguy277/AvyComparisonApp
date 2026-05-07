@@ -23,6 +23,7 @@ import {
   TextField,
 } from "@/components/observation/formPrimitives";
 import { DateStrip } from "@/components/observation/DateStrip";
+import { DetailSection } from "@/components/observation/DetailSection";
 import { LocationField } from "@/components/observation/LocationField";
 import { PhotoPicker } from "@/components/observation/PhotoPicker";
 import {
@@ -92,6 +93,7 @@ export default function ObservationNewScreen() {
   }, [profileLoaded, profile]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const update = <K extends keyof ObservationForm>(
     key: K,
@@ -113,6 +115,22 @@ export default function ObservationNewScreen() {
         if (!next[path]) next[path] = issue.message;
       }
       setErrors(next);
+      // If any failure lives inside the detail expansion, auto-open it
+      // so the user can see + fix the field. Otherwise they'd be stuck
+      // with an alert pointing at fields they can't see.
+      if (
+        Object.keys(next).some(
+          (k) =>
+            k.startsWith("instability") ||
+            k.startsWith("avalanches") ||
+            k === "private" ||
+            k === "photoUsage" ||
+            k === "show_name" ||
+            k === "phone",
+        )
+      ) {
+        setDetailOpen(true);
+      }
       Alert.alert(
         "A few fields need attention",
         Object.values(next).slice(0, 4).join("\n"),
@@ -266,46 +284,14 @@ export default function ObservationNewScreen() {
             />
           </FormSection>
 
-          {/* "Add more detail" placeholder — slice 6 expands here */}
-          <View
-            style={{
-              padding: 14,
-              borderRadius: 12,
-              backgroundColor: palette.ink[800],
-              borderWidth: 0.5,
-              borderColor: palette.ink[500] + "55",
-              marginBottom: 12,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text
-                variant="mono"
-                weight="medium"
-                style={{
-                  fontSize: 9,
-                  letterSpacing: 1.4,
-                  color: palette.ink[400],
-                }}
-              >
-                MORE DETAIL
-              </Text>
-              <Text
-                className="text-ink-200"
-                style={{ fontSize: 13, lineHeight: 18, marginTop: 4 }}
-              >
-                Saw avalanches, cracking, or collapsing? Want to mark this
-                private? The detail section lands in the next build.
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={palette.ink[400]}
-            />
-          </View>
+          {/* Detail expansion — instability, avalanche records, privacy */}
+          <DetailSection
+            open={detailOpen}
+            onToggle={() => setDetailOpen((o) => !o)}
+            form={form}
+            onChange={setForm}
+            errors={errors}
+          />
 
           {/* SUBMIT */}
           <Pressable
