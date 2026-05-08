@@ -2176,27 +2176,28 @@ export default function Index() {
           accessibilityLabel="Report a new observation"
           style={({ pressed }) => ({
             height: 60,
-            minWidth: 160,
+            minWidth: 168,
             paddingHorizontal: 24,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
             gap: 10,
             borderRadius: 30,
-            // Dark ink on warm cream — highest possible contrast on
-            // this palette, unmistakably "primary action button".
-            backgroundColor: pressed ? palette.ink[600] : palette.ink[700],
-            // Stacked shadows: sharp close + soft far for depth.
+            // Burnt-sienna pill — warm, saturated, can't blend into
+            // the warm page background. Inverted shadow + thick edge
+            // ring define the pill shape no matter how the OS renders
+            // shadows on this device.
+            backgroundColor: pressed ? palette.aspen[500] : palette.aspen[400],
+            borderWidth: 2,
+            borderColor: "#FFFFFF",
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.35,
+            shadowOpacity: 0.4,
             shadowRadius: 14,
             elevation: 12,
-            borderWidth: 1,
-            borderColor: palette.ink[600],
           })}
         >
-          <Ionicons name="add-circle" size={26} color="#FFFFFF" />
+          <Ionicons name="add" size={26} color="#FFFFFF" />
           <Text
             variant="mono"
             weight="bold"

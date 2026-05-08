@@ -115,6 +115,55 @@ function firstName(full: string): string {
   return (full.trim().split(/\s+/)[0] ?? "").slice(0, 24);
 }
 
+// Derived completion — checked from form state on every render so the
+// section header's checkmark turns on the moment the user fills the
+// last required field, no explicit "Done" needed.
+function isSectionComplete(
+  form: ObservationForm,
+  key: SectionKey,
+): boolean {
+  switch (key) {
+    case "about":
+      return Boolean(form.name && form.email);
+    case "when":
+      return true; // always has a default
+    case "activity":
+      return form.activity.length > 0;
+    case "where":
+      return Boolean(
+        form.location_name &&
+          !(form.location_point.lat === 0 && form.location_point.lng === 0) &&
+          form.center_id,
+      );
+    case "observation":
+      return form.observation_summary.trim().length > 0;
+    case "photos":
+      return form.images.length > 0;
+    case "instability":
+      // Defaults are valid (all-no). If the user opened it and turned
+      // on cracking/collapsing without picking a distribution, that's
+      // a validation failure surfaced at submit.
+      return true;
+    case "avalanches":
+      // Complete when either no avalanches were observed (nothing to
+      // record) or every observed avalanche has the required fields.
+      if (!form.instability.avalanches_observed) return true;
+      return (
+        form.avalanches.length > 0 &&
+        form.avalanches.every(
+          (a) =>
+            a.location.trim() &&
+            a.elevation.trim() &&
+            a.aspect &&
+            a.d_size &&
+            a.trigger,
+        )
+      );
+    case "privacy":
+      return true; // defaults are valid
+  }
+}
+
 export default function ObservationNewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -159,36 +208,34 @@ export default function ObservationNewScreen() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Section state — every section starts open, then closes when the
-  // user taps "Done" on it. Re-tapping a completed header re-opens it
-  // for editing. This way the form reads top-down and nothing's hidden
-  // behind a tap; completing a section feels like checking off a list.
-  const [openSections, setOpenSections] = useState<Set<SectionKey>>(
-    () => new Set<SectionKey>(SECTION_ORDER),
-  );
-  const [completed, setCompleted] = useState<Set<SectionKey>>(
-    () => new Set<SectionKey>(),
-  );
-  // Once the profile loads, mark "about" as complete if THE PROFILE
-  // already has name+email (returning user). Depends on the profile
-  // value, not the live form state — otherwise this would re-run on
-  // every keystroke and snap the section closed mid-typing.
+  // Section state — accordion. One section open at a time. Tapping a
+  // closed header opens it (closing whichever was open); tapping the
+  // open one collapses it. "Complete" is derived from form content,
+  // so a section automatically gets a checkmark when its required
+  // fields are filled — no explicit "Done" button needed.
+  const [openSection, setOpenSection] = useState<SectionKey | null>("about");
+  // After the profile loads, advance to the first section that isn't
+  // already complete (skips "about" for returning users). Doesn't run
+  // again after that, so the user's manual taps stick.
+  const advancedRef = useRef(false);
   useEffect(() => {
-    if (!profileLoaded || !profile) return;
-    if (!profile.name || !profile.email) return;
-    setCompleted((c) => {
-      if (c.has("about")) return c;
-      const next = new Set(c);
-      next.add("about");
-      return next;
-    });
-    setOpenSections((s) => {
-      if (!s.has("about")) return s;
-      const next = new Set(s);
-      next.delete("about");
-      return next;
-    });
-  }, [profileLoaded, profile]);
+    if (!profileLoaded || advancedRef.current) return;
+    advancedRef.current = true;
+    const tentativeForm = profile
+      ? {
+          ...form,
+          name: form.name || profile.name,
+          email: form.email || profile.email,
+        }
+      : form;
+    for (const key of SECTION_ORDER) {
+      if (!isSectionComplete(tentativeForm, key)) {
+        setOpenSection(key);
+        return;
+      }
+    }
+    setOpenSection(null);
+  }, [profileLoaded, profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Submission state.
   const [submitStep, setSubmitStep] = useState<SubmitStep | null>(null);
@@ -233,26 +280,11 @@ export default function ObservationNewScreen() {
     value: ObservationForm["instability"][K],
   ) => update("instability", { ...form.instability, [key]: value });
 
-  // Section toggle + complete.
+  // Accordion toggle: tap header to open (closes any other), tap
+  // again to collapse. No "Done" button — completion is derived
+  // from form content via isSectionComplete.
   const toggleSection = (key: SectionKey) => {
-    setOpenSections((cur) => {
-      const next = new Set(cur);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-  const completeSection = (key: SectionKey) => {
-    setCompleted((c) => {
-      const next = new Set(c);
-      next.add(key);
-      return next;
-    });
-    setOpenSections((s) => {
-      const next = new Set(s);
-      next.delete(key);
-      return next;
-    });
+    setOpenSection((cur) => (cur === key ? null : key));
   };
 
   // Submission.
@@ -283,11 +315,7 @@ export default function ObservationNewScreen() {
       ) as SectionKey;
       // Make sure the offending section is open so the user can see
       // the error highlight.
-      setOpenSections((s) => {
-        const out = new Set(s);
-        out.add(firstSection);
-        return out;
-      });
+      setOpenSection(firstSection);
       setTimeout(() => scrollToSection(firstSection), 80);
       Alert.alert(
         "A few fields need attention",
@@ -327,8 +355,8 @@ export default function ObservationNewScreen() {
         collapsing: false,
       },
     }));
-    setCompleted(new Set());
-    setOpenSections(new Set<SectionKey>(SECTION_ORDER));
+    setOpenSection("when");
+    advancedRef.current = false;
   }, []);
   const onBackToHome = useCallback(() => {
     setProgressVisible(false);
@@ -397,10 +425,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("about")}
             eyebrow="ABOUT YOU"
             summary={summarizeAbout(form)}
-            open={openSections.has("about")}
-            complete={completed.has("about")}
+            open={openSection === "about"}
+            complete={isSectionComplete(form, "about")}
             onToggle={() => toggleSection("about")}
-            onDone={() => completeSection("about")}
           >
             <Text
               className="text-ink-300"
@@ -439,10 +466,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("when")}
             eyebrow="WHEN"
             summary={summarizeWhen(form)}
-            open={openSections.has("when")}
-            complete={completed.has("when")}
+            open={openSection === "when"}
+            complete={isSectionComplete(form, "when")}
             onToggle={() => toggleSection("when")}
-            onDone={() => completeSection("when")}
           >
             <Text
               className="text-ink-300"
@@ -461,10 +487,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("activity")}
             eyebrow="ACTIVITY"
             summary={summarizeActivity(form)}
-            open={openSections.has("activity")}
-            complete={completed.has("activity")}
+            open={openSection === "activity"}
+            complete={isSectionComplete(form, "activity")}
             onToggle={() => toggleSection("activity")}
-            onDone={() => completeSection("activity")}
           >
             <MultiSelectField
               label="What were you doing?"
@@ -483,10 +508,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("where")}
             eyebrow="WHERE"
             summary={summarizeWhere(form)}
-            open={openSections.has("where")}
-            complete={completed.has("where")}
+            open={openSection === "where"}
+            complete={isSectionComplete(form, "where")}
             onToggle={() => toggleSection("where")}
-            onDone={() => completeSection("where")}
           >
             <LocationField
               value={form.location_point}
@@ -517,10 +541,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("observation")}
             eyebrow="WHAT YOU SAW"
             summary={summarizeObservation(form)}
-            open={openSections.has("observation")}
-            complete={completed.has("observation")}
+            open={openSection === "observation"}
+            complete={isSectionComplete(form, "observation")}
             onToggle={() => toggleSection("observation")}
-            onDone={() => completeSection("observation")}
           >
             <TextField
               label="What did you observe?"
@@ -545,10 +568,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("photos")}
             eyebrow="PHOTOS"
             summary={summarizePhotos(form)}
-            open={openSections.has("photos")}
-            complete={completed.has("photos")}
+            open={openSection === "photos"}
+            complete={isSectionComplete(form, "photos")}
             onToggle={() => toggleSection("photos")}
-            onDone={() => completeSection("photos")}
           >
             <PhotoPicker
               value={form.images}
@@ -561,10 +583,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("instability")}
             eyebrow="SIGNS OF INSTABILITY"
             summary={summarizeInstability(form)}
-            open={openSections.has("instability")}
-            complete={completed.has("instability")}
+            open={openSection === "instability"}
+            complete={isSectionComplete(form, "instability")}
             onToggle={() => toggleSection("instability")}
-            onDone={() => completeSection("instability")}
           >
             <YesNoQuestion
               label="Did you see avalanches?"
@@ -654,15 +675,10 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("avalanches")}
             eyebrow="AVALANCHE DETAILS"
             summary={summarizeAvalanches(form)}
-            open={openSections.has("avalanches")}
-            complete={completed.has("avalanches")}
+            open={openSection === "avalanches"}
+            complete={isSectionComplete(form, "avalanches")}
             disabled={!form.instability.avalanches_observed}
             onToggle={() => toggleSection("avalanches")}
-            onDone={
-              form.instability.avalanches_observed
-                ? () => completeSection("avalanches")
-                : undefined
-            }
           >
             {!form.instability.avalanches_observed ? (
               <Text
@@ -765,10 +781,9 @@ export default function ObservationNewScreen() {
             ref={setSectionRef("privacy")}
             eyebrow="PRIVACY & CONTACT"
             summary={summarizePrivacy(form)}
-            open={openSections.has("privacy")}
-            complete={completed.has("privacy")}
+            open={openSection === "privacy"}
+            complete={isSectionComplete(form, "privacy")}
             onToggle={() => toggleSection("privacy")}
-            onDone={() => completeSection("privacy")}
           >
             <YesNoQuestion
               label="Make this observation private?"
