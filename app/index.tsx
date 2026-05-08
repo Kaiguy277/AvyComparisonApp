@@ -2175,35 +2175,38 @@ export default function Index() {
           accessibilityRole="button"
           accessibilityLabel="Report a new observation"
           style={({ pressed }) => ({
-            height: 56,
-            minWidth: 140,
-            paddingHorizontal: 22,
+            height: 60,
+            minWidth: 160,
+            paddingHorizontal: 24,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
             gap: 10,
-            borderRadius: 28,
-            backgroundColor: pressed
-              ? palette.frost[500]
-              : palette.frost[400],
+            borderRadius: 30,
+            // Dark ink on warm cream — highest possible contrast on
+            // this palette, unmistakably "primary action button".
+            backgroundColor: pressed ? palette.ink[600] : palette.ink[700],
+            // Stacked shadows: sharp close + soft far for depth.
             shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
-            elevation: 8,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.35,
+            shadowRadius: 14,
+            elevation: 12,
+            borderWidth: 1,
+            borderColor: palette.ink[600],
           })}
         >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
+          <Ionicons name="add-circle" size={26} color="#FFFFFF" />
           <Text
             variant="mono"
             weight="bold"
             style={{
-              fontSize: 13,
-              letterSpacing: 1.5,
+              fontSize: 14,
+              letterSpacing: 1.6,
               color: "#FFFFFF",
             }}
           >
-            REPORT
+            REPORT OBS
           </Text>
         </Pressable>
       </View>

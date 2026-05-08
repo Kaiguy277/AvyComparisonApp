@@ -169,25 +169,26 @@ export default function ObservationNewScreen() {
   const [completed, setCompleted] = useState<Set<SectionKey>>(
     () => new Set<SectionKey>(),
   );
-  // Once the profile loads, mark "about" as complete if name+email are
-  // already filled in (returning user). They can still tap to edit.
+  // Once the profile loads, mark "about" as complete if THE PROFILE
+  // already has name+email (returning user). Depends on the profile
+  // value, not the live form state — otherwise this would re-run on
+  // every keystroke and snap the section closed mid-typing.
   useEffect(() => {
-    if (!profileLoaded) return;
-    if (form.name && form.email) {
-      setCompleted((c) => {
-        if (c.has("about")) return c;
-        const next = new Set(c);
-        next.add("about");
-        return next;
-      });
-      setOpenSections((s) => {
-        if (!s.has("about")) return s;
-        const next = new Set(s);
-        next.delete("about");
-        return next;
-      });
-    }
-  }, [profileLoaded, form.name, form.email]);
+    if (!profileLoaded || !profile) return;
+    if (!profile.name || !profile.email) return;
+    setCompleted((c) => {
+      if (c.has("about")) return c;
+      const next = new Set(c);
+      next.add("about");
+      return next;
+    });
+    setOpenSections((s) => {
+      if (!s.has("about")) return s;
+      const next = new Set(s);
+      next.delete("about");
+      return next;
+    });
+  }, [profileLoaded, profile]);
 
   // Submission state.
   const [submitStep, setSubmitStep] = useState<SubmitStep | null>(null);
