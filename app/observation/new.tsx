@@ -19,7 +19,7 @@ import {
 } from "@/components/avalanche/ZoneScreenChrome";
 import { AvalancheEntryCard } from "@/components/observation/AvalancheEntry";
 import { CollapsibleSection } from "@/components/observation/CollapsibleSection";
-import { DateStrip } from "@/components/observation/DateStrip";
+import { DateField } from "@/components/observation/DateField";
 import {
   FieldLabel,
   TextField,
@@ -458,13 +458,10 @@ export default function ObservationNewScreen() {
             complete={isSectionComplete(form, "when")}
             onToggle={() => toggleSection("when")}
           >
-            <Text
-              className="text-ink-300"
-              style={{ fontSize: 12, lineHeight: 17 }}
-            >
-              When did the observation happen?
-            </Text>
-            <DateStrip
+            <DateField
+              label="Observation date"
+              required
+              hint="When did the observation happen?"
               value={form.start_date}
               onChange={(d) => update("start_date", d)}
             />

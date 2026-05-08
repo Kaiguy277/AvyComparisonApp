@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
-import { DateStrip } from "./DateStrip";
+import { DateField } from "./DateField";
 import { FieldLabel, TextField } from "./formPrimitives";
 import { PhotoPicker } from "./PhotoPicker";
 import { SelectField } from "./SelectField";
@@ -111,14 +111,13 @@ export function AvalancheEntryCard({
       </View>
 
       {/* When did this slide happen? Defaults to obs date. */}
-      <View>
-        <FieldLabel
-          label="Date of avalanche"
-          required
-          hint="Often the same as the observation date."
-        />
-        <DateStrip value={value.date} onChange={(d) => update("date", d)} />
-      </View>
+      <DateField
+        label="Date of avalanche"
+        required
+        hint="Often the same as the observation date."
+        value={value.date}
+        onChange={(d) => update("date", d)}
+      />
 
       {/* Where on the mountain */}
       <TextField
