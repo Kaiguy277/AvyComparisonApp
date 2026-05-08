@@ -115,6 +115,39 @@ function firstName(full: string): string {
   return (full.trim().split(/\s+/)[0] ?? "").slice(0, 24);
 }
 
+// Section labels for the "Notes" appendix folded into observation_summary.
+const NOTE_LABELS: Record<SectionKey, string> = {
+  about: "About observer",
+  when: "When",
+  activity: "Activity",
+  where: "Where",
+  observation: "Observation",
+  photos: "Photos",
+  instability: "Instability",
+  avalanches: "Avalanches",
+  privacy: "Privacy",
+};
+
+// Merge per-section notes into observation_summary. Returns a new
+// form object the caller passes to submitObservationFlow. Empty notes
+// are skipped; if no notes exist, the form passes through unchanged.
+function mergeSectionNotes(
+  form: ObservationForm,
+  notes: Partial<Record<SectionKey, string>>,
+): ObservationForm {
+  const lines: string[] = [];
+  for (const key of SECTION_ORDER) {
+    const text = notes[key]?.trim();
+    if (!text) continue;
+    lines.push(`${NOTE_LABELS[key]}: ${text}`);
+  }
+  if (lines.length === 0) return form;
+  const base = form.observation_summary.trim();
+  const appendix = lines.join("\n");
+  const merged = base ? `${base}\n\n— Notes —\n${appendix}` : appendix;
+  return { ...form, observation_summary: merged };
+}
+
 // Derived completion — checked from form state on every render so the
 // section header's checkmark turns on the moment the user fills the
 // last required field, no explicit "Done" needed.
@@ -217,6 +250,14 @@ export default function ObservationNewScreen() {
     () => new Set<SectionKey>(SECTION_ORDER),
   );
 
+  // Per-section freeform notes. Folded into observation_summary at
+  // submit time so the wire format stays unchanged.
+  const [sectionNotes, setSectionNotes] = useState<
+    Partial<Record<SectionKey, string>>
+  >({});
+  const setNoteFor = (key: SectionKey) => (next: string) =>
+    setSectionNotes((p) => ({ ...p, [key]: next }));
+
   // Submission state.
   const [submitStep, setSubmitStep] = useState<SubmitStep | null>(null);
   const [progressVisible, setProgressVisible] = useState(false);
@@ -271,19 +312,21 @@ export default function ObservationNewScreen() {
     });
   };
 
-  // Submission.
+  // Submission. Section notes get folded into observation_summary
+  // here so the wire format stays unchanged.
   const runSubmit = useCallback(async () => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     setProgressVisible(true);
     setSubmitStep({ kind: "validating" });
+    const merged = mergeSectionNotes(form, sectionNotes);
     await submitObservationFlow({
-      form,
+      form: merged,
       onProgress: setSubmitStep,
       signal: controller.signal,
     });
-  }, [form]);
+  }, [form, sectionNotes]);
 
   const onSubmit = useCallback(() => {
     const result = observationFormSchema.safeParse(form);
@@ -345,6 +388,7 @@ export default function ObservationNewScreen() {
       },
     }));
     setOpenSections(new Set<SectionKey>(SECTION_ORDER));
+    setSectionNotes({});
   }, []);
   const onBackToHome = useCallback(() => {
     setProgressVisible(false);
@@ -416,6 +460,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("about")}
             complete={isSectionComplete(form, "about")}
             onToggle={() => toggleSection("about")}
+            notes={sectionNotes.about}
+            onNotesChange={setNoteFor("about")}
           >
             <Text
               className="text-ink-300"
@@ -457,6 +503,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("when")}
             complete={isSectionComplete(form, "when")}
             onToggle={() => toggleSection("when")}
+            notes={sectionNotes.when}
+            onNotesChange={setNoteFor("when")}
           >
             <DateField
               label="Observation date"
@@ -475,6 +523,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("activity")}
             complete={isSectionComplete(form, "activity")}
             onToggle={() => toggleSection("activity")}
+            notes={sectionNotes.activity}
+            onNotesChange={setNoteFor("activity")}
           >
             <MultiSelectField
               label="What were you doing?"
@@ -496,6 +546,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("where")}
             complete={isSectionComplete(form, "where")}
             onToggle={() => toggleSection("where")}
+            notes={sectionNotes.where}
+            onNotesChange={setNoteFor("where")}
           >
             <LocationField
               value={form.location_point}
@@ -529,6 +581,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("observation")}
             complete={isSectionComplete(form, "observation")}
             onToggle={() => toggleSection("observation")}
+            notes={sectionNotes.observation}
+            onNotesChange={setNoteFor("observation")}
           >
             <TextField
               label="What did you observe?"
@@ -556,6 +610,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("photos")}
             complete={isSectionComplete(form, "photos")}
             onToggle={() => toggleSection("photos")}
+            notes={sectionNotes.photos}
+            onNotesChange={setNoteFor("photos")}
           >
             <PhotoPicker
               value={form.images}
@@ -571,6 +627,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("instability")}
             complete={isSectionComplete(form, "instability")}
             onToggle={() => toggleSection("instability")}
+            notes={sectionNotes.instability}
+            onNotesChange={setNoteFor("instability")}
           >
             <YesNoQuestion
               label="Did you see avalanches?"
@@ -664,6 +722,8 @@ export default function ObservationNewScreen() {
             complete={isSectionComplete(form, "avalanches")}
             disabled={!form.instability.avalanches_observed}
             onToggle={() => toggleSection("avalanches")}
+            notes={sectionNotes.avalanches}
+            onNotesChange={setNoteFor("avalanches")}
           >
             {!form.instability.avalanches_observed ? (
               <Text
@@ -769,6 +829,8 @@ export default function ObservationNewScreen() {
             open={openSections.has("privacy")}
             complete={isSectionComplete(form, "privacy")}
             onToggle={() => toggleSection("privacy")}
+            notes={sectionNotes.privacy}
+            onNotesChange={setNoteFor("privacy")}
           >
             <YesNoQuestion
               label="Make this observation private?"

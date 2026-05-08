@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
+import { TextField } from "./formPrimitives";
 
 // One section of the obs form, shaped like a wizard step that lives in
 // a long scroll. Default collapsed → tap header to open. When the user
@@ -30,6 +31,13 @@ interface Props {
   onDone?: () => void;
   // Optional copy for the Done button. Defaults to "Done · Next →".
   doneLabel?: string;
+  // Optional per-section notes textarea, rendered at the bottom of the
+  // body. Used to capture freeform thoughts that don't fit the section's
+  // structured fields. The screen merges these into the main
+  // observation_summary at submit time.
+  notes?: string;
+  onNotesChange?: (next: string) => void;
+  notesPlaceholder?: string;
   children: ReactNode;
 }
 
@@ -44,6 +52,9 @@ export const CollapsibleSection = forwardRef<View, Props>(
       onToggle,
       onDone,
       doneLabel,
+      notes,
+      onNotesChange,
+      notesPlaceholder,
       children,
     },
     ref,
@@ -147,6 +158,17 @@ export const CollapsibleSection = forwardRef<View, Props>(
         {open ? (
           <View style={{ padding: 16, paddingTop: 4, gap: 16 }}>
             {children}
+            {onNotesChange ? (
+              <TextField
+                label="Notes"
+                hint="Optional — anything else worth mentioning."
+                value={notes ?? ""}
+                onChangeText={onNotesChange}
+                multiline
+                rows={3}
+                placeholder={notesPlaceholder ?? "Add a note for this section…"}
+              />
+            ) : null}
             {onDone ? (
               <Pressable
                 onPress={onDone}
