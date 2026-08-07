@@ -16,6 +16,55 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-08-07 — First stabilization pass: all six ship-blockers cleared
+
+Worked straight down the audit's ship-blocker list; all six done, each committed
+separately, all verified live where they touch prod. The through-line: this went
+faster than the audit implied because the diagnoses were precise — most fixes were
+small and surgical once the live backend was confirmed.
+
+**The big discovery up front:** the Supabase project was *auto-paused* (INACTIVE).
+Production has been dead since sometime after the May 8 last commit — no pushes, no
+cron refresh, nothing. Restored it. This also resolved an audit open question: the
+two orphan tables (`avalanche_forecast_cache`, `avalanche_daily_forecasts`) genuinely
+**do not exist** in prod, so every read/write of them in `avalanche-summary` has been
+erroring-and-swallowed from day one. When we get to consolidation, delete that ~150
+lines rather than writing migrations for it.
+
+**Kai's heads-up reframed one item:** there's no production NAC API access yet, so the
+staging default in `observationSubmit.ts` is *correct*, not a bug. Rather than flip it
+to prod, I made it explicit in `.env` with a comment and added a "TEST MODE" line to
+the submit footer, so a future prod cutover is a visible two-line change.
+
+**Gotchas worth remembering:**
+- **A `private` Postgres schema is invisible to edge functions.** The service-role
+  client reads through PostgREST, which only exposes `public`. First attempt at the
+  cron-secret store put it in `private` and the gate failed closed ("auth
+  unavailable"). Fix: table in `public`, RLS on, all grants revoked from anon — anon
+  gets `permission denied`, service_role bypasses RLS. Verified anon can't read it.
+- **Edge deploys work headless via `supabase functions deploy <name> --use-api`** (no
+  Docker). The CLI is at ~/.local/bin/supabase and the project is already linked. It
+  bundles `_shared/*.ts` automatically and fails loudly on a Deno build error, which
+  is our only type-gate for the functions (no local deno).
+- **pg_cron secret plumbing:** updated the 3 http-post jobs with `cron.alter_job`,
+  pulling the secret from the table inside a DO block so the value never entered my
+  SQL text (it lives in cron.job command + the table, both service-role-only, like
+  the anon key already did).
+- The snow-math fix is the one I'd most want re-checked by Kai against a known
+  station, because it changes displayed numbers. The verification I have is
+  structural (point counts prove time-bucketing: 25 pts/24h, 35 pts/72h regardless of
+  cadence) rather than a golden-value comparison. It's correct by construction, but a
+  real-station spot-check before the next TestFlight build would be worth doing.
+
+**What's left from the audit** (next sessions, in rough priority): the data-layer
+refactor (one date convention, one snapshot writer, per-zone date keys, zod on inbound
+— fixes the archive-shows-wrong-day safety bug and the lost-update races); then the
+consolidation pass (delete ~2,500 dead lines incl. ZoneCard, collapse the 7× zone
+catalogue, split index.tsx, adopt the already-installed TanStack Query). The
+observation flow's remaining smaller items (split-validation B15, the CenterPicker
+lock B19) are lower stakes. No CI/tests yet — worth standing up a typecheck gate
+before the refactor churn begins.
+
 ## 2026-08-07 — Adoption day: the audit, and why we're not forking
 
 This project was built in nine days by an earlier era of coding agents, and today's job
