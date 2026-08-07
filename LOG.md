@@ -22,6 +22,20 @@ Format per entry:
 ---
 
 ## 2026-08-07
+- **Safety-grade snow-math fix: timestamp-based lookbacks in `synoptic-api.ts`**
+  (deployed to `get-snotel-observations` + `avalanche-summary`). Every 24/48/72hr/
+  7-day figure (snow-depth change, precip accum, temp hi/lo/avg, wind, hourly
+  series) was computed by ARRAY INDEX assuming 1 sample = 1 hour. Synoptic reports
+  at native cadence (often 5–20 min), so a "24-hour new snow" number was really a
+  ~4-hour number on sub-hourly stations — the headline metric users read before
+  entering avalanche terrain. Replaced `valueAtOffset`/`maxOfLast`/`minOfLast`/
+  `avgOfLast`/`hourlyPoints` with timestamp-anchored `valueHoursAgo`/`maxOverHours`/
+  `minOverHours`/`avgOverHours`/`hourlySeries` (binary-search window by elapsed
+  hours from the latest sample; hourly series/increments bucket by real clock hour
+  so point count no longer scales with reporting frequency). **Verified live:**
+  turnagain-girdwood now returns hourly24hr=25 pts / hourly72hr=35 pts (≈1/hr, 1/2hr)
+  regardless of cadence; temps sane. Note: dead `_shared/snotel-api.ts` has the same
+  bug (~L413-449) but has 0 importers — not fixed (fixing dead code ships nothing).
 - **Shared-secret gate on the 4 publicly-invokable functions — live + verified**
   (`refresh-forecast-cache`, `refresh-stations-cache`, `refresh-observations-cache`,
   `send-snapshot-pushes`). New `_shared/cron-auth.ts` `requireCronKey()` reads a
