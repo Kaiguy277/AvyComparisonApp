@@ -57,7 +57,8 @@ Format per entry:
     code — no migration. Must check live DB before touching backend.
 - **Knowledge graph built** (`/graphify`): `graphify-out/` — 936 nodes, 1,760 edges,
   108 communities. `graph.html` for browsing, `GRAPH_REPORT.md` for the audit trail.
-  Note: graphify-out/ is untracked and NOT in .gitignore — decide before any `git add .`.
+  Decision: committed to git (regenerable, but versioning it keeps the graph in sync
+  with the code it describes and lets `--update` diff against a known baseline).
 - **Tracking set up:** created this LOG.md, JOURNAL.md, and CLAUDE.md (session
   agreements: read log+journal at session start, update mid-session), mirroring the
   AK-RES / rfp-engine / fable5dixon convention.
