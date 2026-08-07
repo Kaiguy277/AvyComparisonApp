@@ -12,12 +12,10 @@ import { AVAILABLE_ZONES, ZONE_TO_CENTER_NAME } from "@/lib/zones";
 import { avalancheApi } from "@/lib/api/avalanche";
 import { getZoneSession, setZoneSession } from "@/lib/zoneSession";
 import { addDaysKey, todayKey } from "@/lib/dates";
+import { useZoneBundle } from "@/hooks/useZoneBundle";
 import {
   ageHours,
   formatAge,
-  getZoneSnapshotForDate,
-  loadSnapshot,
-  type FavoritesSnapshot,
   type ZoneSnapshot,
 } from "@/lib/offlineCache";
 import type {
@@ -71,15 +69,6 @@ export default function ZoneDetailScreen() {
   }>();
   const router = useRouter();
 
-  const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    loadSnapshot().then((s) => {
-      setSnap(s);
-      setLoaded(true);
-    });
-  }, []);
-
   // Observations live outside the offline snapshot — they're cheap to
   // pull on demand and only matter when the user taps into a zone. The
   // session cache survives this screen → /observations → back without
@@ -105,19 +94,20 @@ export default function ZoneDetailScreen() {
     };
   }, [zoneId]);
 
-  // Snapshot is keyed by zoneId × date; pass the route-param date so we
-  // pull the bundle the user was looking at on the home grid (not the
-  // newest, which would jump them to today when scrolling archive).
-  // Ad-hoc zones (not favorites) fall through to the session cache.
-  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId, date) : undefined;
-  const session = getZoneSession(zoneId);
-  const zone: AvalancheZone | undefined = bundle?.forecast ?? session?.forecast;
-  const stations = bundle?.stations ?? session?.stations;
-  const weatherBundle = bundle?.weather ?? session?.weather;
+  // Resolve the bundle for this zone on the viewed date. The hook shows
+  // the newest bundle for "today" but an EXACT-date bundle for archive
+  // days (and never the dateless session cache on an archive day) so a
+  // back-scrolled day can't silently render today's ratings.
+  const {
+    forecast: zone,
+    stations,
+    weather: weatherBundle,
+    cachedAt: fetchedAt,
+    loaded,
+  } = useZoneBundle(zoneId, date);
   const today = zone?.forecast?.[0];
   const tomorrow = zone?.forecast?.[1];
   const fresh = zone ? freshness[zone.freshness.status] : null;
-  const fetchedAt = bundle?.cachedAt ?? session?.cachedAt ?? snap?.fetchedAt;
   // Display name — fall back to the catalog when no forecast is cached.
   const displayName =
     zone?.name ??

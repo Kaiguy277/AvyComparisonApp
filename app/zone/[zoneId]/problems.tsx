@@ -1,16 +1,9 @@
-import { useEffect, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 
 import { Text } from "@/components/ui/Text";
 import { AvalancheProblemCard } from "@/components/avalanche/AvalancheProblemCard";
-import { palette } from "@/constants/design";
-import {
-  getZoneSnapshotForDate,
-  loadSnapshot,
-  type FavoritesSnapshot,
-} from "@/lib/offlineCache";
-import { getZoneSession } from "@/lib/zoneSession";
+import { useZoneBundle } from "@/hooks/useZoneBundle";
 import { AVAILABLE_ZONES } from "@/lib/zones";
 import { ZoneScreenHeader, ZoneScreenContainer } from "@/components/avalanche/ZoneScreenChrome";
 
@@ -19,18 +12,7 @@ export default function ZoneProblemsScreen() {
     zoneId: string;
     date?: string;
   }>();
-  const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    loadSnapshot().then((s) => {
-      setSnap(s);
-      setLoaded(true);
-    });
-  }, []);
-
-  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId, date) : undefined;
-  const session = getZoneSession(zoneId);
-  const zone = bundle?.forecast ?? session?.forecast;
+  const { forecast: zone, loaded, isToday } = useZoneBundle(zoneId, date);
   const problems = zone?.problems ?? [];
 
   return (
@@ -59,7 +41,9 @@ export default function ZoneProblemsScreen() {
             className="text-ink-300"
             style={{ fontSize: 14, lineHeight: 20 }}
           >
-            No avalanche problems are listed in today's forecast for this zone.
+            {isToday
+              ? "No avalanche problems are listed in today's forecast for this zone."
+              : "No forecast is cached for this zone on the selected day."}
           </Text>
         ) : (
           problems.map((p, i) => <AvalancheProblemCard key={i} problem={p} />)

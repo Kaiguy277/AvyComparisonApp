@@ -531,6 +531,7 @@ export default function Index() {
           stations: z.weatherObservations,
           weather: wf,
           cachedAt: nowIso,
+          dateKey: viewedDate,
         });
       }
     }
@@ -554,9 +555,10 @@ export default function Index() {
         stations: soz.weatherObservations,
         weather: wf,
         cachedAt: nowIso,
+        dateKey: viewedDate,
       });
     }
-  }, [summary, stationsOnlyZones, weatherForecastData]);
+  }, [summary, stationsOnlyZones, weatherForecastData, viewedDate]);
 
   const fetchSnotel = useCallback(async (zoneIds: string[]) => {
     setIsSnotelLoading(true);

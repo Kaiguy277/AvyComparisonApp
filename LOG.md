@@ -22,6 +22,25 @@ Format per entry:
 ---
 
 ## 2026-08-07 — Data-layer refactor (phase 2)
+- **SAFETY: archive view can no longer show today's danger under a past date (B8).**
+  New `hooks/useZoneBundle.ts` is the single bundle resolver for the zone detail +
+  4 sub-screens (was pasted 5×). The date rule is the fix: **today → newest stored
+  bundle + in-memory session fallback; archive day → the EXACT-date bundle only,
+  never the session.** The session cache (`lib/zoneSession.ts`) is dateless and holds
+  only the most-recently-fetched day, so falling back to it for a back-scrolled date
+  rendered current ratings under an archive label — a go/no-go safety defect. Session
+  entries now carry a `dateKey` (tagged with `viewedDate` at the home-screen fan-out)
+  and the hook gates the fallback on `dateKey === effectiveDate`, which is only true
+  for today. Empty-state copy in problems.tsx is now date-aware ("No forecast is
+  cached for the selected day"). Removed the 5 copies of the loadSnapshot +
+  getZoneSnapshotForDate + session-fallback boilerplate. tsc + eslint clean on all
+  touched files. NOTE: the §2.4 backend issue (get-cached-forecasts returns a global
+  MAX forecastDate, so a zone whose forecast is a day old gets filed under a newer
+  archive key) is NOT fully fixed here — the client can't key per-zone because
+  `freshness.issueDate` is an unreliable display string. Mitigated: today shows
+  newest (correct current), archive shows only what was explicitly stored + the
+  freshness object marks staleness. True per-zone keying needs get-cached-forecasts
+  to return a raw per-zone ISO date — logged as a backend follow-up.
 - **Single snapshot writer + serialized writes (lost-update race B5/B9 fixed).**
   The snapshot read-modify-write was hand-copied 3× (backgroundRefresh +
   index.tsx's foreground refresh + reactive persist effect), already textually
