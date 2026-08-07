@@ -22,6 +22,21 @@ Format per entry:
 ---
 
 ## 2026-08-07 — Data-layer refactor (phase 2)
+- **Single snapshot writer + serialized writes (lost-update race B5/B9 fixed).**
+  The snapshot read-modify-write was hand-copied 3× (backgroundRefresh +
+  index.tsx's foreground refresh + reactive persist effect), already textually
+  divergent, with four concurrent wake sources able to clobber each other. New
+  `mutateSnapshot(mutator)` in `offlineCache.ts` serializes ALL writes behind one
+  promise chain (load→mutate→save atomic); new `mergeZoneBundle` holds the nested
+  spread/preserve logic once. The two identical fetch-and-store copies collapsed
+  into `refreshFavoritesSnapshot` (now returns `{zones, snapshot}` + writes via
+  mutateSnapshot); index's foreground path just calls it; the reactive persist
+  effect uses mutateSnapshot with its own viewedDate mutator. Deleted the dead
+  superseded helpers (`upsertSnapshotZoneDate`, `persistSnapshotZoneDate`,
+  `listSnapshotDates`) and the unused auto-refresh preference (`loadAutoRefresh`/
+  `saveAutoRefresh` + its key — written/read by nothing, B21). tsc clean. Cannot
+  unit-test the race without a harness (no test infra yet) — verified by
+  construction + tsc; behavior spot-check belongs in the next real-device run.
 - **Single date convention: new `lib/dates.ts` (local everywhere).** Root cause of
   the B6/B7 date bugs: `todayIsoDate()` was UTC, so "today" rolled over at 3 PM
   Alaska, desyncing the pager from the header and locking the → arrow after an

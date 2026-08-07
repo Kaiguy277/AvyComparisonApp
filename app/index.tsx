@@ -24,10 +24,11 @@ import {
   isStale,
   loadFavorites,
   loadSnapshot,
+  mergeZoneBundle,
+  mutateSnapshot,
   OFFLINE_HISTORY_DAYS,
   pruneSnapshot,
   saveFavorites,
-  saveSnapshot,
   todayIsoDate,
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
@@ -76,7 +77,11 @@ import {
   requestAndRegisterLocationWake,
   type LocationDiagnostic,
 } from "@/lib/locationWake";
-import { readLastRefresh, type LastRefreshRecord } from "@/lib/backgroundRefresh";
+import {
+  readLastRefresh,
+  refreshFavoritesSnapshot,
+  type LastRefreshRecord,
+} from "@/lib/backgroundRefresh";
 import { toggleDebugMode, useDebugMode } from "@/lib/debugMode";
 import {
   avalancheApi,
@@ -265,79 +270,17 @@ export default function Index() {
     const now = Date.now();
     if (now - lastBgFetchRef.current < 30 * 60 * 1000) return;
     try {
-      // The server-side cache (refreshed by cron every 1–2h) is fast enough
-      // and complete enough that we don't need separate live calls here.
-      // Bg refresh always pulls today's bundle — historical days, if the
-      // user wants them, are fetched on demand when they tap the arrow.
-      const r = await avalancheApi.getCachedForecasts(favoriteZoneIds);
-      if (!r.success || !r.zones) return;
-      const date = r.forecastDate || todayIsoDate();
-      const stationsDate = r.stationsDate || todayIsoDate();
-      let next: FavoritesSnapshot =
-        (await loadSnapshot()) || { fetchedAt: "", zones: {} };
-      const favSet = new Set(favoriteZoneIds);
-      const nowIso = new Date().toISOString();
-      for (const z of r.zones) {
-        if (!favSet.has(z.id)) continue;
-        const cid = ZONE_TO_CENTER[z.id];
-        const weather = {
-          nacWeather: cid ? r.centerWeather?.[cid] : undefined,
-          nwsForecast: r.zoneNwsForecasts?.[z.id],
-          avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
-          avgLocations: r.zoneAvgLocations?.[z.id],
-        };
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [z.id]: {
-              ...(next.zones[z.id] || {}),
-              [date]: {
-                forecast: z,
-                stations: z.weatherObservations,
-                weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-      }
-      // Stations-only favorites — no forecast, just fresh wx.
-      for (const soz of r.stationsOnlyZones || []) {
-        if (!favSet.has(soz.id)) continue;
-        const cid = soz.centerId || ZONE_TO_CENTER[soz.id];
-        const weather = {
-          nacWeather: cid ? r.centerWeather?.[cid] : undefined,
-          nwsForecast: r.zoneNwsForecasts?.[soz.id],
-          avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
-          avgLocations: r.zoneAvgLocations?.[soz.id],
-        };
-        const existing = next.zones[soz.id]?.[stationsDate];
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [soz.id]: {
-              ...(next.zones[soz.id] || {}),
-              [stationsDate]: {
-                forecast: existing?.forecast,
-                stations: soz.weatherObservations,
-                weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-      }
-      next = pruneSnapshot(next, favoriteZoneIds);
-      await saveSnapshot(next);
-      setSnapshot(next);
+      // Single shared writer (also used by the bg-task / push / location
+      // wakes). It reads favorites from storage, pulls the cron-refreshed
+      // server cache, and stores today's bundle through the serialized
+      // snapshot writer — historical days are fetched on demand when the
+      // user taps the arrow.
+      const result = await refreshFavoritesSnapshot("foreground");
+      if (!result) return;
+      setSnapshot(result.snapshot);
       // Tick throttle only after a successful save — a failed fetch
       // shouldn't eat the next 30-minute retry window.
       lastBgFetchRef.current = now;
-      console.log(
-        `[bg-refresh] cached ${r.zones.length} forecast + ${r.stationsOnlyZones?.length || 0} stations-only`,
-      );
     } catch (err) {
       console.warn("[bg-refresh] failed", err);
     }
@@ -514,84 +457,50 @@ export default function Index() {
     if (!summary || favoriteZoneIds.length === 0) return;
     if (loadSource === "offline") return;
     const favSet = new Set(favoriteZoneIds);
+    const wfFor = (id: string, centerId: string | undefined) =>
+      weatherForecastData
+        ? {
+            nacWeather: centerId
+              ? weatherForecastData.centerWeather[centerId]
+              : undefined,
+            nwsForecast: weatherForecastData.zoneNwsForecasts[id],
+            avgDiscussion: centerId
+              ? weatherForecastData.centerAvgDiscussions[centerId]
+              : undefined,
+            avgLocations: weatherForecastData.zoneAvgLocations[id],
+          }
+        : undefined;
     (async () => {
-      let next: FavoritesSnapshot =
-        (await loadSnapshot()) || { fetchedAt: "", zones: {} };
-      let touched = false;
+      // Serialized through mutateSnapshot so this in-memory persist can't
+      // race the fetch-and-store writer (bg/push/foreground) and drop its
+      // zones. Bundles are keyed by viewedDate; mergeZoneBundle preserves
+      // any fields this pass doesn't supply.
       const nowIso = new Date().toISOString();
-      for (const z of summary.zones) {
-        if (!favSet.has(z.id)) continue;
-        const centerId = ZONE_TO_CENTER[z.id];
-        const wf = weatherForecastData
-          ? {
-              nacWeather: centerId
-                ? weatherForecastData.centerWeather[centerId]
-                : undefined,
-              nwsForecast: weatherForecastData.zoneNwsForecasts[z.id],
-              avgDiscussion: centerId
-                ? weatherForecastData.centerAvgDiscussions[centerId]
-                : undefined,
-              avgLocations: weatherForecastData.zoneAvgLocations[z.id],
-            }
-          : undefined;
-        const existing = next.zones[z.id]?.[viewedDate];
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [z.id]: {
-              ...(next.zones[z.id] || {}),
-              [viewedDate]: {
-                forecast: z,
-                stations: z.weatherObservations || existing?.stations,
-                weather: wf || existing?.weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-        touched = true;
-      }
-      // Persist stations-only entries too — same date keying as the forecast
-      // entries above so all of today's bundles share a row.
-      for (const soz of stationsOnlyZones) {
-        if (!favSet.has(soz.id)) continue;
-        const centerId = soz.centerId || ZONE_TO_CENTER[soz.id];
-        const wf = weatherForecastData
-          ? {
-              nacWeather: centerId
-                ? weatherForecastData.centerWeather[centerId]
-                : undefined,
-              nwsForecast: weatherForecastData.zoneNwsForecasts[soz.id],
-              avgDiscussion: centerId
-                ? weatherForecastData.centerAvgDiscussions[centerId]
-                : undefined,
-              avgLocations: weatherForecastData.zoneAvgLocations[soz.id],
-            }
-          : undefined;
-        const existing = next.zones[soz.id]?.[viewedDate];
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [soz.id]: {
-              ...(next.zones[soz.id] || {}),
-              [viewedDate]: {
-                forecast: existing?.forecast,
-                stations: soz.weatherObservations || existing?.stations,
-                weather: wf || existing?.weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-        touched = true;
-      }
-      if (touched) {
-        const pruned = pruneSnapshot(next, favoriteZoneIds);
-        await saveSnapshot(pruned);
-        setSnapshot(pruned);
-      }
+      const pruned = await mutateSnapshot((current) => {
+        let next = current;
+        let touched = false;
+        for (const z of summary.zones) {
+          if (!favSet.has(z.id)) continue;
+          next = mergeZoneBundle(next, z.id, viewedDate, {
+            forecast: z,
+            stations: z.weatherObservations,
+            weather: wfFor(z.id, ZONE_TO_CENTER[z.id]),
+          }, nowIso);
+          touched = true;
+        }
+        for (const soz of stationsOnlyZones) {
+          if (!favSet.has(soz.id)) continue;
+          next = mergeZoneBundle(next, soz.id, viewedDate, {
+            stations: soz.weatherObservations,
+            weather: wfFor(soz.id, soz.centerId || ZONE_TO_CENTER[soz.id]),
+          }, nowIso);
+          touched = true;
+        }
+        // No favorites in view → return the same reference so mutateSnapshot
+        // skips the write entirely.
+        return touched ? pruneSnapshot(next, favoriteZoneIds) : current;
+      });
+      setSnapshot(pruned);
     })();
   }, [summary, stationsOnlyZones, weatherForecastData, favoriteZoneIds, viewedDate, loadSource]);
 
