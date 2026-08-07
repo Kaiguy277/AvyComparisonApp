@@ -47,9 +47,12 @@ import {
 } from "@/lib/observation/schema";
 import { useObserverProfile } from "@/lib/observerProfile";
 import {
+  deserializeDraftForm,
+  getDraft,
   submitObservationFlow,
   type SubmitStep,
 } from "@/lib/observation/submitFlow";
+import { observationApiConfig } from "@/lib/api/observationSubmit";
 import {
   summarizeAbout,
   summarizeActivity,
@@ -203,6 +206,7 @@ export default function ObservationNewScreen() {
     zoneId?: string;
     lat?: string;
     lng?: string;
+    draftId?: string;
   }>();
   const { profile, loaded: profileLoaded } = useObserverProfile();
 
@@ -213,8 +217,12 @@ export default function ObservationNewScreen() {
   const initialCenter = params.zoneId
     ? ZONE_TO_CENTER[params.zoneId]
     : undefined;
-  const initialLat = params.lat ? Number(params.lat) : undefined;
-  const initialLng = params.lng ? Number(params.lng) : undefined;
+  // Malformed params yield NaN, which is `!== undefined` — guard with
+  // isFinite so junk coordinates never seed the form as a "valid" fix.
+  const parsedLat = params.lat ? Number(params.lat) : undefined;
+  const parsedLng = params.lng ? Number(params.lng) : undefined;
+  const initialLat = Number.isFinite(parsedLat) ? parsedLat : undefined;
+  const initialLng = Number.isFinite(parsedLng) ? parsedLng : undefined;
 
   const [form, setForm] = useState<ObservationForm>(() =>
     emptyObservationForm({
@@ -226,7 +234,11 @@ export default function ObservationNewScreen() {
     }),
   );
 
-  // Pre-fill from observer profile once it loads.
+  // Pre-fill from observer profile once it loads. Text fields keep
+  // anything already typed (`||`); show_name/photoUsage always have a
+  // non-empty default, so the saved profile preference must win — the
+  // old `f.photoUsage || profile.photoUsage` never applied it and
+  // silently reset "anonymous"/"private" users to "credit".
   useEffect(() => {
     if (!profileLoaded || !profile) return;
     setForm((f) => ({
@@ -234,8 +246,8 @@ export default function ObservationNewScreen() {
       name: f.name || profile.name,
       email: f.email || profile.email,
       phone: f.phone || profile.phone,
-      show_name: f.show_name || profile.showName,
-      photoUsage: f.photoUsage || profile.photoUsage,
+      show_name: profile.showName,
+      photoUsage: profile.photoUsage,
     }));
   }, [profileLoaded, profile]);
 
@@ -262,6 +274,27 @@ export default function ObservationNewScreen() {
   const [submitStep, setSubmitStep] = useState<SubmitStep | null>(null);
   const [progressVisible, setProgressVisible] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Draft being retried, if any. Set from the route param (offline-drafts
+  // banner) or from a failed submission this session; cleared by the
+  // flow itself on success. Carrying the id through retries means a
+  // second failure updates the queued record instead of duplicating it.
+  const draftIdRef = useRef<string | null>(params.draftId ?? null);
+  useEffect(() => {
+    const id = params.draftId;
+    if (!id) return;
+    let cancelled = false;
+    getDraft(id).then((record) => {
+      if (cancelled || !record) return;
+      // Photos' local URIs may have been evicted by the OS since the
+      // draft was saved; the picker will show any survivors and the
+      // user can re-add the rest.
+      setForm(deserializeDraftForm(record.snapshot.form));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [params.draftId]);
 
   const inFlight =
     submitStep?.kind === "validating" ||
@@ -294,12 +327,19 @@ export default function ObservationNewScreen() {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors((e) => ({ ...e, [key]: "" }));
   };
+  // Functional update — two calls in the same tick (e.g. turning
+  // "Cracking?" off also clears its description) must not clobber each
+  // other with a stale `form.instability` spread.
   const updateInstability = <
     K extends keyof ObservationForm["instability"],
   >(
     key: K,
     value: ObservationForm["instability"][K],
-  ) => update("instability", { ...form.instability, [key]: value });
+  ) =>
+    setForm((prev) => ({
+      ...prev,
+      instability: { ...prev.instability, [key]: value },
+    }));
 
   // Toggle: tap a header to flip that one section's open state.
   // Other sections are unaffected.
@@ -321,11 +361,20 @@ export default function ObservationNewScreen() {
     setProgressVisible(true);
     setSubmitStep({ kind: "validating" });
     const merged = mergeSectionNotes(form, sectionNotes);
-    await submitObservationFlow({
+    const result = await submitObservationFlow({
       form: merged,
-      onProgress: setSubmitStep,
+      onProgress: (step) => {
+        // A superseded attempt (cancelled or replaced by a retry) must
+        // not drive the modal — its late "cancelled" error would paint
+        // over the live attempt's progress.
+        if (abortRef.current === controller) setSubmitStep(step);
+      },
       signal: controller.signal,
+      draftId: draftIdRef.current ?? undefined,
     });
+    if (abortRef.current !== controller) return;
+    if (result.ok) draftIdRef.current = null;
+    else if (result.draftId) draftIdRef.current = result.draftId;
   }, [form, sectionNotes]);
 
   const onSubmit = useCallback(() => {
@@ -370,6 +419,7 @@ export default function ObservationNewScreen() {
   const onSubmitAnother = useCallback(() => {
     setProgressVisible(false);
     setSubmitStep(null);
+    draftIdRef.current = null;
     setForm((prev) => ({
       ...prev,
       start_date: new Date(),
@@ -908,6 +958,9 @@ export default function ObservationNewScreen() {
             Sent to {form.center_id || initialCenter || "the relevant center"} via
             avalanche.org. Email kept private; photos use the credit setting
             you choose above.
+            {observationApiConfig.isStaging
+              ? "\nTEST MODE — this build submits to NAC's staging system, not the live center."
+              : ""}
           </Text>
 
           <Pressable

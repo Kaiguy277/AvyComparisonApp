@@ -48,6 +48,8 @@ export interface UploadMediaArgs {
   photoUsage: "anonymous" | "credit" | "private";
   // Title shown in the NAC media browser; we use the location name.
   title?: string;
+  // Aborts the in-flight POST (not just between steps).
+  signal?: AbortSignal;
 }
 
 export class ObservationApiError extends Error {
@@ -62,7 +64,8 @@ export class ObservationApiError extends Error {
 }
 
 export async function uploadMedia(args: UploadMediaArgs): Promise<MediaItem> {
-  const { image, centerId, observerName, caption, photoUsage, title } = args;
+  const { image, centerId, observerName, caption, photoUsage, title, signal } =
+    args;
 
   const portrait = image.height >= image.width;
   const longSide = portrait ? image.height : image.width;
@@ -100,13 +103,14 @@ export async function uploadMedia(args: UploadMediaArgs): Promise<MediaItem> {
     caption: caption ?? null,
   };
 
-  return postJson<MediaItem>(MEDIA_PATH, payload);
+  return postJson<MediaItem>(MEDIA_PATH, payload, signal);
 }
 
 export async function submitObservation(
   payload: SubmitPayload,
+  signal?: AbortSignal,
 ): Promise<unknown> {
-  return postJson(OBSERVATION_PATH, payload);
+  return postJson(OBSERVATION_PATH, payload, signal);
 }
 
 // EXIF DateTimeOriginal is "YYYY:MM:DD HH:MM:SS"; NAC expects YYYY-MM-DD.
@@ -116,7 +120,11 @@ function exifDateToYmd(raw?: string | null): string | null {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   const url = `${NAC_HOST}${path}`;
   const res = await fetch(url, {
     method: "POST",
@@ -126,6 +134,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
       Origin: NAC_ORIGIN,
     },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     const text = await safeReadText(res);

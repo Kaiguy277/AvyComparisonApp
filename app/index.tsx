@@ -2478,14 +2478,16 @@ function PushDiagnosticLine() {
 // Tapping the banner walks them back to the submit form so they can
 // retry. Banner self-hides when the queue empties.
 function ObservationDraftsBanner() {
-  const [count, setCount] = useState(0);
+  const [drafts, setDrafts] = useState<
+    Awaited<ReturnType<typeof listObservationDrafts>>
+  >([]);
   const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
     const refresh = () => {
-      listObservationDrafts().then((drafts) => {
-        if (!cancelled) setCount(drafts.length);
+      listObservationDrafts().then((list) => {
+        if (!cancelled) setDrafts(list);
       });
     };
     refresh();
@@ -2498,11 +2500,20 @@ function ObservationDraftsBanner() {
     };
   }, []);
 
+  const count = drafts.length;
   if (count === 0) return null;
+  // Oldest first — clear the backlog in the order it was written.
+  const nextDraft = [...drafts].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  )[0];
 
   return (
     <Pressable
-      onPress={() => router.push("/observation/new" as never)}
+      onPress={() =>
+        router.push(
+          `/observation/new?draftId=${encodeURIComponent(nextDraft.id)}` as never,
+        )
+      }
       style={({ pressed }) => ({
         marginHorizontal: 16,
         marginTop: 10,

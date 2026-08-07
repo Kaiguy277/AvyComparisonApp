@@ -22,6 +22,33 @@ Format per entry:
 ---
 
 ## 2026-08-07
+- **Observation submit flow: all five audit bugs fixed** (`lib/api/observationSubmit.ts`,
+  `lib/observation/submitFlow.ts`, `app/observation/new.tsx`, `app/index.tsx`, `.env`):
+  - Abort signal now threaded into every fetch (`postJson`/`uploadMedia`/
+    `submitObservation` take `signal`) — cancel actually cancels the in-flight POST.
+  - Superseded attempts can no longer drive the progress modal (guard in `runSubmit`
+    checks `abortRef.current === controller` before applying progress) — fixes the
+    retry race that flashed "Submission cancelled" over a live attempt.
+  - Post-submit profile persistence moved into its own try — a local housekeeping
+    throw can no longer report a *successful* NAC submission as a failure.
+  - Draft queue wired end-to-end: `saveDraft` upserts by id (no duplicate queue
+    entries on repeated failures), flow clears the draft on success, form loads a
+    draft via `?draftId=` (new `getDraft`/`deserializeDraftForm` exports), home
+    banner routes to the oldest draft instead of a blank form.
+  - Profile prefill: `show_name`/`photoUsage` now come from the saved profile
+    (old `||` pattern silently reset "anonymous"/"private" to "credit").
+  - Bonus: NaN guard on `lat`/`lng` route params; footer shows a TEST MODE line
+    when pointed at NAC staging.
+  - NAC staging config made explicit in `.env` (`EXPO_PUBLIC_NAC_HOST/ORIGIN`) with
+    a comment: staging is deliberate (no prod NAC partner access yet); prod cutover
+    is now a visible two-line flip. `npx tsc --noEmit` clean.
+- **Stabilization work begun (post-audit).** Discovered the Supabase project
+  `tfvxhsgwrwvendrnbrgf` was **INACTIVE (auto-paused)** — the production backend has
+  been dead since some point after the May 8 last commit. Restored it via MCP.
+  Implication: nothing (pushes, cron refreshes, caches) has been running; cron jobs'
+  behavior after restore needs verification. Also: no production NAC API access
+  exists (Kai) — the staging default in `observationSubmit.ts` is *correct* for now;
+  plan is to make it explicit + documented rather than flip to prod.
 - **Full-codebase audit (5 parallel deep-read agents, ~28k lines).** First session with
   the new-generation agent; mission was to decide hard-fork vs continue. **Verdict:
   continue — architecture is sound; halt feature work for a ~2-week stabilization pass.**

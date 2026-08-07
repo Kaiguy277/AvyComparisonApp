@@ -49,6 +49,10 @@ export interface SubmitOptions {
   form: ObservationForm;
   onProgress: (step: SubmitStep) => void;
   signal?: AbortSignal;
+  // When retrying a saved draft: its queue id. On success the draft is
+  // removed; on another failure the same record is updated in place
+  // (no duplicate queue entries).
+  draftId?: string;
 }
 
 export interface SubmitResult {
@@ -58,6 +62,9 @@ export interface SubmitResult {
   response?: unknown;
   // True when we saved a draft because the device was offline.
   saved?: boolean;
+  // Set when a draft was saved (new or updated) — the caller should
+  // carry this into the next attempt so retries update, not duplicate.
+  draftId?: string;
 }
 
 // Run the submission. Throws on programming errors; returns SubmitResult
@@ -65,7 +72,7 @@ export interface SubmitResult {
 export async function submitObservationFlow(
   opts: SubmitOptions,
 ): Promise<SubmitResult> {
-  const { form, onProgress, signal } = opts;
+  const { form, onProgress, signal, draftId } = opts;
 
   onProgress({ kind: "validating" });
 
@@ -82,14 +89,14 @@ export async function submitObservationFlow(
   // If we know we're offline up front, save and bail.
   const net = await NetInfo.fetch();
   if (net.isConnected === false || net.isInternetReachable === false) {
-    await saveDraft(form);
+    const savedId = await saveDraft(form, draftId);
     onProgress({
       kind: "error",
       message:
         "You're offline. We saved your observation locally — try sending again when you're back online.",
       offline: true,
     });
-    return { ok: false, saved: true };
+    return { ok: false, saved: true, draftId: savedId };
   }
 
   try {
@@ -111,6 +118,7 @@ export async function submitObservationFlow(
         caption: form.images[i].caption,
         photoUsage: form.photoUsage,
         title: form.location_name,
+        signal,
       });
       obsMedia.push(item);
     }
@@ -136,6 +144,7 @@ export async function submitObservationFlow(
           caption: av.images[i].caption,
           photoUsage: form.photoUsage,
           title: av.location || form.location_name,
+          signal,
         });
         list.push(item);
       }
@@ -154,11 +163,21 @@ export async function submitObservationFlow(
       // require review). Slice 8 / partner conversation refines this.
       status: "published",
     });
-    const response = await apiSubmitObservation(payload);
+    const response = await apiSubmitObservation(payload, signal);
 
-    // 4. Persist observer profile so name/email pre-fill next time.
-    await persistObserverProfileFromForm(form);
-    await markObserverProfileSubmitted();
+    // The observation is on NAC's servers — everything from here on is
+    // local housekeeping and must never surface as a submit failure.
+    // (Previously a profile-save throw here reported success as failure
+    // and primed a duplicate submission.)
+    try {
+      // 4. Persist observer profile so name/email pre-fill next time.
+      await persistObserverProfileFromForm(form);
+      await markObserverProfileSubmitted();
+      // 5. This form is no longer a pending draft.
+      if (draftId) await clearDraft(draftId);
+    } catch (housekeepingErr) {
+      console.warn("post-submit housekeeping failed", housekeepingErr);
+    }
 
     onProgress({ kind: "success" });
     return { ok: true, response };
@@ -175,23 +194,23 @@ export async function submitObservationFlow(
       // 4xx: caller's fault (likely auth — Origin not allowlisted).
       // 5xx / network: NAC's side or transit. Save a draft for retry.
       const offline = err.status >= 500 || err.status === 0;
-      if (offline) await saveDraft(form);
+      const savedId = offline ? await saveDraft(form, draftId) : undefined;
       onProgress({
         kind: "error",
         message: friendlyApiError(err),
         offline,
       });
-      return { ok: false, saved: offline };
+      return { ok: false, saved: offline, draftId: savedId };
     }
     // Generic network failure (no Response). Treat as offline.
-    await saveDraft(form);
+    const savedId = await saveDraft(form, draftId);
     onProgress({
       kind: "error",
       message:
         "Couldn't reach the avalanche center. Saved locally — try again in a bit.",
       offline: true,
     });
-    return { ok: false, saved: true };
+    return { ok: false, saved: true, draftId: savedId };
   }
 }
 
@@ -244,7 +263,7 @@ async function persistObserverProfileFromForm(
 
 // ───────────────────────────── draft queue ──────────────────────────────
 
-interface DraftRecord {
+export interface DraftRecord {
   id: string;
   createdAt: string;
   // Form snapshot with Date fields stringified. Local image URIs are
@@ -262,17 +281,29 @@ type SerializableForm = Omit<ObservationForm, "start_date" | "avalanches"> & {
   })[];
 };
 
-async function saveDraft(form: ObservationForm): Promise<void> {
+// Save (or update-in-place, when `existingId` matches a queued record)
+// a draft. Returns the record id so callers can retry without creating
+// duplicates, or undefined when the write failed.
+async function saveDraft(
+  form: ObservationForm,
+  existingId?: string,
+): Promise<string | undefined> {
   try {
     const drafts = await listDrafts();
-    drafts.push({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    const record: DraftRecord = {
+      id:
+        existingId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       createdAt: new Date().toISOString(),
       snapshot: { form: serializeForm(form) },
-    });
+    };
+    const idx = drafts.findIndex((d) => d.id === record.id);
+    if (idx >= 0) drafts[idx] = record;
+    else drafts.push(record);
     await AsyncStorage.setItem(DRAFT_QUEUE_KEY, JSON.stringify(drafts));
+    return record.id;
   } catch {
     // Best-effort — if AsyncStorage is full or unavailable, oh well.
+    return undefined;
   }
 }
 
@@ -293,6 +324,12 @@ export async function clearDraft(id: string): Promise<void> {
   await AsyncStorage.setItem(DRAFT_QUEUE_KEY, JSON.stringify(next));
 }
 
+// Fetch one draft by id (undefined when it's gone — e.g. already sent).
+export async function getDraft(id: string): Promise<DraftRecord | undefined> {
+  const drafts = await listDrafts();
+  return drafts.find((d) => d.id === id);
+}
+
 function serializeForm(form: ObservationForm): SerializableForm {
   return {
     ...form,
@@ -301,5 +338,14 @@ function serializeForm(form: ObservationForm): SerializableForm {
       ...a,
       date: a.date.toISOString(),
     })),
+  };
+}
+
+// Inverse of serializeForm — revive Date fields from a queued snapshot.
+export function deserializeDraftForm(s: SerializableForm): ObservationForm {
+  return {
+    ...s,
+    start_date: new Date(s.start_date),
+    avalanches: s.avalanches.map((a) => ({ ...a, date: new Date(a.date) })),
   };
 }
