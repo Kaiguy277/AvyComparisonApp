@@ -22,6 +22,17 @@ Format per entry:
 ---
 
 ## 2026-08-07
+- **`refresh-stations-cache`: stop overwriting good cache with empty payloads**
+  (deployed + verified live). Previously an upstream failure left the snotel/weather
+  maps `{}`, then all 92 zones were upserted blank (clobbering the last good rows for
+  the same `zone_id,snapshot_date`) and every device was pushed to re-download the
+  blanks — all while returning `success:true`. Now: `r.ok` guards before `r.json()`;
+  track `snotelOk`/`weatherOk`; **bail with 502 if both upstreams fail** (cache left
+  intact); per-zone, skip zones whose payload is empty so they keep their prior good
+  row instead of being blanked (`written`/`skipped` in the response). **Verified
+  live:** healthy run returned `written:92, skipped:0`; `stations_cache` has exactly
+  92 rows/snapshot_date, 1440/1472 with stations. (Pre-existing: stale May rows the
+  cleanup cron will trim; the initial `rows:0` from list_tables was a stale estimate.)
 - **Safety-grade snow-math fix: timestamp-based lookbacks in `synoptic-api.ts`**
   (deployed to `get-snotel-observations` + `avalanche-summary`). Every 24/48/72hr/
   7-day figure (snow-depth change, precip accum, temp hi/lo/avg, wind, hourly
