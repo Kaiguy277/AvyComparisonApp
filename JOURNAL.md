@@ -16,6 +16,59 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-08-07 — Data-layer refactor (phase 2): dates, one writer, the archive safety bug
+
+Three tasks, each committed on its own. The theme: the data layer's bugs were all
+downstream of two structural problems — no single date convention and no single
+snapshot writer — so fixing the structure fixed the bugs.
+
+**Dates.** `todayIsoDate()` was UTC; the observation form was local; three separate
+workarounds in `index.tsx` had been bolted on to paper over the resulting off-by-one
+rather than fixing the root. Introduced `lib/dates.ts` (local, one convention) and
+routed everything through it. The subtle part was the *frozen* today values: both
+`todayStr` and the header date object were computed once at mount, so an overnight
+background stranded the pager on yesterday with the forward arrow disabled. Made them
+recompute on AppState 'active'.
+
+**One writer.** The snapshot read-modify-write existed three times and the two purpose-
+built helpers in offlineCache sat dead — the exact "each slice re-solved it locally"
+signature from the audit. Added `mutateSnapshot` (serializes every write behind one
+promise chain) + `mergeZoneBundle` (the nested spread, once). The two identical
+fetch-and-store copies collapsed into `refreshFavoritesSnapshot`; the reactive persist
+effect kept its distinct viewedDate/in-memory semantics but now runs atomic. Deleted
+the dead helpers and the unused auto-refresh preference while I was in there.
+
+**The archive safety bug — the one that mattered most.** Zone detail screens fell back
+to a *dateless* in-memory session cache when the snapshot lacked a bundle for the
+viewed date. The session always holds the most-recently-fetched day, so back-scrolling
+to an archive day silently showed today's danger ratings under that day's label. For a
+tool people read before committing to terrain, that's the worst kind of bug: confident
+and wrong. The fix rides on the 5-way-duplication cleanup the audit already wanted — a
+single `useZoneBundle` hook whose date rule *is* the safety property: today shows
+newest + session fallback; an archive day shows only the exact stored bundle, never the
+session. Tagged session entries with a `dateKey` and gated the fallback on it.
+
+What I deliberately did NOT do: fully fix §2.4 (get-cached-forecasts returns a global
+max forecastDate, so a zone whose forecast is a day old gets filed under a newer archive
+key). The honest reason: the client has no reliable per-zone date — `freshness.issueDate`
+is the mis-parsing display string the audit already flagged. The today=newest /
+archive=exact rule *mitigates* it (archive only shows what was explicitly stored, and
+the freshness object marks staleness), but the real fix is a backend change to return a
+raw per-zone ISO date from get-cached-forecasts. Logged as a follow-up rather than
+faked client-side.
+
+**State of the audit now.** Every ship-blocker and the two highest-value data-layer
+structural fixes are done. What remains from the audit, roughly: the §2.4 backend
+per-zone date; the consolidation pass (delete ~2,500 dead lines incl. ZoneCard, collapse
+the 7× zone catalogue, split the 2,675-line index.tsx, adopt the already-installed
+TanStack Query); zod on inbound responses; and standing up a CI/typecheck gate before
+that churn. No test infra yet — the whole data layer's date + concurrency logic is
+verified by construction and tsc, which is thinner than I'd like. If I were prioritizing
+the next session: TanStack Query adoption would retire most of index.tsx's remaining
+hand-rolled effects (including the B10 fetchSummary race) in one structural move, and a
+minimal test harness around lib/dates + the snapshot merge would give the date/
+concurrency work real coverage.
+
 ## 2026-08-07 — First stabilization pass: all six ship-blockers cleared
 
 Worked straight down the audit's ship-blocker list; all six done, each committed
