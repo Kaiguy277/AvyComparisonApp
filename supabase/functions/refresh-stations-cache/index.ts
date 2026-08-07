@@ -7,6 +7,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { ALL_ZONES, groupByCenter } from "../_shared/zones-list.ts";
+import { requireCronKey } from "../_shared/cron-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +18,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const denied = await requireCronKey(req, corsHeaders);
+  if (denied) return denied;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   // See refresh-forecast-cache for why we use INTERNAL_SR_KEY instead of
@@ -126,6 +130,9 @@ serve(async (req) => {
         Authorization: `Bearer ${serviceKey}`,
         apikey: serviceKey,
         "Content-Type": "application/json",
+        // send-snapshot-pushes is shared-secret gated; forward the key
+        // this request was invoked with rather than re-reading it.
+        "x-cron-key": req.headers.get("x-cron-key") ?? "",
       },
     });
     const body = await r.json();

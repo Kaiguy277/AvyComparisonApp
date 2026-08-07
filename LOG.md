@@ -22,6 +22,22 @@ Format per entry:
 ---
 
 ## 2026-08-07
+- **Shared-secret gate on the 4 publicly-invokable functions — live + verified**
+  (`refresh-forecast-cache`, `refresh-stations-cache`, `refresh-observations-cache`,
+  `send-snapshot-pushes`). New `_shared/cron-auth.ts` `requireCronKey()` reads a
+  secret from `public.function_secrets` (RLS on, all grants revoked from anon —
+  service_role reads it, anon gets `permission denied`) and constant-time compares
+  it to an `x-cron-key` header. All 3 http-post cron jobs updated via
+  `cron.alter_job` to send the header (value pulled from the table, never in git).
+  `refresh-stations-cache` forwards its received key to the internal
+  `send-snapshot-pushes` call. Functions deployed via `supabase functions deploy
+  --use-api` (no Docker). **Verified live:** missing key → 401, wrong key → 401,
+  correct key → 200, anon REST read of `function_secrets` → 42501 permission denied.
+  Migration `20260807010000_function_secrets.sql` in repo. Gotcha logged: a
+  `private` schema does NOT work — the service-role edge client reads through
+  PostgREST which only exposes `public`; the table must be in public + locked.
+  Secret value stored out-of-band; if repo is ever used to seed a fresh project,
+  insert a `cron_shared_secret` row and set the same value in the cron headers.
 - **`device_tokens` locked down — live in prod + repo migration**
   (`supabase/migrations/20260807000000_device_tokens_lockdown.sql`, applied via MCP;
   verified only `anon insert` remains in `pg_policies`). Dropped anon SELECT
