@@ -21,7 +21,20 @@ Format per entry:
 
 ---
 
-## 2026-08-07
+## 2026-08-07 — Data-layer refactor (phase 2)
+- **Single date convention: new `lib/dates.ts` (local everywhere).** Root cause of
+  the B6/B7 date bugs: `todayIsoDate()` was UTC, so "today" rolled over at 3 PM
+  Alaska, desyncing the pager from the header and locking the → arrow after an
+  overnight background. New `lib/dates.ts` (todayKey/toKey/fromKey/addDaysKey/
+  formatDayKey/formatDayKeyLong) is local per the observation-form reasoning
+  (`schema.ts:222`). `offlineCache.ts` date helpers now delegate to it (names
+  kept: `todayIsoDate`/`addDaysIso`/`formatDateLabel`); `pruneSnapshot` cutoff and
+  the flat-shape migration are local too. `index.tsx`: `todayStr` and the header
+  `today` object are no longer frozen at mount — both recompute on AppState
+  'active' (fixes the overnight pager lockout). Removed the stale UTC-rollover
+  workaround comment. Fixed the local/UTC mix in `zone/[zoneId]/index.tsx:789`
+  (7-day obs window). tsc clean. NOTE: the archive-shows-wrong-day safety bug (B8)
+  is a *separate* fix (task 9) — this task removes the date desync underneath it.
 - **`refresh-stations-cache`: stop overwriting good cache with empty payloads**
   (deployed + verified live). Previously an upstream failure left the snotel/weather
   maps `{}`, then all 92 zones were upserted blank (clobbering the last good rows for

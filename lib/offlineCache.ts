@@ -4,6 +4,7 @@ import type {
   WeatherObservation,
   ZoneWeatherForecast,
 } from "./api/avalanche";
+import { addDaysKey, formatDayKey, toKey, todayKey } from "./dates";
 
 // Storage keys
 const FAVORITES_KEY = "avy-favorites";
@@ -67,10 +68,11 @@ export async function saveFavorites(ids: string[]): Promise<void> {
 
 // ────────── Snapshot (bundles indexed by zoneId × date) ──────────
 
+// Local day key for a Date or ISO string (see lib/dates.ts on why local).
 function isoDate(d: Date | string): string {
   const x = typeof d === "string" ? new Date(d) : d;
-  if (isNaN(x.getTime())) return new Date().toISOString().slice(0, 10);
-  return x.toISOString().slice(0, 10);
+  if (isNaN(x.getTime())) return todayKey();
+  return toKey(x);
 }
 
 // Read & migrate-from-flat-shape if needed. The old shape was
@@ -173,9 +175,8 @@ export function pruneSnapshot(
   historyDays = OFFLINE_HISTORY_DAYS,
 ): FavoritesSnapshot {
   const favSet = new Set(favoriteZoneIds);
-  const cutoff = new Date();
-  cutoff.setUTCDate(cutoff.getUTCDate() - historyDays + 1);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // Local cutoff — keep today plus (historyDays − 1) prior local days.
+  const cutoffStr = addDaysKey(todayKey(), -(historyDays - 1));
 
   const nextZones: typeof snap.zones = {};
   for (const [zoneId, byDate] of Object.entries(snap.zones)) {
@@ -243,20 +244,8 @@ export function formatAge(iso: string | undefined): string {
   return `${Math.round(h / 24)}d ago`;
 }
 
-// Format YYYY-MM-DD for display ("MAY 1", "TUE · APR 30") in the hero.
-export function formatDateLabel(date: string): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  if (isNaN(d.getTime())) return date;
-  const month = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][d.getUTCMonth()];
-  return `${month} ${d.getUTCDate()}`;
-}
-
-export function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export function addDaysIso(date: string, delta: number): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
-}
+// Date helpers now live in lib/dates.ts (single local convention). These
+// re-exports keep the historical names working for existing callers.
+export const formatDateLabel = formatDayKey;
+export const todayIsoDate = todayKey;
+export const addDaysIso = addDaysKey;

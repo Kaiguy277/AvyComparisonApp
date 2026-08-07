@@ -31,19 +31,15 @@ import {
   todayIsoDate,
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
+import { formatDayKeyLong, fromKey } from "@/lib/dates";
 
 // How far back the user can scroll while online. Server retains 14 days
 // in forecast_cache; we expose 10 to give the cleanup a buffer.
 const ONLINE_HISTORY_DAYS = 10;
 
-const WEEKDAY_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
 // "MON · MAY 1" — used in the hero pager when viewing an archive day.
-function viewedDateLabel(date: string): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  if (isNaN(d.getTime())) return date;
-  return `${WEEKDAY_SHORT[d.getUTCDay()]} · ${formatDateLabel(date)}`;
-}
+// Local, via the single date convention in lib/dates.ts.
+const viewedDateLabel = formatDayKeyLong;
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -139,7 +135,10 @@ export default function Index() {
   // the ← / → arrows in the hero step it back/forward through the archive
   // window.
   const [viewedDate, setViewedDate] = useState<string>(todayIsoDate());
-  const todayStr = useMemo(() => todayIsoDate(), []);
+  // Not frozen: recomputed on foreground (see AppState effect) so leaving
+  // the app backgrounded overnight doesn't strand the pager on yesterday
+  // with the → arrow disabled at viewedDate === a stale "today".
+  const [todayStr, setTodayStr] = useState<string>(todayIsoDate());
   const isViewingToday = viewedDate === todayStr;
   // Persisted starred zones — survive relaunch and feed offline cache.
   const [favoriteZoneIds, setFavoriteZoneIds] = useState<string[]>([]);
@@ -208,8 +207,10 @@ export default function Index() {
     }
   }, [summary, fadeAnim]);
 
+  // Derived from todayStr (local day key) so it refreshes on foreground
+  // rather than freezing at mount overnight.
   const today = useMemo(() => {
-    const d = new Date();
+    const d = fromKey(todayStr);
     return {
       day: String(d.getDate()).padStart(2, "0"),
       month: months[d.getMonth()],
@@ -218,7 +219,7 @@ export default function Index() {
         .toLocaleDateString("en-US", { weekday: "long" })
         .toUpperCase(),
     };
-  }, []);
+  }, [todayStr]);
 
   // Load saved favorites + offline snapshot. The displayed list seeds from
   // favorites (or DEFAULT_ZONE_IDS for first-run) — ad-hoc picks are
@@ -346,7 +347,10 @@ export default function Index() {
   useEffect(() => {
     refreshFavoritesInBackground();
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") refreshFavoritesInBackground();
+      if (state === "active") {
+        setTodayStr(todayIsoDate());
+        refreshFavoritesInBackground();
+      }
     });
     return () => sub.remove();
   }, [refreshFavoritesInBackground]);
@@ -872,15 +876,12 @@ export default function Index() {
     if (favoriteZoneIds.length === 0) return;
     if (isOnline === null) return;
     autoLoadedRef.current = true;
-    // Offline at launch: skip fetchSummary (which pins to viewedDate =
-    // today UTC) and call loadFromSnapshot() directly so we pick the
-    // newest cached bundle per zone. fetchSummary's offline branch does
-    // an exact-match lookup on today's UTC date — when the device's UTC
-    // has rolled over since the last bg-wake, the snapshot is keyed
-    // under yesterday UTC and the lookup silently returns nothing.
-    // Skip if no snapshot was hydrated — loadFromSnapshot() with no
-    // target date would otherwise pop a "No cached forecast" alert on
-    // a fresh install opened offline.
+    // Offline at launch: call loadFromSnapshot() directly so we pick the
+    // newest cached bundle per zone rather than pinning to today's key
+    // (a zone whose last successful refresh was yesterday has no bundle
+    // under today). Skip if no snapshot was hydrated — loadFromSnapshot()
+    // would otherwise pop a "No cached forecast" alert on a fresh install
+    // opened offline.
     if (isOnline === false) {
       if (snapshot && Object.keys(snapshot.zones).length > 0) {
         loadFromSnapshot().catch(() => {});

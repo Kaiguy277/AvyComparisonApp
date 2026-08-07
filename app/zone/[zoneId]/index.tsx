@@ -11,6 +11,7 @@ import { dangerColors, freshness, palette } from "@/constants/design";
 import { AVAILABLE_ZONES, ZONE_TO_CENTER_NAME } from "@/lib/zones";
 import { avalancheApi } from "@/lib/api/avalanche";
 import { getZoneSession, setZoneSession } from "@/lib/zoneSession";
+import { addDaysKey, todayKey } from "@/lib/dates";
 import {
   ageHours,
   formatAge,
@@ -786,9 +787,7 @@ function observationLines(obs: ObservationSummary[] | null): string[] {
   // Tile communicates in-zone signal — center-wide count goes on the
   // screen instead, behind the "All center" filter chip.
   const inZone = obs.filter((o) => o.inZone);
-  const since = new Date();
-  since.setDate(since.getDate() - 7);
-  const sinceStr = since.toISOString().slice(0, 10);
+  const sinceStr = addDaysKey(todayKey(), -7);
   const inZoneLast7 = inZone.filter(
     (o) => (o.startDate ?? "") >= sinceStr,
   ).length;
