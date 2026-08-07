@@ -22,6 +22,20 @@ Format per entry:
 ---
 
 ## 2026-08-07
+- **`device_tokens` locked down — live in prod + repo migration**
+  (`supabase/migrations/20260807000000_device_tokens_lockdown.sql`, applied via MCP;
+  verified only `anon insert` remains in `pg_policies`). Dropped anon SELECT
+  (push-token harvest vector — Expo's push endpoint accepts unauthenticated sends)
+  and anon UPDATE (mass row corruption). App registration switched to insert-only
+  (`ignoreDuplicates: true` in `lib/pushNotifications.ts`) so no UPDATE arm is
+  needed; dead tokens still pruned via DeviceNotRegistered in the fan-out.
+  `scripts/check-device-tokens.sh` now requires SUPABASE_SERVICE_ROLE_KEY.
+  Tradeoff accepted: `last_seen` no longer refreshes (nothing consumed it).
+- **Live Supabase verified (task 1):** the two orphan tables
+  (`avalanche_forecast_cache`, `avalanche_daily_forecasts`) **do not exist in prod**
+  — every read/write in `avalanche-summary` has been erroring+swallowed since day
+  one; the ~150 lines touching them should be deleted, not migrated. All 4 pg_cron
+  jobs active again post-restore. All cache tables ~empty (project was paused).
 - **Observation submit flow: all five audit bugs fixed** (`lib/api/observationSubmit.ts`,
   `lib/observation/submitFlow.ts`, `app/observation/new.tsx`, `app/index.tsx`, `.env`):
   - Abort signal now threaded into every fetch (`postJson`/`uploadMedia`/
