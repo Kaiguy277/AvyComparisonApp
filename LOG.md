@@ -21,6 +21,31 @@ Format per entry:
 
 ---
 
+## 2026-08-07 — Tier 3: consolidation (branch `chore/tier3-consolidation`)
+- **Deleted ~2,700 lines of verified-dead code.** Built an import-reachability
+  analysis from the `app/` entry points (routes auto-discovered by expo-router),
+  cross-checked with grep — did NOT trust the audit blind, and it paid off: the audit
+  thought `WeatherStationCard`/`MetricChart`/`WindCompass`/`WindDirectionRow` were
+  ZoneCard-only, but they're reachable via `stations.tsx`, so they were kept.
+  - **App/components (−1,899 lines, 12 files):** `ZoneCard.tsx` (845, the abandoned
+    ZoneTile predecessor), `ZoneComparisonMatrix`, `TempSparkline`, `DangerStack`,
+    `HeadlineDanger`, `ElevationPyramid`, `WeatherForecastCard` (dead via ZoneCard),
+    `dangerColors.ts` shim, `constants/theme.ts`, and the 3 Expo-template theme hooks.
+  - **Backend (−~800 lines):** `_shared/cors.ts`, `snotel-api.ts` (also removes the
+    Tier-2-deferred token-in-logs sites), `validation.ts`, and the unreachable
+    single-station `fetchStationObservations` in `synoptic-api.ts` (live batched path
+    + shared helpers untouched). Redeployed avalanche-summary + get-snotel-observations,
+    smoke-tested. tsc + 53 tests green.
+- **Zone catalogue (task 20): shipped a drift-GUARD, deferred the physical merge.**
+  The catalogue is duplicated across the app + edge (two runtimes can't share one
+  import) — a true single source needs a codegen/build step and rewiring 5 live
+  forecast functions, which is high-risk for low ROI (zones almost never change). The
+  audit's real concern was "the sync is luck, not structure." Converted that luck into
+  an enforced contract: `lib/zones.test.ts` (6 tests) asserts the zone-id sets, center
+  assignments, NAC-slug map, NWS map, and weather-station coverage all agree across the
+  5 importable copies (documents the 2 known station-less zones). Catches future drift
+  at zero risk. Full physical consolidation left as a dedicated future change.
+
 ## 2026-08-07 — Tier 2: backend cleanup (branch `chore/backend-cleanup`, all deployed live)
 - **CORS: added `Access-Control-Allow-Methods: POST, OPTIONS` + `Max-Age` to all 9 edge
   functions.** They inlined `corsHeaders` with no Allow-Methods, so a browser preflight
