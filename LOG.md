@@ -21,6 +21,19 @@ Format per entry:
 
 ---
 
+## 2026-08-07 — Tier 1: avalanche-problem elevation-band safety fix
+- **Fixed A1 (safety): the problem card showed problems at the wrong elevation band,
+  and disagreed with the rose beside it.** `AvalancheProblemCard.tsx:95` matched bands
+  by substring — `"Treeline"` also matched `"Below Treeline"`, so a below-treeline-only
+  problem rendered at TL too. The rose (`ProblemRose`) had the correct mapping but a
+  *separate* copy, so text and rose could diverge. Extracted one shared
+  `lib/avalanche/elevationBand.ts` (`elevationBand` + `elevationRingIndex`, "below"
+  checked before the treeline fallthrough) and routed BOTH the card (exact band match)
+  and the rose through it — they now agree by construction. Live screen
+  (`problems.tsx` renders the card). +6 Vitest tests (47 total). tsc + lint clean.
+  Tier 1's other item — device smoke test of the TanStack conversion — assumed passing
+  per Kai; not runnable here (no iOS sim).
+
 ## 2026-08-07 — Test harness (Vitest)
 - **No iOS simulator is possible here** (Linux; iOS sim is Mac-only, no Android SDK
   installed). Checked the STT app repo per Kai — its "simulator test thing" is actually
