@@ -21,7 +21,31 @@ Format per entry:
 
 ---
 
-## 2026-08-07 — Data-layer refactor (phase 2)
+## 2026-08-07 — Data-layer refactor (phase 3: TanStack Query)
+- **Forecast fetching moved onto TanStack Query (B10, B12, B13, B16 fixed).** The
+  hand-rolled `fetchSummary`/`fetchSnotel`/`fetchWeatherForecast`/`loadFromSnapshot`
+  tangle in `index.tsx` (useState+useEffect+.then, ~380 lines) is replaced by one
+  `useQuery` keyed on `["forecast", sortedDisplayedZoneIds, viewedDate, isOnline]`.
+  The whole decision tree (offline→snapshot, cached→server, archive→snapshot,
+  today-miss→live-scrape+snotel+weather folded in) is extracted to
+  `lib/forecast/loadForecastBundle.ts` returning ONE complete bundle; the component
+  derives its existing state-variable names from `query.data` (memoized for stable
+  identity) so the ~1,900-line render + the persist/session effects were untouched.
+  Fixes: **B10** (overlapping fetches clobbering each other + the
+  `setViewedDate(cached.forecastDate)` hijack — viewedDate is now a query INPUT, and
+  the hijack line is gone); **B13** (a live-scrape total failure now `throw`s →
+  `query.error` → one Alert, distinct from an empty result); **B12** (isOnline is in
+  the key, so regaining service refetches — the old one-shot autoLoadedRef couldn't);
+  **B16** (`zonesScraped` derived per-bundle, so it can't show a stale prior scrape).
+  `index.tsx` 2,675 → 2,294 lines. Removed the now-dead auto-load effect, autoLoadedRef,
+  and the secondary snotel/weather loading indicator. keepPreviousData holds the last
+  bundle during a refetch; both write-back effects (snapshot persist + session fan-out)
+  now skip while `isFetching` so placeholder data from the previous date can't be filed
+  under the new date's key. tsc + eslint clean. **NEEDS A DEVICE SMOKE TEST before
+  merge** — this is the largest single rewrite of the app's busiest file and there's
+  no test harness; verified by construction + tsc/eslint only. Priority check paths:
+  date paging (archive ↔ today), pull-to-refresh, offline launch, going offline→online,
+  and a live-scrape fallback (rare: only when the server cache misses).
 - **SAFETY: archive view can no longer show today's danger under a past date (B8).**
   New `hooks/useZoneBundle.ts` is the single bundle resolver for the zone detail +
   4 sub-screens (was pasted 5×). The date rule is the fix: **today → newest stored
