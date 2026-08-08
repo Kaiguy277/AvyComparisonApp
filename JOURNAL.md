@@ -16,6 +16,37 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-08-07 — Tier 3: deleting dead code without guessing, and knowing when to stop
+
+The project's own CLAUDE.md rule — "check reachability before touching a component,
+~2,500 lines are dead" — is exactly right, and the temptation was to just delete the
+audit's list. I didn't. I wrote a real import-reachability analysis (walk imports from
+every `app/` route, since expo-router auto-discovers them) and let *that* produce the
+delete list, cross-checked with grep. Worth it: the audit was wrong on four files —
+`WeatherStationCard`/`MetricChart`/`WindCompass`/`WindDirectionRow` are reachable
+through `stations.tsx`, not only through the dead `ZoneCard`. Deleting them would have
+broken the stations screen. The analysis caught what a list-follower would have missed.
+~2,700 lines gone (app + backend), tsc + tests green, live functions smoke-tested.
+
+The interesting judgment call was task 20, the 7× zone catalogue. The instinct is
+"duplication bad, consolidate." But the honest analysis says otherwise: the copies live
+in two runtimes (the app bundle and the Deno edge functions) that genuinely cannot share
+an import, so a real single source needs a codegen/build step and a rewire of five *live
+forecast* functions. High risk, and the payoff is small because the zone set almost never
+changes. The audit's actual complaint wasn't "there are copies" — it was "they stay in
+sync by luck." So I fixed *that*: a drift-guard test that fails the moment any copy
+diverges. That's the whole safety benefit at none of the risk. The physical merge is a
+real future change, but it should be its own deliberate thing, not tacked onto a deletion
+pass. Deleting dead code and restructuring live code are different risk classes and I
+didn't want to blur them.
+
+General lesson from this whole session worth writing down: the audit was an excellent
+map but not a substitute for verification. It was wrong about ZoneCard's dependents,
+imprecise about the token-in-logs sites (dead code, not live), and it over-weighted the
+zone-catalogue consolidation. Every time I verified before acting — reachability graph,
+live DB checks, the drift test — it changed what I did. Trust the audit to point; verify
+before you cut.
+
 ## 2026-08-07 — Phase 3: TanStack Query, and being honest about what I can't verify
 
 Did "the big one" — moved forecast fetching onto TanStack Query. The design that
