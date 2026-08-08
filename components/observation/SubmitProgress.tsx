@@ -148,7 +148,7 @@ function BusyBody({
           className="text-ink-400"
           style={{ fontSize: 11, lineHeight: 15, textAlign: "center" }}
         >
-          Don't close the app until this finishes — your photos are uploading.
+          Don’t close the app until this finishes — your photos are uploading.
         </Text>
       )}
     </View>

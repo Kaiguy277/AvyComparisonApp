@@ -61,7 +61,7 @@ export default function ZoneNwsScreen() {
 }
 
 function NwsForecastView({ nws }: { nws: NwsForecast }) {
-  const periods = nws.periods ?? [];
+  const periods = useMemo(() => nws.periods ?? [], [nws.periods]);
 
   // High/low across the day periods so the user can read the temperature
   // arc at a glance before scrolling through period cards.

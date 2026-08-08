@@ -34,23 +34,8 @@ import {
 } from "@/lib/offlineCache";
 import { formatDayKeyLong, fromKey } from "@/lib/dates";
 
-// How far back the user can scroll while online. Server retains 14 days
-// in forecast_cache; we expose 10 to give the cleanup a buffer.
-const ONLINE_HISTORY_DAYS = 10;
-
-// "MON · MAY 1" — used in the hero pager when viewing an archive day.
-// Local, via the single date convention in lib/dates.ts.
-const viewedDateLabel = formatDayKeyLong;
-
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import {
-  Card,
-  CardContent,
-  CardEyebrow,
-  CardHeader,
-} from "@/components/ui/Card";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { Collapsible } from "@/components/ui/Collapsible";
 import { Text } from "@/components/ui/Text";
 import { FavoritesReorder } from "@/components/avalanche/FavoritesReorder";
@@ -88,6 +73,14 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
 import { listDrafts as listObservationDrafts } from "@/lib/observation/submitFlow";
 import { setZoneSession } from "@/lib/zoneSession";
+
+// How far back the user can scroll while online. Server retains 14 days
+// in forecast_cache; we expose 10 to give the cleanup a buffer.
+const ONLINE_HISTORY_DAYS = 10;
+
+// "MON · MAY 1" — used in the hero pager when viewing an archive day.
+// Local, via the single date convention in lib/dates.ts.
+const viewedDateLabel = formatDayKeyLong;
 
 const months = [
   "JANUARY",

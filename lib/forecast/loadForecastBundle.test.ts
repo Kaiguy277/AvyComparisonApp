@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+import { loadForecastBundle } from "./loadForecastBundle";
+
 // Mock the network client and the snapshot reader so we can drive each
 // branch of the decision tree deterministically. AVAILABLE_ZONES /
 // ZONE_TO_CENTER (from @/lib/zones) are left real — they're a pure catalog
@@ -17,8 +19,6 @@ const { api, loadSnapshot } = vi.hoisted(() => ({
 
 vi.mock("@/lib/api/avalanche", () => ({ avalancheApi: api }));
 vi.mock("@/lib/offlineCache", () => ({ loadSnapshot }));
-
-import { loadForecastBundle } from "./loadForecastBundle";
 
 const ZONE = "turnagain-girdwood"; // a real CNFAIC zone id
 const fc = (id: string) => ({ id, name: id }) as any;

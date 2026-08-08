@@ -205,7 +205,7 @@ export interface NacWeatherTable {
   zone_name: string;
   zone_id: string;
   columns: string[];
-  rows: Array<{ heading: string; field: string; unit: string | null }>;
+  rows: { heading: string; field: string; unit: string | null }[];
   data: (string | null)[][];
 }
 
@@ -301,7 +301,7 @@ export interface ObservationSummary {
   advancedFields: Record<string, unknown> | null;
   // Avalanche records — full nested objects (trigger, type, size,
   // depth/width/vertical, aspect, elevation, comments). Passed through.
-  avalanches: Array<Record<string, unknown>>;
+  avalanches: Record<string, unknown>[];
   hasAvalanches: boolean;
   media: ObservationMedia[];
   thumbnails: string[];

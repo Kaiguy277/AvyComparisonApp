@@ -517,7 +517,7 @@ export default function ObservationNewScreen() {
               className="text-ink-300"
               style={{ fontSize: 12, lineHeight: 17 }}
             >
-              Stored on this device so you don't have to type it again next
+              Stored on this device so you don’t have to type it again next
               time.
             </Text>
             <TextField
@@ -780,8 +780,8 @@ export default function ObservationNewScreen() {
                 className="text-ink-300"
                 style={{ fontSize: 13, lineHeight: 18 }}
               >
-                Skipped — you didn't see any avalanches. Toggle "Did you see
-                avalanches?" in the previous section to add records here.
+                Skipped — you didn’t see any avalanches. Toggle “Did you see
+                avalanches?” in the previous section to add records here.
               </Text>
             ) : (
               <>

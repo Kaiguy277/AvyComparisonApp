@@ -38,7 +38,15 @@ export default function ObservationDetailScreen() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    if (obs !== null) {
+    // Resolve from the session cache fresh (keyed by zoneId + obsId)
+    // rather than reading the captured `obs` state with only [zoneId,
+    // obsId] deps — the latter was a stale-closure trap (B14). Still
+    // falls through to a fetch when this obs isn't in the cached list.
+    const cached = getZoneSession(zoneId)?.observations?.find(
+      (o) => o.id === obsId,
+    );
+    if (cached) {
+      setObs(cached);
       setLoaded(true);
       return;
     }
@@ -377,7 +385,7 @@ function AvalancheRecord({ rec }: { rec: Record<string, unknown> }) {
   // NAC keeps shipping new fields, so we render whatever's present
   // rather than hard-coding a curated subset. Skip empty values + the
   // attached-media field (we already render media at the top).
-  const rows: Array<[string, string]> = [];
+  const rows: [string, string][] = [];
   for (const [k, v] of Object.entries(rec)) {
     if (v === null || v === undefined) continue;
     if (k === "media" || k === "id") continue;
@@ -424,7 +432,7 @@ function AvalancheRecord({ rec }: { rec: Record<string, unknown> }) {
 function AdvancedSection({ obs }: { obs: ObservationSummary }) {
   const af = obs.advancedFields;
   if (!af) return null;
-  const blocks: Array<{ label: string; body: string }> = [];
+  const blocks: { label: string; body: string }[] = [];
 
   const ws = af["weather_summary"];
   if (typeof ws === "string" && ws.trim()) {

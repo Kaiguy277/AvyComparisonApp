@@ -708,39 +708,6 @@ function SubTile({
   );
 }
 
-function Meta({
-  label,
-  value,
-  valueColor,
-}: {
-  label: string;
-  value: string;
-  valueColor?: string;
-}) {
-  return (
-    <View>
-      <Text
-        variant="mono"
-        weight="medium"
-        className="text-ink-400"
-        style={{ fontSize: 9, letterSpacing: 1.2 }}
-      >
-        {label}
-      </Text>
-      <Text
-        variant="mono"
-        style={{
-          fontSize: 12,
-          color: valueColor ?? palette.ink[200],
-          marginTop: 2,
-        }}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 // True when there's any published narrative beyond avalanche problems —
 // drives whether the "Full forecast" tile is enabled. Includes the
 // bottom line, snowpack discussion, weather discussion, the avalanche
