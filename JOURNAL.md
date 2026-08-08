@@ -16,6 +16,46 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-08-07 — Phase 3: TanStack Query, and being honest about what I can't verify
+
+Did "the big one" — moved forecast fetching onto TanStack Query. The design that
+made it tractable: don't rewrite the render. I extracted the entire fetch decision
+tree into `lib/forecast/loadForecastBundle.ts` (a pure-ish async queryFn returning one
+complete bundle), then derived the component's existing state-variable names
+(`summary`, `weatherForecastData`, `loadSource`, …) from `query.data`. So ~1,900 lines
+of render and the two write-back effects never changed — only the ~380-line fetch
+tangle got deleted. index.tsx dropped to 2,294 lines and four audit bugs (B10, B12,
+B13, B16) fell out of the structure rather than needing individual patches.
+
+The subtle bug I had to design around was `keepPreviousData`. It keeps the previous
+date's bundle on screen during a refetch — good UX, matches the old "don't blank"
+feel — but the persist and session-fan-out effects key on `viewedDate`, which has
+*already* moved. Without a guard they'd file yesterday's forecast under today's key
+the instant you page, and for a date with no data that stale write would survive
+(the correct result is "empty", which doesn't overwrite). This is the same class as
+the B8 safety bug I'd just fixed, arriving through a different door. The fix: both
+write-back effects now bail while `forecastQuery.isFetching`, so only settled data for
+the current key ever gets persisted. Worth noting the old code had the same transient
+window (setViewedDate + async setSummary); I didn't invent it, but keepPreviousData
+made it worth closing properly.
+
+**The honest part.** This is the largest single rewrite of the app's busiest file, and
+I can't run it. The environment is Linux; it's an iPhone-first Expo app with native
+modules (background fetch, notifications, location) that don't work on web, and there's
+no iOS simulator here and no test harness in the repo. So "verified" means tsc clean,
+eslint clean, and careful branch-for-branch translation of the decision tree — nothing
+more. tsc cannot catch a wrong query key, a bad `enabled` predicate, or a
+keepPreviousData edge I didn't think of. Before this merges it needs a real device run:
+date paging archive↔today, pull-to-refresh, offline launch, and the offline→online
+transition are the paths most likely to expose a mistake. The live-scrape fallback is
+rare (only on a server-cache miss) but is the most-rewritten branch, so worth forcing.
+
+If I could change one thing about the order of this whole effort, it'd be to stand up a
+minimal test harness (even just Jest over lib/dates, the snapshot merge, and
+loadForecastBundle with a mocked avalancheApi) BEFORE this phase rather than after.
+Four commits of date/concurrency/fetch logic now rest on construction-correctness alone.
+That's the honest top of the next-session list, ahead of more feature-shaped work.
+
 ## 2026-08-07 — Data-layer refactor (phase 2): dates, one writer, the archive safety bug
 
 Three tasks, each committed on its own. The theme: the data layer's bugs were all
