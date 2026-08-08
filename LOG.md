@@ -21,6 +21,28 @@ Format per entry:
 
 ---
 
+## 2026-08-07 — Test harness (Vitest)
+- **No iOS simulator is possible here** (Linux; iOS sim is Mac-only, no Android SDK
+  installed). Checked the STT app repo per Kai — its "simulator test thing" is actually
+  a **Vitest** logic harness, not a device sim. Mirrored that pattern.
+- **Added Vitest + 41 tests** covering the exact logic changed this session that tsc
+  can't verify: `lib/dates` (13 — local-convention round-trips, DST, the 3 PM Alaska
+  rollover), `lib/offlineCache` (11 — mergeZoneBundle preserve/immutability, prune
+  age+favorite filters, getZoneSnapshotForDate exact-vs-newest, flat→nested migration,
+  and the **mutateSnapshot lost-update race** with two concurrent writers), the
+  **`loadForecastBundle` decision tree** (9 — offline, cached-hit-no-fallthrough,
+  archive exact-date fallback, archive-miss-returns-empty-not-stale, live scrape with
+  snotel/weather folding, live-total-failure throws, best-effort hiccup — this
+  de-risks the TanStack conversion), and the **synoptic timestamp math** (8 — a
+  10-min-cadence station's "24hr ago" is ~24h back not 4h, hourlySeries ~24 pts not
+  144, hourlyIncrements sums per bucket without 6× double-count). All green under
+  `TZ=America/Anchorage`.
+- Setup: `vitest.config.ts` (@ alias → root, node env, async-storage aliased to an
+  in-memory stub in `test/mocks/`, include scoped to lib/hooks/supabase so RN screens
+  stay out). Exported the pure helpers in `synoptic-api.ts` to test them (harmless for
+  the Deno edge fn). New scripts: `npm test`, `npm run test:watch`, `npm run typecheck`.
+  CLAUDE.md gate section updated. Still no CI; device smoke-test still manual.
+
 ## 2026-08-07 — Data-layer refactor (phase 3: TanStack Query)
 - **Forecast fetching moved onto TanStack Query (B10, B12, B13, B16 fixed).** The
   hand-rolled `fetchSummary`/`fetchSnotel`/`fetchWeatherForecast`/`loadFromSnapshot`

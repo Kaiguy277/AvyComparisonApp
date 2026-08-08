@@ -46,5 +46,9 @@ array-index snow math, broken observation cancel/draft flow.
 - **Dates:** `todayIsoDate()` is UTC and rolls over at 3 PM Alaska time. Don't add a
   fourth workaround; fix callers to a single convention (local, per
   `lib/observation/schema.ts:227-229` reasoning) when touching date logic.
-- No tests and no CI exist yet. `npx tsc --noEmit` is the only gate — run it before
-  claiming a change is done.
+- **Gates before claiming a change is done:** `npm run typecheck` (tsc --noEmit),
+  `npm run lint`, and `npm test` (Vitest — logic tests for `lib/dates`, offline-cache
+  merge/prune, `loadForecastBundle`, and the synoptic timestamp math). Tests pin
+  `TZ=America/Anchorage` for deterministic date assertions. No CI yet — run them
+  locally. The app itself is iPhone-first and can't be run in this Linux env (no iOS
+  sim); Vitest covers the pure logic, device smoke-testing is still manual.

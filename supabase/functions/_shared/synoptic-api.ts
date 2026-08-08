@@ -337,7 +337,7 @@ function safeSubtract(a: number | null, b: number | null): number | null {
 // array position is NOT time. Everything below anchors to the latest
 // sample's clock and selects by elapsed hours, not element count.
 
-function anchorMs(timestamps: string[]): number {
+export function anchorMs(timestamps: string[]): number {
   const raw = timestamps.length
     ? Date.parse(timestamps[timestamps.length - 1])
     : NaN;
@@ -346,7 +346,7 @@ function anchorMs(timestamps: string[]): number {
 
 // First index whose timestamp is within `hours` of the latest sample.
 // Assumes ascending timestamps (Synoptic's date_time order).
-function windowStartIdx(timestamps: string[], hours: number): number {
+export function windowStartIdx(timestamps: string[], hours: number): number {
   const cutoff = anchorMs(timestamps) - hours * 3_600_000;
   let lo = 0;
   let hi = timestamps.length;
@@ -360,7 +360,7 @@ function windowStartIdx(timestamps: string[], hours: number): number {
 
 // Value ~`hours` ago: the most recent non-null reading at or before
 // (anchor − hours). Returns null if there's no reading that old.
-function valueHoursAgo(
+export function valueHoursAgo(
   vals: (number | null)[],
   timestamps: string[],
   hours: number,
@@ -385,17 +385,17 @@ function validInWindow(
   return out;
 }
 
-function maxOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
+export function maxOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
   const v = validInWindow(vals, timestamps, hours);
   return v.length ? Math.max(...v) : null;
 }
 
-function minOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
+export function minOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
   const v = validInWindow(vals, timestamps, hours);
   return v.length ? Math.min(...v) : null;
 }
 
-function avgOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
+export function avgOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
   const v = validInWindow(vals, timestamps, hours);
   if (!v.length) return null;
   return Math.round(v.reduce((a, b) => a + b, 0) / v.length);
@@ -413,7 +413,7 @@ function bucketMs(hours: number): number {
  * reading in each bucket wins). Time-based, so a 10-minute station and
  * an hourly station both yield ~`hours` points instead of 6× more.
  */
-function hourlySeries(vals: (number | null)[], timestamps: string[], hours: number): TempDataPoint[] {
+export function hourlySeries(vals: (number | null)[], timestamps: string[], hours: number): TempDataPoint[] {
   const start = windowStartIdx(timestamps, hours);
   const width = bucketMs(hours);
   const points: TempDataPoint[] = [];
@@ -434,7 +434,7 @@ function hourlySeries(vals: (number | null)[], timestamps: string[], hours: numb
  * resets / negative diffs become 0. Deltas are SUMMED within each clock
  * bucket so sub-hourly reporting doesn't drop accumulation.
  */
-function hourlyIncrements(
+export function hourlyIncrements(
   vals: (number | null)[],
   timestamps: string[],
   hours: number,
