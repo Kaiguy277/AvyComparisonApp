@@ -21,6 +21,34 @@ Format per entry:
 
 ---
 
+## 2026-08-07 — Tier 2: backend cleanup (branch `chore/backend-cleanup`, all deployed live)
+- **CORS: added `Access-Control-Allow-Methods: POST, OPTIONS` + `Max-Age` to all 9 edge
+  functions.** They inlined `corsHeaders` with no Allow-Methods, so a browser preflight
+  for a POST failed → uncallable from any web client (the RN app was unaffected since it
+  sends no Origin, but the shared web app is). Verified live: OPTIONS on
+  get-cached-forecasts now returns `access-control-allow-methods: POST, OPTIONS`.
+- **Deleted the orphan-table code in `avalanche-summary`** (−204 lines, 2357→2153).
+  `avalanche_forecast_cache` and `avalanche_daily_forecasts` don't exist in prod, so
+  every read/write errored and was swallowed — and `checkForecastCache` cost a wasted
+  round-trip per zone on every call. Removed `checkForecastCache`/`storeForecastCache`/
+  `buildZoneDataFromCache` + `CacheEntry`, the 3 store call-sites, the cache-check
+  block, and the `avalanche_daily_forecasts` write. Kept `CacheStatus` + the response's
+  per-zone `cacheStatus` field (now always "miss") so the response shape is unchanged.
+  This also removed the §3.7 **display-string→timestamp bug** (task 15) — it lived
+  inside the daily_forecasts write (`new Date(freshness.issueDate)` on a "May 1, 2 PM"
+  label). Verified live: avalanche-summary still returns a valid forecast.
+- **Freshness stamps now render in each zone's timezone** (§3.6). `calculateFreshness`
+  called `formatDate` with no tz → defaulted to Alaska for all 92 zones (4h off for the
+  lower-48). Added a `timezone` param, threaded `config.timezone` at both live call
+  sites. (The 3rd call site was in the deleted cache-rebuild code.)
+- **Token-in-logs (task 13): verified NOT a live issue.** The flagged sites
+  (`snotel-api.ts`, the single `fetchStationObservations`) are dead code with no live
+  callers; the live batched Synoptic path never logs the URL. Deferred to the Tier 3
+  dead-code deletion rather than redacting code that's about to be removed.
+- All 9 functions deployed via `supabase functions deploy --use-api`. Re-verified the
+  shared-secret gate still works post-redeploy (send-snapshot-pushes with the right
+  x-cron-key → 200). App tsc clean.
+
 ## 2026-08-07 — SESSION SUMMARY (stabilization pass → merged to main)
 
 First working session on this project with the new-generation agent. Started from a
