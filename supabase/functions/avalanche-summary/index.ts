@@ -6,6 +6,8 @@ import { getStationsForZone } from '../_shared/weather-station-config.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
 // Supabase client for cache operations
@@ -914,8 +916,15 @@ function formatDate(isoDate: string | null, timezone: string = 'America/Anchorag
   }
 }
 
-// Calculate freshness status based on expiration
-function calculateFreshness(startDate: string | null, endDate: string | null): {
+// Calculate freshness status based on expiration. `timezone` is the
+// zone's local zone (from ZONE_CONFIG) — the issue/expiry DISPLAY strings
+// must render in it, or every zone shows Alaska time (4h off for the
+// lower-48 centers, and the date is wrong near day boundaries).
+function calculateFreshness(
+  startDate: string | null,
+  endDate: string | null,
+  timezone: string = 'America/Anchorage',
+): {
   issueDate: string | null;
   expiresDate: string | null;
   ageHours: number | null;
@@ -958,8 +967,8 @@ function calculateFreshness(startDate: string | null, endDate: string | null): {
     console.log(`Freshness result: status=${status}`);
 
     return {
-      issueDate: formatDate(startDate),
-      expiresDate: formatDate(endDate),
+      issueDate: formatDate(startDate, timezone),
+      expiresDate: formatDate(endDate, timezone),
       ageHours,
       hoursUntilExpiry,
       status,
@@ -1447,127 +1456,13 @@ interface ZoneData {
 // Cache status for logging/debugging
 type CacheStatus = 'hit' | 'miss' | 'stored' | 'error';
 
-interface CacheEntry {
-  zone_id: string;
-  nac_zone_id: string;
-  center_id: string;
-  published_time: string;
-  expires_time: string | null;
-  forecast_data: any;
-  scraped_content: string | null;
-  data_source: string;
-}
-
-// Check forecast cache for a zone by published_time
-async function checkForecastCache(
-  zoneId: string,
-  publishedTime: string | null
-): Promise<{ data: CacheEntry | null; status: CacheStatus }> {
-  if (!publishedTime) {
-    console.log(`Cache SKIP for ${zoneId}: no published_time provided`);
-    return { data: null, status: 'miss' };
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('avalanche_forecast_cache')
-      .select('*')
-      .eq('zone_id', zoneId)
-      .eq('published_time', publishedTime)
-      .single();
-
-    if (error || !data) {
-      console.log(`Cache MISS for ${zoneId} @ ${publishedTime}`);
-      return { data: null, status: 'miss' };
-    }
-
-    console.log(`Cache HIT for ${zoneId} @ ${publishedTime}`);
-    return { data: data as CacheEntry, status: 'hit' };
-  } catch (error) {
-    console.error(`Cache lookup error for ${zoneId}:`, error);
-    return { data: null, status: 'error' };
-  }
-}
-
-// Store forecast data in cache
-async function storeForecastCache(
-  zoneData: ZoneData,
-  config: { nacZoneId: string; centerId: string }
-): Promise<CacheStatus> {
-  if (!zoneData.publishedTime) {
-    console.log(`Skipping cache store for ${zoneData.id}: no published_time`);
-    return 'miss';
-  }
-
-  try {
-    // Build forecast_data object matching what we need to reconstruct ZoneData
-    const forecastData = {
-      forecast: zoneData.forecast,
-      problems: zoneData.problems,
-      weather: zoneData.weather,
-      bottomLine: zoneData.bottomLine,
-      hazardDiscussion: zoneData.hazardDiscussion,
-      freshness: zoneData.freshness,
-    };
-
-    const { error } = await supabase
-      .from('avalanche_forecast_cache')
-      .upsert({
-        zone_id: zoneData.id,
-        nac_zone_id: config.nacZoneId,
-        center_id: config.centerId,
-        published_time: zoneData.publishedTime,
-        expires_time: zoneData.expiresTime, // Use raw ISO timestamp, NOT formatted expiresDate
-        forecast_data: forecastData,
-        scraped_content: zoneData.scrapedContent,
-        data_source: zoneData.dataSource,
-      }, {
-        onConflict: 'zone_id,published_time',
-      });
-
-    if (error) {
-      console.error(`Cache store error for ${zoneData.id}:`, error);
-      return 'error';
-    }
-
-    console.log(`Cache STORED for ${zoneData.id} @ ${zoneData.publishedTime}`);
-    return 'stored';
-  } catch (error) {
-    console.error(`Cache store exception for ${zoneData.id}:`, error);
-    return 'error';
-  }
-}
-
-// Reconstruct ZoneData from cache entry
-// IMPORTANT: Recalculates freshness status based on current time (not cached value)
-function buildZoneDataFromCache(
-  cached: CacheEntry,
-  config: { id: string; name: string; forecastUrl: string }
-): ZoneData {
-  const fd = cached.forecast_data;
-  
-  // Recalculate freshness based on current time using the original timestamps
-  // This ensures expired forecasts show correct "expired" status even on cache hits
-  const freshness = calculateFreshness(cached.published_time, cached.expires_time);
-  
-  return {
-    id: config.id,
-    nacZoneId: cached.nac_zone_id,
-    name: config.name,
-    center: cached.center_id,
-    forecastUrl: config.forecastUrl,
-    forecast: fd.forecast || [],
-    problems: fd.problems || [],
-    weather: fd.weather || { snow: 'N/A', wind: 'N/A', temps: 'N/A', discussion: null },
-    bottomLine: fd.bottomLine || '',
-    hazardDiscussion: fd.hazardDiscussion || '',
-    freshness,
-    dataSource: cached.data_source as 'api' | 'scrape' | 'map-layer',
-    scrapedContent: cached.scraped_content,
-    publishedTime: cached.published_time,
-    expiresTime: cached.expires_time,
-  };
-}
+// NOTE: the avalanche_forecast_cache read/write/rebuild helpers
+// (checkForecastCache / storeForecastCache / buildZoneDataFromCache) and
+// their CacheEntry type were removed — that table does not exist in the
+// production project, so every call errored and was swallowed. The
+// synthesized-results write to avalanche_daily_forecasts was removed for
+// the same reason. `CacheStatus` is kept only for the response's
+// per-zone cacheStatus field, which now always reports "miss".
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -1612,26 +1507,12 @@ serve(async (req) => {
       const publishedTime = forecast?.published_time || mapData?.start_date || null;
       const expiresTime = forecast?.expires_time || mapData?.end_date || null;
       
-      // Check cache using the API's published_time
-      if (publishedTime) {
-        const cacheResult = await checkForecastCache(config.id, publishedTime);
-        
-        if (cacheResult.data) {
-          // Cache HIT - use cached data (skip expensive parsing and Firecrawl)
-          cacheStatuses.set(config.id, 'hit');
-          const cachedData = buildZoneDataFromCache(cacheResult.data, {
-            id: config.id,
-            name: config.name,
-            forecastUrl: config.forecastUrl,
-          });
-          console.log(`Using CACHED data for ${config.name} (published: ${publishedTime})`);
-          return cachedData;
-        }
-      }
-      
-      // Cache MISS - process the API response we already have
-      console.log(`Cache miss for ${config.name}, processing API response...`);
-      const freshness = calculateFreshness(publishedTime, expiresTime);
+      // (Removed a dead avalanche_forecast_cache read that used to sit
+      // here — the table doesn't exist in prod, so the lookup always
+      // errored and fell through, costing a round-trip per zone for
+      // nothing. Process the NAC API response we already fetched.)
+      console.log(`Processing API response for ${config.name}...`);
+      const freshness = calculateFreshness(publishedTime, expiresTime, config.timezone);
       
       // If API returned good data
       if (forecast) {
@@ -1669,12 +1550,7 @@ serve(async (req) => {
             publishedTime: publishedTime,
             expiresTime: expiresTime,
           };
-          
-          // Store in cache (async, don't await)
-          storeForecastCache(zoneData, { nacZoneId: config.nacZoneId, centerId: config.centerId })
-            .then(status => cacheStatuses.set(config.id, status))
-            .catch(err => console.error(`Cache store failed for ${config.id}:`, err));
-          
+
           return zoneData;
         }
       }
@@ -1683,7 +1559,7 @@ serve(async (req) => {
       if (config.centerId === 'UAC') {
         const uacResult = await fetchUacForecast(config.id, config);
         if (uacResult.success && uacResult.zoneData) {
-          const uacFreshness = calculateFreshness(uacResult.zoneData.publishedTime, uacResult.zoneData.expiresTime);
+          const uacFreshness = calculateFreshness(uacResult.zoneData.publishedTime, uacResult.zoneData.expiresTime, config.timezone);
           const zoneData: ZoneData = {
             id: config.id,
             nacZoneId: config.nacZoneId,
@@ -1708,10 +1584,6 @@ serve(async (req) => {
             publishedTime: uacResult.zoneData.publishedTime,
             expiresTime: uacResult.zoneData.expiresTime,
           };
-
-          storeForecastCache(zoneData, { nacZoneId: config.nacZoneId, centerId: config.centerId })
-            .then(status => cacheStatuses.set(config.id, status))
-            .catch(err => console.error(`Cache store failed for ${config.id}:`, err));
 
           return zoneData;
         }
@@ -1749,12 +1621,7 @@ serve(async (req) => {
           publishedTime: publishedTime,
           expiresTime: expiresTime,
         };
-        
-        // Store in cache (async, don't await)
-        storeForecastCache(zoneData, { nacZoneId: config.nacZoneId, centerId: config.centerId })
-          .then(status => cacheStatuses.set(config.id, status))
-          .catch(err => console.error(`Cache store failed for ${config.id}:`, err));
-        
+
         return zoneData;
       }
       
@@ -2247,83 +2114,12 @@ Return valid JSON with this structure:
 
     console.log('Summary generated successfully');
 
-    // Cache the synthesized results in avalanche_daily_forecasts for future fast loads
-    try {
-      const now = new Date();
-
-      const zoneCachePromises = zonesWithMetadata.map((zone: any) => {
-        const sourceData = zonesData.find(z => z.id === zone.id);
-        const zoneConfig = ZONE_CONFIG.find(z => z.id === zone.id);
-        const zoneTz = zoneConfig?.timezone || 'America/Anchorage';
-        const localTime = new Date(now.toLocaleString('en-US', { timeZone: zoneTz }));
-        const forecastDate = localTime.toISOString().split('T')[0];
-
-        return supabase
-          .from('avalanche_daily_forecasts')
-          .upsert({
-            zone_id: zone.id,
-            center_id: sourceData?.center || 'UNKNOWN',
-            forecast_date: forecastDate,
-            published_time: zone.freshness?.issueDate ? new Date(zone.freshness.issueDate).toISOString() : null,
-            expires_time: zone.freshness?.expiresDate ? new Date(zone.freshness.expiresDate).toISOString() : null,
-            synthesized_data: {
-              id: zone.id,
-              name: zone.name,
-              forecastUrl: zone.forecastUrl,
-              forecast: zone.forecast,
-              weather: zone.weather,
-              problems: zone.problems,
-              keyMessage: zone.keyMessage,
-              travelAdvice: zone.travelAdvice,
-              freshness: zone.freshness,
-              hazardDiscussion: zone.hazardDiscussion,
-              weatherValidation: zone.weatherValidation,
-            },
-          }, {
-            onConflict: 'zone_id,forecast_date',
-          });
-      });
-
-      const summaryCenters = new Map<string, string>();
-      for (const zone of zonesWithMetadata) {
-        const sourceData = zonesData.find(z => z.id === zone.id);
-        if (!sourceData?.center || summaryCenters.has(sourceData.center)) continue;
-
-        const zoneConfig = ZONE_CONFIG.find(z => z.id === zone.id);
-        const zoneTz = zoneConfig?.timezone || 'America/Anchorage';
-        const localTime = new Date(now.toLocaleString('en-US', { timeZone: zoneTz }));
-        const forecastDate = localTime.toISOString().split('T')[0];
-        summaryCenters.set(sourceData.center, forecastDate);
-      }
-
-      const summaryCachePromises = Array.from(summaryCenters.entries()).map(([centerId, forecastDate]) =>
-        supabase
-          .from('avalanche_daily_forecasts')
-          .upsert({
-            zone_id: `_summary_${centerId}`,
-            center_id: centerId,
-            forecast_date: forecastDate,
-            synthesized_data: {
-              quickTake: summary.quickTake || '',
-              weatherHighlights: summary.weatherHighlights || '',
-              bottomLine: summary.bottomLine || '',
-            },
-          }, {
-            onConflict: 'zone_id,forecast_date',
-          })
-      );
-
-      const cacheResults = await Promise.all([...zoneCachePromises, ...summaryCachePromises]);
-      const cacheErrors = cacheResults.filter(r => r.error);
-      if (cacheErrors.length > 0) {
-        console.error(`Failed to cache ${cacheErrors.length} forecast rows:`, cacheErrors.map(r => r.error));
-      } else {
-        console.log(`Cached ${zonesWithMetadata.length} zones and ${summaryCachePromises.length} summaries`);
-      }
-    } catch (cacheError) {
-      // Don't fail the response if caching fails
-      console.error('Error caching forecasts:', cacheError);
-    }
+    // (Removed the write to avalanche_daily_forecasts here — that table
+    // doesn't exist in prod, so every upsert errored and was swallowed.
+    // It also carried the display-string→timestamp bug: freshness.issueDate
+    // is a formatted label like "May 1, 2:00 PM", not an ISO string, so
+    // new Date(...) mis-parsed it. The real forecast cache is written by
+    // the refresh-forecast-cache cron into forecast_cache.)
 
     return new Response(
       JSON.stringify({
