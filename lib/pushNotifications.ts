@@ -170,6 +170,11 @@ async function runRegistration(
 
     await Notifications.registerTaskAsync(PUSH_REFRESH_TASK);
 
+    // Insert-only registration (ON CONFLICT DO NOTHING). Anon has no
+    // SELECT/UPDATE on device_tokens anymore (tokens were world-readable
+    // — see migration 20260807000000), so re-registering an existing
+    // token must be a no-op rather than an update. Dead tokens are
+    // pruned server-side via DeviceNotRegistered on the push fan-out.
     const { error: upsertError } = await supabase
       .from("device_tokens")
       .upsert(
@@ -178,7 +183,7 @@ async function runRegistration(
           platform: Platform.OS,
           last_seen: new Date().toISOString(),
         },
-        { onConflict: "token" },
+        { onConflict: "token", ignoreDuplicates: true },
       );
 
     if (upsertError) {

@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
@@ -23,26 +24,23 @@ import {
   isStale,
   loadFavorites,
   loadSnapshot,
+  mergeZoneBundle,
+  mutateSnapshot,
   OFFLINE_HISTORY_DAYS,
   pruneSnapshot,
   saveFavorites,
-  saveSnapshot,
   todayIsoDate,
   type FavoritesSnapshot,
 } from "@/lib/offlineCache";
+import { formatDayKeyLong, fromKey } from "@/lib/dates";
 
 // How far back the user can scroll while online. Server retains 14 days
 // in forecast_cache; we expose 10 to give the cleanup a buffer.
 const ONLINE_HISTORY_DAYS = 10;
 
-const WEEKDAY_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
 // "MON · MAY 1" — used in the hero pager when viewing an archive day.
-function viewedDateLabel(date: string): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  if (isNaN(d.getTime())) return date;
-  return `${WEEKDAY_SHORT[d.getUTCDay()]} · ${formatDateLabel(date)}`;
-}
+// Local, via the single date convention in lib/dates.ts.
+const viewedDateLabel = formatDayKeyLong;
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -79,29 +77,17 @@ import {
   requestAndRegisterLocationWake,
   type LocationDiagnostic,
 } from "@/lib/locationWake";
-import { readLastRefresh, type LastRefreshRecord } from "@/lib/backgroundRefresh";
-import { toggleDebugMode, useDebugMode } from "@/lib/debugMode";
 import {
-  avalancheApi,
-  type AvalancheSummary,
-  type AvalancheZone,
-  type AvgDiscussion,
-  type AvgLocation,
-  type NacWeatherProduct,
-  type NwsForecast,
-  type ScrapedZoneInfo,
-  type StationsOnlyZone,
-  type ZoneWeatherForecast,
-} from "@/lib/api/avalanche";
-import { AVAILABLE_ZONES, DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
+  readLastRefresh,
+  refreshFavoritesSnapshot,
+  type LastRefreshRecord,
+} from "@/lib/backgroundRefresh";
+import { toggleDebugMode, useDebugMode } from "@/lib/debugMode";
+import { loadForecastBundle } from "@/lib/forecast/loadForecastBundle";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
+import { listDrafts as listObservationDrafts } from "@/lib/observation/submitFlow";
 import { setZoneSession } from "@/lib/zoneSession";
-
-interface WeatherForecastBundle {
-  centerWeather: Record<string, NacWeatherProduct>;
-  zoneNwsForecasts: Record<string, NwsForecast>;
-  centerAvgDiscussions: Record<string, AvgDiscussion>;
-  zoneAvgLocations: Record<string, AvgLocation[]>;
-}
 
 const months = [
   "JANUARY",
@@ -119,6 +105,7 @@ const months = [
 ];
 
 export default function Index() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   // Top-level collapse state. Picker is collapsed by default — favorites
@@ -136,12 +123,14 @@ export default function Index() {
   // the ← / → arrows in the hero step it back/forward through the archive
   // window.
   const [viewedDate, setViewedDate] = useState<string>(todayIsoDate());
-  const todayStr = useMemo(() => todayIsoDate(), []);
+  // Not frozen: recomputed on foreground (see AppState effect) so leaving
+  // the app backgrounded overnight doesn't strand the pager on yesterday
+  // with the → arrow disabled at viewedDate === a stale "today".
+  const [todayStr, setTodayStr] = useState<string>(todayIsoDate());
   const isViewingToday = viewedDate === todayStr;
   // Persisted starred zones — survive relaunch and feed offline cache.
   const [favoriteZoneIds, setFavoriteZoneIds] = useState<string[]>([]);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
-  const autoLoadedRef = useRef(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
   // Snapshot of displayedZoneIds at the moment the map opened, so we can
   // detect whether the View Zones button needs to refetch on close.
@@ -150,28 +139,63 @@ export default function Index() {
   // and never need the manual selector. Open it on demand.
   const [compareOpen, setCompareOpen] = useState(false);
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSnotelLoading, setIsSnotelLoading] = useState(false);
-  const [isWeatherForecastLoading, setIsWeatherForecastLoading] = useState(false);
-
-  const [summary, setSummary] = useState<AvalancheSummary | null>(null);
-  const [scrapedAt, setScrapedAt] = useState<string | null>(null);
-  const [zonesScraped, setZonesScraped] = useState<ScrapedZoneInfo[]>([]);
-  const [loadSource, setLoadSource] = useState<"cached" | "live" | "offline" | null>(null);
-  const [weatherForecastData, setWeatherForecastData] =
-    useState<WeatherForecastBundle | null>(null);
-  // Zones with no current avalanche forecast but live wx station data.
-  // Rendered as muted tiles below the main grid so the user can still
-  // see hourly station updates year-round.
-  const [stationsOnlyZones, setStationsOnlyZones] = useState<StationsOnlyZone[]>(
-    [],
-  );
-
   // Offline cache state — keeps the last-known-good bundle for favorite zones
   // available even when the phone has no service.
   const [snapshot, setSnapshot] = useState<FavoritesSnapshot | null>(null);
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const lastBgFetchRef = useRef<number>(0);
+
+  // The forecast bundle for (displayed zones × viewed date × connectivity),
+  // owned by TanStack Query. This replaced a hand-rolled fetchSummary /
+  // fetchSnotel / fetchWeatherForecast tangle whose overlapping in-flight
+  // calls could clobber each other and let a slow response rewrite the
+  // viewed date. The query keys on the inputs, so changing the date or the
+  // selection refetches deterministically and a stale response for an old
+  // key is discarded. keepPreviousData holds the last bundle on screen
+  // while a new one loads (matching the old "don't blank on refetch" feel).
+  const forecastQuery = useQuery({
+    queryKey: ["forecast", [...displayedZoneIds].sort(), viewedDate, isOnline],
+    queryFn: () =>
+      loadForecastBundle({
+        zoneIds: displayedZoneIds,
+        date: viewedDate,
+        isToday: viewedDate === todayStr,
+        isOnline,
+      }),
+    enabled: prefsLoaded && displayedZoneIds.length > 0 && isOnline !== null,
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+  });
+  const bundle = forecastQuery.data;
+  // Memoized on the bundle so the derived arrays keep a stable identity
+  // across renders — the persist + session-fan-out effects depend on them
+  // and would otherwise re-run on every render (a fresh [] each time).
+  const { summary, stationsOnlyZones, weatherForecastData, scrapedAt, zonesScraped, loadSource } =
+    useMemo(
+      () => ({
+        summary: bundle?.summary ?? null,
+        stationsOnlyZones: bundle?.stationsOnlyZones ?? [],
+        weatherForecastData: bundle?.weather ?? null,
+        scrapedAt: bundle?.scrapedAt ?? null,
+        zonesScraped: bundle?.zonesScraped ?? [],
+        loadSource: bundle?.loadSource ?? null,
+      }),
+      [bundle],
+    );
+  const isLoading = forecastQuery.isFetching;
+
+  // A hard fetch failure (all live-scrape batches failed) surfaces here —
+  // distinct from an empty result, which the old code couldn't tell apart.
+  useEffect(() => {
+    if (!forecastQuery.error) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+      () => {},
+    );
+    Alert.alert(
+      "Error",
+      "Failed to fetch avalanche conditions. Please try again.",
+    );
+  }, [forecastQuery.error]);
 
   // First-launch onboarding modal — explains why we need push + Background
   // App Refresh, then triggers the iOS push permission prompt on tap.
@@ -205,8 +229,10 @@ export default function Index() {
     }
   }, [summary, fadeAnim]);
 
+  // Derived from todayStr (local day key) so it refreshes on foreground
+  // rather than freezing at mount overnight.
   const today = useMemo(() => {
-    const d = new Date();
+    const d = fromKey(todayStr);
     return {
       day: String(d.getDate()).padStart(2, "0"),
       month: months[d.getMonth()],
@@ -215,7 +241,7 @@ export default function Index() {
         .toLocaleDateString("en-US", { weekday: "long" })
         .toUpperCase(),
     };
-  }, []);
+  }, [todayStr]);
 
   // Load saved favorites + offline snapshot. The displayed list seeds from
   // favorites (or DEFAULT_ZONE_IDS for first-run) — ad-hoc picks are
@@ -261,79 +287,17 @@ export default function Index() {
     const now = Date.now();
     if (now - lastBgFetchRef.current < 30 * 60 * 1000) return;
     try {
-      // The server-side cache (refreshed by cron every 1–2h) is fast enough
-      // and complete enough that we don't need separate live calls here.
-      // Bg refresh always pulls today's bundle — historical days, if the
-      // user wants them, are fetched on demand when they tap the arrow.
-      const r = await avalancheApi.getCachedForecasts(favoriteZoneIds);
-      if (!r.success || !r.zones) return;
-      const date = r.forecastDate || todayIsoDate();
-      const stationsDate = r.stationsDate || todayIsoDate();
-      let next: FavoritesSnapshot =
-        (await loadSnapshot()) || { fetchedAt: "", zones: {} };
-      const favSet = new Set(favoriteZoneIds);
-      const nowIso = new Date().toISOString();
-      for (const z of r.zones) {
-        if (!favSet.has(z.id)) continue;
-        const cid = ZONE_TO_CENTER[z.id];
-        const weather = {
-          nacWeather: cid ? r.centerWeather?.[cid] : undefined,
-          nwsForecast: r.zoneNwsForecasts?.[z.id],
-          avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
-          avgLocations: r.zoneAvgLocations?.[z.id],
-        };
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [z.id]: {
-              ...(next.zones[z.id] || {}),
-              [date]: {
-                forecast: z,
-                stations: z.weatherObservations,
-                weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-      }
-      // Stations-only favorites — no forecast, just fresh wx.
-      for (const soz of r.stationsOnlyZones || []) {
-        if (!favSet.has(soz.id)) continue;
-        const cid = soz.centerId || ZONE_TO_CENTER[soz.id];
-        const weather = {
-          nacWeather: cid ? r.centerWeather?.[cid] : undefined,
-          nwsForecast: r.zoneNwsForecasts?.[soz.id],
-          avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
-          avgLocations: r.zoneAvgLocations?.[soz.id],
-        };
-        const existing = next.zones[soz.id]?.[stationsDate];
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [soz.id]: {
-              ...(next.zones[soz.id] || {}),
-              [stationsDate]: {
-                forecast: existing?.forecast,
-                stations: soz.weatherObservations,
-                weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-      }
-      next = pruneSnapshot(next, favoriteZoneIds);
-      await saveSnapshot(next);
-      setSnapshot(next);
+      // Single shared writer (also used by the bg-task / push / location
+      // wakes). It reads favorites from storage, pulls the cron-refreshed
+      // server cache, and stores today's bundle through the serialized
+      // snapshot writer — historical days are fetched on demand when the
+      // user taps the arrow.
+      const result = await refreshFavoritesSnapshot("foreground");
+      if (!result) return;
+      setSnapshot(result.snapshot);
       // Tick throttle only after a successful save — a failed fetch
       // shouldn't eat the next 30-minute retry window.
       lastBgFetchRef.current = now;
-      console.log(
-        `[bg-refresh] cached ${r.zones.length} forecast + ${r.stationsOnlyZones?.length || 0} stations-only`,
-      );
     } catch (err) {
       console.warn("[bg-refresh] failed", err);
     }
@@ -343,7 +307,10 @@ export default function Index() {
   useEffect(() => {
     refreshFavoritesInBackground();
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") refreshFavoritesInBackground();
+      if (state === "active") {
+        setTodayStr(todayIsoDate());
+        refreshFavoritesInBackground();
+      }
     });
     return () => sub.remove();
   }, [refreshFavoritesInBackground]);
@@ -360,80 +327,6 @@ export default function Index() {
         saveFavorites(next).catch(() => {});
         return next;
       });
-    },
-    [],
-  );
-
-  // Hydrate the screen state from the offline snapshot. Picks the bundle
-  // for `targetDate` if provided; otherwise picks each zone's most recent
-  // cached date. Returns true if anything was loaded — callers use the
-  // boolean to decide whether to surface an empty state. The "no cache"
-  // alert only fires when invoked by the user (no targetDate), since the
-  // archive-back path has its own inline empty state.
-  const loadFromSnapshot = useCallback(
-    async (targetDate?: string): Promise<boolean> => {
-      const snap = await loadSnapshot();
-      if (!snap || Object.keys(snap.zones).length === 0) {
-        if (!targetDate) {
-          Alert.alert(
-            "No cached forecast",
-            "Add favorites and fetch a forecast while online to enable offline mode.",
-          );
-        }
-        return false;
-      }
-      const zones: AvalancheZone[] = [];
-      const stationsOnly: StationsOnlyZone[] = [];
-      const bundle: WeatherForecastBundle = {
-        centerWeather: {},
-        zoneNwsForecasts: {},
-        centerAvgDiscussions: {},
-        zoneAvgLocations: {},
-      };
-      let resolvedDate: string | null = null;
-      for (const [zoneId, byDate] of Object.entries(snap.zones)) {
-        // For an archive day, only return data if we have an exact match —
-        // we don't want to silently swap in an older snapshot.
-        const dates = Object.keys(byDate).sort().reverse();
-        const pick = targetDate
-          ? byDate[targetDate]
-            ? targetDate
-            : null
-          : dates[0];
-        if (!pick) continue;
-        const s = byDate[pick];
-        const cid = ZONE_TO_CENTER[zoneId];
-        if (s.forecast) {
-          zones.push(s.forecast);
-        } else if (s.stations && s.stations.length > 0) {
-          // No forecast cached for this zone but we have stations + maybe
-          // weather — surface as a stations-only entry so the home grid
-          // can render the muted tile and route the user into the detail
-          // / stations sub-screens.
-          stationsOnly.push({
-            id: zoneId,
-            centerId: cid ?? "",
-            weatherObservations: s.stations,
-          });
-        } else {
-          continue;
-        }
-        if (!resolvedDate || pick > resolvedDate) resolvedDate = pick;
-        const w = s.weather;
-        if (!w) continue;
-        if (cid && w.nacWeather) bundle.centerWeather[cid] = w.nacWeather;
-        if (w.nwsForecast) bundle.zoneNwsForecasts[zoneId] = w.nwsForecast;
-        if (cid && w.avgDiscussion) bundle.centerAvgDiscussions[cid] = w.avgDiscussion;
-        if (w.avgLocations) bundle.zoneAvgLocations[zoneId] = w.avgLocations;
-      }
-      if (zones.length === 0 && stationsOnly.length === 0) return false;
-      setSummary({ quickTake: "", zones, weatherHighlights: "", bottomLine: "" });
-      setStationsOnlyZones(stationsOnly);
-      setScrapedAt(snap.fetchedAt);
-      setLoadSource("offline");
-      setWeatherForecastData(bundle);
-      if (resolvedDate && !targetDate) setViewedDate(resolvedDate);
-      return true;
     },
     [],
   );
@@ -506,87 +399,58 @@ export default function Index() {
   useEffect(() => {
     if (!summary || favoriteZoneIds.length === 0) return;
     if (loadSource === "offline") return;
+    // Don't persist while a refetch is in flight: with keepPreviousData the
+    // bundle on screen is the PREVIOUS date's data until the new one lands,
+    // and viewedDate has already moved — writing now would file yesterday's
+    // forecast under today's (or an archive day's) key.
+    if (forecastQuery.isFetching) return;
     const favSet = new Set(favoriteZoneIds);
+    const wfFor = (id: string, centerId: string | undefined) =>
+      weatherForecastData
+        ? {
+            nacWeather: centerId
+              ? weatherForecastData.centerWeather[centerId]
+              : undefined,
+            nwsForecast: weatherForecastData.zoneNwsForecasts[id],
+            avgDiscussion: centerId
+              ? weatherForecastData.centerAvgDiscussions[centerId]
+              : undefined,
+            avgLocations: weatherForecastData.zoneAvgLocations[id],
+          }
+        : undefined;
     (async () => {
-      let next: FavoritesSnapshot =
-        (await loadSnapshot()) || { fetchedAt: "", zones: {} };
-      let touched = false;
+      // Serialized through mutateSnapshot so this in-memory persist can't
+      // race the fetch-and-store writer (bg/push/foreground) and drop its
+      // zones. Bundles are keyed by viewedDate; mergeZoneBundle preserves
+      // any fields this pass doesn't supply.
       const nowIso = new Date().toISOString();
-      for (const z of summary.zones) {
-        if (!favSet.has(z.id)) continue;
-        const centerId = ZONE_TO_CENTER[z.id];
-        const wf = weatherForecastData
-          ? {
-              nacWeather: centerId
-                ? weatherForecastData.centerWeather[centerId]
-                : undefined,
-              nwsForecast: weatherForecastData.zoneNwsForecasts[z.id],
-              avgDiscussion: centerId
-                ? weatherForecastData.centerAvgDiscussions[centerId]
-                : undefined,
-              avgLocations: weatherForecastData.zoneAvgLocations[z.id],
-            }
-          : undefined;
-        const existing = next.zones[z.id]?.[viewedDate];
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [z.id]: {
-              ...(next.zones[z.id] || {}),
-              [viewedDate]: {
-                forecast: z,
-                stations: z.weatherObservations || existing?.stations,
-                weather: wf || existing?.weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-        touched = true;
-      }
-      // Persist stations-only entries too — same date keying as the forecast
-      // entries above so all of today's bundles share a row.
-      for (const soz of stationsOnlyZones) {
-        if (!favSet.has(soz.id)) continue;
-        const centerId = soz.centerId || ZONE_TO_CENTER[soz.id];
-        const wf = weatherForecastData
-          ? {
-              nacWeather: centerId
-                ? weatherForecastData.centerWeather[centerId]
-                : undefined,
-              nwsForecast: weatherForecastData.zoneNwsForecasts[soz.id],
-              avgDiscussion: centerId
-                ? weatherForecastData.centerAvgDiscussions[centerId]
-                : undefined,
-              avgLocations: weatherForecastData.zoneAvgLocations[soz.id],
-            }
-          : undefined;
-        const existing = next.zones[soz.id]?.[viewedDate];
-        next = {
-          fetchedAt: nowIso,
-          zones: {
-            ...next.zones,
-            [soz.id]: {
-              ...(next.zones[soz.id] || {}),
-              [viewedDate]: {
-                forecast: existing?.forecast,
-                stations: soz.weatherObservations || existing?.stations,
-                weather: wf || existing?.weather,
-                cachedAt: nowIso,
-              },
-            },
-          },
-        };
-        touched = true;
-      }
-      if (touched) {
-        const pruned = pruneSnapshot(next, favoriteZoneIds);
-        await saveSnapshot(pruned);
-        setSnapshot(pruned);
-      }
+      const pruned = await mutateSnapshot((current) => {
+        let next = current;
+        let touched = false;
+        for (const z of summary.zones) {
+          if (!favSet.has(z.id)) continue;
+          next = mergeZoneBundle(next, z.id, viewedDate, {
+            forecast: z,
+            stations: z.weatherObservations,
+            weather: wfFor(z.id, ZONE_TO_CENTER[z.id]),
+          }, nowIso);
+          touched = true;
+        }
+        for (const soz of stationsOnlyZones) {
+          if (!favSet.has(soz.id)) continue;
+          next = mergeZoneBundle(next, soz.id, viewedDate, {
+            stations: soz.weatherObservations,
+            weather: wfFor(soz.id, soz.centerId || ZONE_TO_CENTER[soz.id]),
+          }, nowIso);
+          touched = true;
+        }
+        // No favorites in view → return the same reference so mutateSnapshot
+        // skips the write entirely.
+        return touched ? pruneSnapshot(next, favoriteZoneIds) : current;
+      });
+      setSnapshot(pruned);
     })();
-  }, [summary, stationsOnlyZones, weatherForecastData, favoriteZoneIds, viewedDate, loadSource]);
+  }, [summary, stationsOnlyZones, weatherForecastData, favoriteZoneIds, viewedDate, loadSource, forecastQuery.isFetching]);
 
   // Fan every zone we have data for into the session-level in-memory
   // cache so the detail / sub-screens can find them — including ad-hoc
@@ -594,6 +458,10 @@ export default function Index() {
   // persistent offline snapshot.
   useEffect(() => {
     if (!summary && stationsOnlyZones.length === 0) return;
+    // As with the snapshot persist: don't tag placeholder data (previous
+    // date's bundle, kept on screen during a refetch) with the new
+    // viewedDate — the zone detail gates its session fallback on that key.
+    if (forecastQuery.isFetching) return;
     const nowIso = new Date().toISOString();
     if (summary) {
       for (const z of summary.zones) {
@@ -615,6 +483,7 @@ export default function Index() {
           stations: z.weatherObservations,
           weather: wf,
           cachedAt: nowIso,
+          dateKey: viewedDate,
         });
       }
     }
@@ -638,258 +507,13 @@ export default function Index() {
         stations: soz.weatherObservations,
         weather: wf,
         cachedAt: nowIso,
+        dateKey: viewedDate,
       });
     }
-  }, [summary, stationsOnlyZones, weatherForecastData]);
+  }, [summary, stationsOnlyZones, weatherForecastData, viewedDate, forecastQuery.isFetching]);
 
-  const fetchSnotel = useCallback(async (zoneIds: string[]) => {
-    setIsSnotelLoading(true);
-    try {
-      const r = await avalancheApi.getSnotelObservations(zoneIds);
-      if (r.success && r.observations) {
-        setSummary((prev) =>
-          prev
-            ? {
-                ...prev,
-                zones: prev.zones.map((zone) => ({
-                  ...zone,
-                  weatherObservations:
-                    r.observations?.[zone.id] || zone.weatherObservations,
-                })),
-              }
-            : prev,
-        );
-      }
-    } catch (err) {
-      console.error("SNOTEL fetch error", err);
-    } finally {
-      setIsSnotelLoading(false);
-    }
-  }, []);
-
-  const fetchWeatherForecast = useCallback(async (zoneIds: string[]) => {
-    setIsWeatherForecastLoading(true);
-    try {
-      const r = await avalancheApi.getWeatherForecast(zoneIds);
-      if (r.success) {
-        setWeatherForecastData({
-          centerWeather: r.centerWeather || {},
-          zoneNwsForecasts: r.zoneNwsForecasts || {},
-          centerAvgDiscussions: r.centerAvgDiscussions || {},
-          zoneAvgLocations: r.zoneAvgLocations || {},
-        });
-      }
-    } catch (err) {
-      console.error("Weather forecast fetch error", err);
-    } finally {
-      setIsWeatherForecastLoading(false);
-    }
-  }, []);
-
-  const getZoneWeatherForecast = useCallback(
-    (zoneId: string): ZoneWeatherForecast | undefined => {
-      if (!weatherForecastData) return undefined;
-      const centerId = ZONE_TO_CENTER[zoneId];
-      const nacWeather = centerId
-        ? weatherForecastData.centerWeather[centerId]
-        : undefined;
-      const nwsForecast = weatherForecastData.zoneNwsForecasts[zoneId];
-      const avgDiscussion = centerId
-        ? weatherForecastData.centerAvgDiscussions[centerId]
-        : undefined;
-      const avgLocations = weatherForecastData.zoneAvgLocations[zoneId];
-      if (!nacWeather && !nwsForecast && !avgDiscussion && !avgLocations) return undefined;
-      return { nacWeather, nwsForecast, avgDiscussion, avgLocations };
-    },
-    [weatherForecastData],
-  );
-
-  const fetchSummary = useCallback(
-    async (zoneIdsOverride?: string[], dateOverride?: string) => {
-      const zoneIds = zoneIdsOverride ?? displayedZoneIds;
-      const targetDate = dateOverride ?? viewedDate;
-      const isToday = targetDate === todayIsoDate();
-      if (zoneIds.length === 0) {
-        Alert.alert(
-          "No zones selected",
-          "Please select at least one zone to view forecasts.",
-        );
-        return;
-      }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-
-    setIsLoading(true);
-    setLoadSource(null);
-
-    // Offline short-circuit: skip every network call and try the on-device
-    // snapshot. The OFFLINE banner already explains the state to the user;
-    // we don't want to surface a "Failed to fetch" alert on top of it.
-    if (isOnline === false) {
-      try {
-        await loadFromSnapshot(targetDate);
-      } catch (err) {
-        console.warn("offline snapshot load failed", err);
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    try {
-      // 1) Try the server-side cache first — refreshed by cron every 1–2h.
-      // This is the fast path: ~200ms instead of ~40s for live scraping.
-      // Pin to a specific date when the user is browsing the archive.
-      const cached = await avalancheApi.getCachedForecasts(
-        zoneIds,
-        isToday ? undefined : targetDate,
-      );
-      // The cache is "complete enough" if every requested zone is
-      // accounted for either by a forecast row OR a stations-only row.
-      // Stations-only zones still satisfy the request — the user wants
-      // wx station data even when no avalanche forecast exists.
-      const cachedHasAnyZones =
-        (cached.zones && cached.zones.length > 0) ||
-        (cached.stationsOnlyZones && cached.stationsOnlyZones.length > 0);
-      if (
-        cached.success &&
-        cachedHasAnyZones &&
-        (!cached.missingZoneIds || cached.missingZoneIds.length === 0)
-      ) {
-        // Hydrate the same shape we get from live scrape so the UI is identical.
-        setSummary({
-          quickTake: "",
-          zones: cached.zones || [],
-          weatherHighlights: "",
-          bottomLine: "",
-        });
-        setStationsOnlyZones(cached.stationsOnlyZones || []);
-        setScrapedAt(cached.forecastFetchedAt || cached.stationsFetchedAt || new Date().toISOString());
-        setLoadSource("cached");
-        if (cached.forecastDate) setViewedDate(cached.forecastDate);
-        // Cache also includes the weather bundle — feed it straight in so the
-        // outlook section renders without a second round-trip.
-        setWeatherForecastData({
-          centerWeather: cached.centerWeather || {},
-          zoneNwsForecasts: cached.zoneNwsForecasts || {},
-          centerAvgDiscussions: cached.centerAvgDiscussions || {},
-          zoneAvgLocations: cached.zoneAvgLocations || {},
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // For archive dates, fall through to offline cache rather than
-      // attempting a live scrape — NAC's live API only ever returns the
-      // current forecast, so there's no historical data to reach for.
-      if (!isToday) {
-        const ok = await loadFromSnapshot(targetDate);
-        if (!ok) {
-          // Clear the previous day's cards so the user sees the inline
-          // "no forecast cached for this date yet" notice instead of stale
-          // data from whatever they were just viewing.
-          setSummary(null);
-          setStationsOnlyZones([]);
-          setWeatherForecastData(null);
-          setScrapedAt(null);
-          setLoadSource(null);
-        }
-        setIsLoading(false);
-        return;
-      }
-
-      // 2) Fallback: live scrape, batched per center.
-      const centerGroups = new Map<string, string[]>();
-      for (const zoneId of zoneIds) {
-        const info = AVAILABLE_ZONES.find((z) => z.id === zoneId);
-        const centerId = info?.center || "UNKNOWN";
-        if (!centerGroups.has(centerId)) centerGroups.set(centerId, []);
-        centerGroups.get(centerId)!.push(zoneId);
-      }
-
-      const BATCH_SIZE = 4;
-      const entries = Array.from(centerGroups.entries());
-      const allZones: AvalancheZone[] = [];
-      const allZonesScraped: ScrapedZoneInfo[] = [];
-      let hasAnySuccess = false;
-
-      for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-        const batch = entries.slice(i, i + BATCH_SIZE);
-        const results = await Promise.all(
-          batch.map(([centerId, zoneIds]) =>
-            avalancheApi.getSummary(zoneIds).then((response) => ({ centerId, response })),
-          ),
-        );
-        for (const { response } of results) {
-          if (response.success && response.summary) {
-            allZones.push(...response.summary.zones);
-            if (response.zonesScraped) allZonesScraped.push(...response.zonesScraped);
-            hasAnySuccess = true;
-          }
-        }
-      }
-
-      if (hasAnySuccess) {
-        setSummary({
-          quickTake: "",
-          zones: allZones,
-          weatherHighlights: "",
-          bottomLine: "",
-        });
-        // Live scrape returns only zones with active forecasts; stations-only
-        // entries come from the cached path.
-        setStationsOnlyZones([]);
-        setScrapedAt(new Date().toISOString());
-        setZonesScraped(allZonesScraped);
-        setLoadSource("live");
-        fetchSnotel(zoneIds);
-        fetchWeatherForecast(zoneIds);
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-        Alert.alert("Error", "Failed to fetch avalanche conditions.");
-      }
-    } catch (err) {
-      console.error("Fetch error", err);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-      Alert.alert("Error", "Failed to fetch avalanche conditions. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-    },
-    [displayedZoneIds, viewedDate, isOnline, fetchSnotel, fetchWeatherForecast, loadFromSnapshot],
-  );
-
-  // Auto-load favorites on first launch when prefs are ready and the user
-  // has any starred zones. The cache read takes ~200ms so this is invisible.
-  // Only fires once per session — pull-to-refresh / explicit fetches still work.
-  // Waits for `isOnline` to be a known boolean so we route correctly: when
-  // airplane-mode is detected we go straight to the offline snapshot
-  // instead of firing a network call that's certain to fail.
-  useEffect(() => {
-    if (!prefsLoaded || autoLoadedRef.current) return;
-    if (favoriteZoneIds.length === 0) return;
-    if (isOnline === null) return;
-    autoLoadedRef.current = true;
-    // Offline at launch: skip fetchSummary (which pins to viewedDate =
-    // today UTC) and call loadFromSnapshot() directly so we pick the
-    // newest cached bundle per zone. fetchSummary's offline branch does
-    // an exact-match lookup on today's UTC date — when the device's UTC
-    // has rolled over since the last bg-wake, the snapshot is keyed
-    // under yesterday UTC and the lookup silently returns nothing.
-    // Skip if no snapshot was hydrated — loadFromSnapshot() with no
-    // target date would otherwise pop a "No cached forecast" alert on
-    // a fresh install opened offline.
-    if (isOnline === false) {
-      if (snapshot && Object.keys(snapshot.zones).length > 0) {
-        loadFromSnapshot().catch(() => {});
-      }
-      return;
-    }
-    fetchSummary(favoriteZoneIds);
-  }, [prefsLoaded, favoriteZoneIds, isOnline, fetchSummary, loadFromSnapshot, snapshot]);
-
-  // Step viewedDate forward/back. The arrow handler does the fetch — keep
-  // the boundary checks here so the press is a no-op rather than burying
-  // logic inside the JSX.
+  // Step viewedDate forward/back. Just moves the date — the forecast query
+  // keys on viewedDate, so changing it refetches the right bundle.
   const stepDate = useCallback(
     (delta: number) => {
       const next = addDaysIso(viewedDate, delta);
@@ -901,9 +525,8 @@ export default function Index() {
       if (next < earliest) return;
       Haptics.selectionAsync().catch(() => {});
       setViewedDate(next);
-      fetchSummary(undefined, next);
     },
-    [viewedDate, isOnline, fetchSummary],
+    [viewedDate, isOnline],
   );
 
   const canStepBack = useMemo(() => {
@@ -997,10 +620,9 @@ export default function Index() {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={() => {
-              // Re-fetch whichever zones are currently on screen, falling
-              // back to the working selection if nothing's loaded yet.
-              const ids = summary?.zones?.map((z) => z.id) ?? displayedZoneIds;
-              fetchSummary(ids);
+              // Force a refetch of the current (zones × date) bundle,
+              // bypassing staleTime.
+              forecastQuery.refetch();
             }}
             tintColor={palette.frost[400]}
             colors={[palette.frost[400]]}
@@ -1078,6 +700,11 @@ export default function Index() {
             digging through Settings. Hides itself once registration
             completes. */}
         <LocationWakeBanner />
+
+        {/* Unsent observation drafts — shown when the user submitted
+            while offline and the form was queued locally. Tap goes
+            back to the form so they can retry. */}
+        <ObservationDraftsBanner />
 
         {/* HEADER — wordmark + date pager on the top row, status meta
             (cached/live/offline + fetched time) on a small line below.
@@ -1228,18 +855,6 @@ export default function Index() {
                   })
                   .toUpperCase()}
               </Text>
-              {isSnotelLoading || isWeatherForecastLoading ? (
-                <Text
-                  variant="mono"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: 1.2,
-                    color: palette.aspen[400],
-                  }}
-                >
-                  · {isSnotelLoading ? "STATIONS…" : "WEATHER…"}
-                </Text>
-              ) : null}
             </View>
           ) : null}
 
@@ -1588,7 +1203,7 @@ export default function Index() {
                   </View>
                   <Button
                     onPress={() => {
-                      fetchSummary();
+                      forecastQuery.refetch();
                       setCompareOpen(false);
                     }}
                     disabled={isLoading || displayedZoneIds.length === 0}
@@ -1900,7 +1515,6 @@ export default function Index() {
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
                   setViewedDate(todayStr);
-                  fetchSummary(undefined, todayStr);
                 }}
                 hitSlop={10}
                 style={({ pressed }) => ({
@@ -2136,6 +1750,74 @@ export default function Index() {
         </View>
       </ScrollView>
 
+      {/* Floating "REPORT" button. Wrapped in an absolute-fill overlay
+          with pointerEvents="box-none" so the FAB always renders above
+          siblings (TopoBackground, ScrollView, etc.) and never gets
+          clipped by overflow on any iOS device. The overlay itself
+          ignores touches except where the Pressable lives. */}
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: "flex-end",
+          alignItems: "flex-end",
+          paddingRight: 16,
+          paddingBottom: insets.bottom + 24,
+          zIndex: 1000,
+          elevation: 1000,
+        }}
+      >
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+              () => {},
+            );
+            router.push("/observation/new" as never);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Report a new observation"
+          style={({ pressed }) => ({
+            height: 60,
+            minWidth: 168,
+            paddingHorizontal: 24,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            borderRadius: 30,
+            // Burnt-sienna pill — warm, saturated, can't blend into
+            // the warm page background. Inverted shadow + thick edge
+            // ring define the pill shape no matter how the OS renders
+            // shadows on this device.
+            backgroundColor: pressed ? palette.aspen[500] : palette.aspen[400],
+            borderWidth: 2,
+            borderColor: "#FFFFFF",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.4,
+            shadowRadius: 14,
+            elevation: 12,
+          })}
+        >
+          <Ionicons name="add" size={26} color="#FFFFFF" />
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{
+              fontSize: 14,
+              letterSpacing: 1.6,
+              color: "#FFFFFF",
+            }}
+          >
+            REPORT OBS
+          </Text>
+        </Pressable>
+      </View>
+
       <Modal
         visible={mapModalOpen}
         animationType="slide"
@@ -2218,7 +1900,9 @@ export default function Index() {
                     () => {},
                   );
                   setMapModalOpen(false);
-                  fetchSummary(displayedZoneIds);
+                  // Selection may already have refetched via the query key;
+                  // force one in case the set is unchanged but stale.
+                  forecastQuery.refetch();
                 }}
                 hitSlop={10}
                 style={{
@@ -2397,6 +2081,96 @@ function PushDiagnosticLine() {
 // onboarding — or upgraded from a build that didn't ask — would have
 // no path to enable it short of digging through Settings. This banner
 // auto-hides once the diagnostic reports "ok".
+// Banner that surfaces locally-queued observation drafts. Drafts get
+// created when the user submits while offline (or hits a 5xx).
+// Tapping the banner walks them back to the submit form so they can
+// retry. Banner self-hides when the queue empties.
+function ObservationDraftsBanner() {
+  const [drafts, setDrafts] = useState<
+    Awaited<ReturnType<typeof listObservationDrafts>>
+  >([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      listObservationDrafts().then((list) => {
+        if (!cancelled) setDrafts(list);
+      });
+    };
+    refresh();
+    // Re-check on focus + periodic — the form on submit may add a
+    // draft while we're not watching.
+    const t = setInterval(refresh, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  const count = drafts.length;
+  if (count === 0) return null;
+  // Oldest first — clear the backlog in the order it was written.
+  const nextDraft = [...drafts].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  )[0];
+
+  return (
+    <Pressable
+      onPress={() =>
+        router.push(
+          `/observation/new?draftId=${encodeURIComponent(nextDraft.id)}` as never,
+        )
+      }
+      style={({ pressed }) => ({
+        marginHorizontal: 16,
+        marginTop: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: pressed
+          ? palette.aspen[400] + "22"
+          : palette.aspen[400] + "15",
+        borderWidth: 0.5,
+        borderColor: palette.aspen[400] + "88",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      })}
+    >
+      <Ionicons
+        name="cloud-offline-outline"
+        size={16}
+        color={palette.aspen[400]}
+      />
+      <View style={{ flex: 1 }}>
+        <Text
+          variant="mono"
+          weight="medium"
+          style={{
+            fontSize: 10,
+            letterSpacing: 1.3,
+            color: palette.aspen[400],
+          }}
+        >
+          UNSENT · {count} OBSERVATION{count === 1 ? "" : "S"}
+        </Text>
+        <Text
+          className="text-ink-200"
+          style={{ fontSize: 12, lineHeight: 17, marginTop: 2 }}
+        >
+          Tap to retry sending — the network was down when you submitted.
+        </Text>
+      </View>
+      <Ionicons
+        name="chevron-forward"
+        size={14}
+        color={palette.aspen[400]}
+      />
+    </Pressable>
+  );
+}
+
 function LocationWakeBanner() {
   const [diag, setDiag] = useState<LocationDiagnostic | null>(null);
   const [busy, setBusy] = useState(false);

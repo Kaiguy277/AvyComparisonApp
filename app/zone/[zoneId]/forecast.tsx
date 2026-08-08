@@ -1,16 +1,10 @@
-import { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
-import {
-  getZoneSnapshotForDate,
-  loadSnapshot,
-  type FavoritesSnapshot,
-} from "@/lib/offlineCache";
-import { getZoneSession } from "@/lib/zoneSession";
+import { useZoneBundle } from "@/hooks/useZoneBundle";
 import { AVAILABLE_ZONES } from "@/lib/zones";
 import {
   ZoneScreenHeader,
@@ -36,19 +30,10 @@ export default function ZoneFullForecastScreen() {
     zoneId: string;
     date?: string;
   }>();
-  const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    loadSnapshot().then((s) => {
-      setSnap(s);
-      setLoaded(true);
-    });
-  }, []);
-
-  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId, date) : undefined;
-  const session = getZoneSession(zoneId);
-  const zone: AvalancheZone | undefined = bundle?.forecast ?? session?.forecast;
-  const weatherBundle = bundle?.weather ?? session?.weather;
+  const { forecast: zone, weather: weatherBundle, loaded } = useZoneBundle(
+    zoneId,
+    date,
+  );
 
   const sections = collectSections(zone, weatherBundle);
 

@@ -5,6 +5,7 @@ import { Text } from "@/components/ui/Text";
 import { Badge } from "@/components/ui/Badge";
 import { ProblemRose } from "./ProblemRose";
 import { palette } from "@/constants/design";
+import { elevationBand } from "@/lib/avalanche/elevationBand";
 import type { AvalancheProblem } from "@/lib/api/avalanche";
 
 function formatSize(value: number): string {
@@ -88,13 +89,17 @@ export function AvalancheProblemCard({ problem }: Props) {
             <ProblemRose aspects={problem.aspects} size={104} />
             <View className="flex-1 gap-1.5" style={{ paddingTop: 4 }}>
               {[
-                { key: "Alpine", label: "ALP" },
-                { key: "Treeline", label: "TL" },
-                { key: "Below Treeline", label: "BTL" },
-              ].map(({ key, label }) => {
-                const match = problem.aspects.find((a) =>
-                  a.elevation.toLowerCase().includes(key.toLowerCase().split(" ")[0]),
+                { band: "alpine" as const, label: "ALP" },
+                { band: "treeline" as const, label: "TL" },
+                { band: "belowTreeline" as const, label: "BTL" },
+              ].map(({ band, label }) => {
+                // Match by canonical band (shared with ProblemRose) so the
+                // text list and the rose never disagree. The old substring
+                // match let "Treeline" also match "Below Treeline".
+                const match = problem.aspects.find(
+                  (a) => elevationBand(a.elevation) === band,
                 );
+                const key = band;
                 const aspectStr = match
                   ? match.aspects.length === 8
                     ? "All aspects"

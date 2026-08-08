@@ -27,6 +27,13 @@ export interface ZoneSessionEntry {
   stations?: WeatherObservation[];
   observations?: ObservationSummary[];
   cachedAt: string;
+  // Local day key (YYYY-MM-DD) the forecast/stations/weather represent.
+  // Consumers MUST match this against the date being viewed before using
+  // this entry as a fallback — the map holds only the most recently
+  // fetched day, so using it for an archive date would show today's
+  // ratings under an archive label (a safety bug). Absent for entries
+  // that carry only date-agnostic data (e.g. recent observations).
+  dateKey?: string;
 }
 
 const cache = new Map<string, ZoneSessionEntry>();
@@ -44,6 +51,7 @@ export function setZoneSession(
     stations: entry.stations ?? prev?.stations,
     observations: entry.observations ?? prev?.observations,
     cachedAt: entry.cachedAt,
+    dateKey: entry.dateKey ?? prev?.dateKey,
   });
 }
 

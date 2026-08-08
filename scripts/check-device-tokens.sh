@@ -4,10 +4,12 @@
 # device's Expo push token to Supabase.
 #
 # Usage:
-#   ./scripts/check-device-tokens.sh
+#   SUPABASE_SERVICE_ROLE_KEY=... ./scripts/check-device-tokens.sh
 #
-# Anon key is read from .env (EXPO_PUBLIC_SUPABASE_ANON_KEY); the
-# REST endpoint is read from EXPO_PUBLIC_SUPABASE_URL.
+# Requires the service role key: since migration 20260807000000 the
+# anon role can only INSERT into device_tokens (reads were a push-token
+# harvest vector), so listing rows needs service-role access. The REST
+# endpoint is read from .env (EXPO_PUBLIC_SUPABASE_URL).
 
 set -euo pipefail
 
@@ -23,9 +25,14 @@ fi
 source "$env_file"
 
 URL="${EXPO_PUBLIC_SUPABASE_URL:-}"
-KEY="${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}"
-if [[ -z "$URL" || -z "$KEY" ]]; then
-  echo "error: missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY" >&2
+KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
+if [[ -z "$URL" ]]; then
+  echo "error: missing EXPO_PUBLIC_SUPABASE_URL in .env" >&2
+  exit 1
+fi
+if [[ -z "$KEY" ]]; then
+  echo "error: set SUPABASE_SERVICE_ROLE_KEY (anon can no longer read device_tokens" >&2
+  echo "       — migration 20260807000000). Find it in the Supabase dashboard → API." >&2
   exit 1
 fi
 

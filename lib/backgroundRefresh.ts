@@ -6,9 +6,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
   loadFavorites,
-  loadSnapshot,
+  mergeZoneBundle,
+  mutateSnapshot,
   pruneSnapshot,
-  saveSnapshot,
   todayIsoDate,
   type FavoritesSnapshot,
 } from "./offlineCache";
@@ -68,14 +68,24 @@ const MIN_INTERVAL_SECONDS = 15 * 60;
 // normally.
 const isExpoGo = Constants.appOwnership === "expo";
 
-// Shared refresh body — reusable across the BGTaskScheduler wake-up, the
-// silent-push notification handler, and the in-app foreground refresh.
-// Returns the count of zones written, or null if nothing was attempted.
+// Shared refresh body — the single "fetch cached forecasts and store
+// them" writer, reused across the BGTaskScheduler wake-up, the silent-
+// push handler, the location wake, and the in-app foreground refresh.
+// All writes go through the serialized mutateSnapshot so concurrent
+// wake sources can't lose each other's updates. Returns the zone count
+// and the resulting snapshot (so a UI caller can setSnapshot), or null
+// if nothing was attempted.
 export async function refreshFavoritesSnapshot(
   source: LastRefreshRecord["source"] = "bg-task",
-): Promise<number | null> {
+): Promise<{ zones: number; snapshot: FavoritesSnapshot } | null> {
   const favs = await loadFavorites();
-  if (!favs || favs.length === 0) return 0;
+  // No favorites → nothing to do (distinct from failure). Zero-count
+  // sentinel keeps the bg-task's iOS result as NoData rather than Failed;
+  // the empty snapshot is never applied (the only .snapshot consumer,
+  // the foreground refresh, is guarded against empty favorites).
+  if (!favs || favs.length === 0) {
+    return { zones: 0, snapshot: { fetchedAt: "", zones: {} } };
+  }
   const r = await avalancheApi.getCachedForecasts(favs);
   if (!r.success || !r.zones) {
     console.warn(`[${source}] getCachedForecasts unsuccessful`);
@@ -85,83 +95,50 @@ export async function refreshFavoritesSnapshot(
   // Stations-only zones are dated by the stations snapshot, which may not
   // align with the forecast date — fall back to today.
   const stationsDate = r.stationsDate || todayIsoDate();
-  let next: FavoritesSnapshot =
-    (await loadSnapshot()) || { fetchedAt: "", zones: {} };
   const favSet = new Set(favs);
   const nowIso = new Date().toISOString();
 
-  for (const z of r.zones) {
-    if (!favSet.has(z.id)) continue;
-    const cid = ZONE_TO_CENTER[z.id];
-    const weather = {
-      nacWeather: cid ? r.centerWeather?.[cid] : undefined,
-      nwsForecast: r.zoneNwsForecasts?.[z.id],
-      avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
-      avgLocations: r.zoneAvgLocations?.[z.id],
-    };
-    next = {
-      fetchedAt: nowIso,
-      zones: {
-        ...next.zones,
-        [z.id]: {
-          ...(next.zones[z.id] || {}),
-          [date]: {
-            forecast: z,
-            stations: z.weatherObservations,
-            weather,
-            cachedAt: nowIso,
-          },
+  const snapshot = await mutateSnapshot((current) => {
+    let next = current;
+    for (const z of r.zones!) {
+      if (!favSet.has(z.id)) continue;
+      const cid = ZONE_TO_CENTER[z.id];
+      next = mergeZoneBundle(next, z.id, date, {
+        forecast: z,
+        stations: z.weatherObservations,
+        weather: {
+          nacWeather: cid ? r.centerWeather?.[cid] : undefined,
+          nwsForecast: r.zoneNwsForecasts?.[z.id],
+          avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
+          avgLocations: r.zoneAvgLocations?.[z.id],
         },
-      },
-    };
-  }
-
-  // Stations-only zones — no forecast, but the cron is still updating
-  // their station and weather data. Write into the snapshot so the
-  // detail screen can render fresh wx info even off-season.
-  for (const soz of r.stationsOnlyZones || []) {
-    if (!favSet.has(soz.id)) continue;
-    const cid = soz.centerId || ZONE_TO_CENTER[soz.id];
-    const weather = {
-      nacWeather: cid ? r.centerWeather?.[cid] : undefined,
-      nwsForecast: r.zoneNwsForecasts?.[soz.id],
-      avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
-      avgLocations: r.zoneAvgLocations?.[soz.id],
-    };
-    const existing = next.zones[soz.id]?.[stationsDate];
-    next = {
-      fetchedAt: nowIso,
-      zones: {
-        ...next.zones,
-        [soz.id]: {
-          ...(next.zones[soz.id] || {}),
-          [stationsDate]: {
-            // Preserve any pre-existing forecast (rare but possible: a
-            // stations-only response after we previously had a forecast
-            // on the same date should not erase it).
-            forecast: existing?.forecast,
-            stations: soz.weatherObservations,
-            weather,
-            cachedAt: nowIso,
-          },
+      }, nowIso);
+    }
+    // Stations-only zones — no forecast, but the cron is still updating
+    // their station/weather data. mergeZoneBundle preserves any existing
+    // forecast on the same date.
+    for (const soz of r.stationsOnlyZones || []) {
+      if (!favSet.has(soz.id)) continue;
+      const cid = soz.centerId || ZONE_TO_CENTER[soz.id];
+      next = mergeZoneBundle(next, soz.id, stationsDate, {
+        stations: soz.weatherObservations,
+        weather: {
+          nacWeather: cid ? r.centerWeather?.[cid] : undefined,
+          nwsForecast: r.zoneNwsForecasts?.[soz.id],
+          avgDiscussion: cid ? r.centerAvgDiscussions?.[cid] : undefined,
+          avgLocations: r.zoneAvgLocations?.[soz.id],
         },
-      },
-    };
-  }
-
-  next = pruneSnapshot(next, favs);
-  await saveSnapshot(next);
-  const totalCached =
-    r.zones.length + (r.stationsOnlyZones?.length || 0);
-  await writeLastRefresh({
-    at: nowIso,
-    source,
-    zones: totalCached,
+      }, nowIso);
+    }
+    return pruneSnapshot(next, favs);
   });
+
+  const totalCached = r.zones.length + (r.stationsOnlyZones?.length || 0);
+  await writeLastRefresh({ at: nowIso, source, zones: totalCached });
   console.log(
     `[${source}] cached ${r.zones.length} forecast + ${r.stationsOnlyZones?.length || 0} stations-only for ${date}`,
   );
-  return totalCached;
+  return { zones: totalCached, snapshot };
 }
 
 // defineTask must be evaluated at module load (before app entry resolves)
@@ -171,12 +148,12 @@ export async function refreshFavoritesSnapshot(
 if (!isExpoGo) {
   TaskManager.defineTask(BG_TASK_NAME, async () => {
     try {
-      const n = await refreshFavoritesSnapshot("bg-task");
+      const result = await refreshFavoritesSnapshot("bg-task");
       // NewData / NoData / Failed are signals to iOS about whether
       // the fetch produced anything useful — informs the OS's
       // scheduling heuristic for the next fire.
-      if (n === null) return BackgroundFetch.BackgroundFetchResult.Failed;
-      return n > 0
+      if (result === null) return BackgroundFetch.BackgroundFetchResult.Failed;
+      return result.zones > 0
         ? BackgroundFetch.BackgroundFetchResult.NewData
         : BackgroundFetch.BackgroundFetchResult.NoData;
     } catch (err) {

@@ -203,18 +203,21 @@ function buildObservation(
   const sweCurrent = lastNonNull(wteqVals);
   const tempCurrent = lastNonNull(tobsVals);
 
-  // Historical lookback values (hourly data, so index offset = hours)
-  const snowDepth24hrAgo = valueAtOffset(snwdVals, -24);
-  const snowDepth72hrAgo = valueAtOffset(snwdVals, -72);
-  const snowDepth7dayAgo = valueAtOffset(snwdVals, -168);
+  // Historical lookback values. Selected by TIMESTAMP, not array index:
+  // Synoptic returns each station at its native cadence (often 5–20 min,
+  // not hourly), so "N samples ago" is not "N hours ago" — the old
+  // index math reported e.g. a 4-hour snow total as the 24-hour number.
+  const snowDepth24hrAgo = valueHoursAgo(snwdVals, timestamps, 24);
+  const snowDepth72hrAgo = valueHoursAgo(snwdVals, timestamps, 72);
+  const snowDepth7dayAgo = valueHoursAgo(snwdVals, timestamps, 168);
 
-  const prec24hrAgo = valueAtOffset(precVals, -24);
-  const prec48hrAgo = valueAtOffset(precVals, -48);
-  const prec72hrAgo = valueAtOffset(precVals, -72);
-  const prec7dayAgo = valueAtOffset(precVals, -168);
+  const prec24hrAgo = valueHoursAgo(precVals, timestamps, 24);
+  const prec48hrAgo = valueHoursAgo(precVals, timestamps, 48);
+  const prec72hrAgo = valueHoursAgo(precVals, timestamps, 72);
+  const prec7dayAgo = valueHoursAgo(precVals, timestamps, 168);
 
-  const swe24hrAgo = valueAtOffset(wteqVals, -24);
-  const swe72hrAgo = valueAtOffset(wteqVals, -72);
+  const swe24hrAgo = valueHoursAgo(wteqVals, timestamps, 24);
+  const swe72hrAgo = valueHoursAgo(wteqVals, timestamps, 72);
 
   // Snow change calculations
   const snowNew24hr = safeSubtract(snowDepth, snowDepth24hrAgo);
@@ -238,7 +241,7 @@ function buildObservation(
     : null;
 
   // Temperature metrics
-  const temp24hrAgo = valueAtOffset(tobsVals, -24);
+  const temp24hrAgo = valueHoursAgo(tobsVals, timestamps, 24);
   let trend: 'warming' | 'cooling' | 'stable' | null = null;
   if (tempCurrent !== null && temp24hrAgo !== null) {
     const diff = tempCurrent - temp24hrAgo;
@@ -281,31 +284,31 @@ function buildObservation(
     },
     temperature: {
       current: tempCurrent,
-      high24hr: maxOfLast(tobsVals, 24),
-      low24hr: minOfLast(tobsVals, 24),
-      high72hr: maxOfLast(tobsVals, 72),
-      low72hr: minOfLast(tobsVals, 72),
-      avg24hr: avgOfLast(tobsVals, 24),
-      avg72hr: avgOfLast(tobsVals, 72),
+      high24hr: maxOverHours(tobsVals, timestamps, 24),
+      low24hr: minOverHours(tobsVals, timestamps, 24),
+      high72hr: maxOverHours(tobsVals, timestamps, 72),
+      low72hr: minOverHours(tobsVals, timestamps, 72),
+      avg24hr: avgOverHours(tobsVals, timestamps, 24),
+      avg72hr: avgOverHours(tobsVals, timestamps, 72),
       trend,
-      hourly24hr: hourlyPoints(tobsVals, timestamps, 24),
-      hourly72hr: hourlyPoints(tobsVals, timestamps, 72),
+      hourly24hr: hourlySeries(tobsVals, timestamps, 24),
+      hourly72hr: hourlySeries(tobsVals, timestamps, 72),
     },
     wind: hasWindData ? {
       speedCurrent: lastNonNull(wspdVals),
-      speedAvg24hr: avgOfLast(wspdVals, 24),
-      speedMax24hr: maxOfLast(wspdxVals.length > 0 ? wspdxVals : wspdVals, 24),
-      speedAvg72hr: avgOfLast(wspdVals, 72),
-      speedMax72hr: maxOfLast(wspdxVals.length > 0 ? wspdxVals : wspdVals, 72),
+      speedAvg24hr: avgOverHours(wspdVals, timestamps, 24),
+      speedMax24hr: maxOverHours(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 24),
+      speedAvg72hr: avgOverHours(wspdVals, timestamps, 72),
+      speedMax72hr: maxOverHours(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 72),
       direction: getWindDirection(lastNonNull(wdirVals)),
-      direction24hr: predominantWindDir(wdirVals, 24),
-      direction72hr: predominantWindDir(wdirVals, 72),
-      hourlySpeed24hr: hourlyPoints(wspdVals, timestamps, 24),
-      hourlySpeed72hr: hourlyPoints(wspdVals, timestamps, 72),
-      hourlyGust24hr: hourlyPoints(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 24),
-      hourlyGust72hr: hourlyPoints(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 72),
-      hourlyDirection24hr: hourlyPoints(wdirVals, timestamps, 24),
-      hourlyDirection72hr: hourlyPoints(wdirVals, timestamps, 72),
+      direction24hr: predominantWindDir(wdirVals, timestamps, 24),
+      direction72hr: predominantWindDir(wdirVals, timestamps, 72),
+      hourlySpeed24hr: hourlySeries(wspdVals, timestamps, 24),
+      hourlySpeed72hr: hourlySeries(wspdVals, timestamps, 72),
+      hourlyGust24hr: hourlySeries(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 24),
+      hourlyGust72hr: hourlySeries(wspdxVals.length > 0 ? wspdxVals : wspdVals, timestamps, 72),
+      hourlyDirection24hr: hourlySeries(wdirVals, timestamps, 24),
+      hourlyDirection72hr: hourlySeries(wdirVals, timestamps, 72),
     } : null,
     dataQuality,
   };
@@ -324,88 +327,144 @@ function lastNonNull(vals: (number | null)[]): number | null {
   return null;
 }
 
-function valueAtOffset(vals: (number | null)[], offset: number): number | null {
-  const idx = vals.length + offset;
-  if (idx < 0 || idx >= vals.length) return null;
-  return vals[idx];
-}
-
 function safeSubtract(a: number | null, b: number | null): number | null {
   if (a === null || b === null) return null;
   return Math.round((a - b) * 100) / 100;
 }
 
-function maxOfLast(vals: (number | null)[], hours: number): number | null {
-  const slice = vals.slice(-hours);
-  const valid = slice.filter((v): v is number => v !== null);
-  return valid.length > 0 ? Math.max(...valid) : null;
+// ── Timestamp-based selection ──
+// Synoptic returns each station at its native cadence (5–60 min), so
+// array position is NOT time. Everything below anchors to the latest
+// sample's clock and selects by elapsed hours, not element count.
+
+export function anchorMs(timestamps: string[]): number {
+  const raw = timestamps.length
+    ? Date.parse(timestamps[timestamps.length - 1])
+    : NaN;
+  return Number.isNaN(raw) ? Date.now() : raw;
 }
 
-function minOfLast(vals: (number | null)[], hours: number): number | null {
-  const slice = vals.slice(-hours);
-  const valid = slice.filter((v): v is number => v !== null);
-  return valid.length > 0 ? Math.min(...valid) : null;
+// First index whose timestamp is within `hours` of the latest sample.
+// Assumes ascending timestamps (Synoptic's date_time order).
+export function windowStartIdx(timestamps: string[], hours: number): number {
+  const cutoff = anchorMs(timestamps) - hours * 3_600_000;
+  let lo = 0;
+  let hi = timestamps.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (Date.parse(timestamps[mid]) >= cutoff) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
 }
 
-function avgOfLast(vals: (number | null)[], hours: number): number | null {
-  const slice = vals.slice(-hours);
-  const valid = slice.filter((v): v is number => v !== null);
-  if (valid.length === 0) return null;
-  return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
+// Value ~`hours` ago: the most recent non-null reading at or before
+// (anchor − hours). Returns null if there's no reading that old.
+export function valueHoursAgo(
+  vals: (number | null)[],
+  timestamps: string[],
+  hours: number,
+): number | null {
+  const cutoff = anchorMs(timestamps) - hours * 3_600_000;
+  for (let i = vals.length - 1; i >= 0; i--) {
+    if (Date.parse(timestamps[i]) <= cutoff && vals[i] !== null) return vals[i];
+  }
+  return null;
+}
+
+function validInWindow(
+  vals: (number | null)[],
+  timestamps: string[],
+  hours: number,
+): number[] {
+  const start = windowStartIdx(timestamps, hours);
+  const out: number[] = [];
+  for (let i = start; i < vals.length; i++) {
+    if (vals[i] !== null) out.push(vals[i] as number);
+  }
+  return out;
+}
+
+export function maxOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
+  const v = validInWindow(vals, timestamps, hours);
+  return v.length ? Math.max(...v) : null;
+}
+
+export function minOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
+  const v = validInWindow(vals, timestamps, hours);
+  return v.length ? Math.min(...v) : null;
+}
+
+export function avgOverHours(vals: (number | null)[], timestamps: string[], hours: number): number | null {
+  const v = validInWindow(vals, timestamps, hours);
+  if (!v.length) return null;
+  return Math.round(v.reduce((a, b) => a + b, 0) / v.length);
+}
+
+// Bucket width for downsampled series/increments: ~1 point/hour within
+// 24h, ~1 point/2h beyond. Buckets are real clock hours, so point count
+// no longer depends on the station's reporting frequency.
+function bucketMs(hours: number): number {
+  return (hours <= 24 ? 1 : 2) * 3_600_000;
 }
 
 /**
- * Build hourly increments from a cumulative running total (e.g., precip_accum
- * which only resets at the seasonal start). Returns positive deltas only;
- * sensor resets / negative diffs become 0.
+ * Downsample a raw series to one point per clock-hour bucket (last
+ * reading in each bucket wins). Time-based, so a 10-minute station and
+ * an hourly station both yield ~`hours` points instead of 6× more.
  */
-function hourlyIncrements(
+export function hourlySeries(vals: (number | null)[], timestamps: string[], hours: number): TempDataPoint[] {
+  const start = windowStartIdx(timestamps, hours);
+  const width = bucketMs(hours);
+  const points: TempDataPoint[] = [];
+  let bucket = Number.NaN;
+  for (let i = start; i < vals.length; i++) {
+    if (vals[i] === null) continue;
+    const b = Math.floor(Date.parse(timestamps[i]) / width);
+    const pt = { timestamp: timestamps[i], value: Math.round(vals[i] as number) };
+    if (b !== bucket) { points.push(pt); bucket = b; }
+    else points[points.length - 1] = pt;
+  }
+  return points;
+}
+
+/**
+ * Build hourly increments from a cumulative running total (e.g., PREC
+ * accum, resets only at season start). Positive deltas only; sensor
+ * resets / negative diffs become 0. Deltas are SUMMED within each clock
+ * bucket so sub-hourly reporting doesn't drop accumulation.
+ */
+export function hourlyIncrements(
   vals: (number | null)[],
   timestamps: string[],
   hours: number,
   precision = 2,
 ): TempDataPoint[] {
-  const startIdx = Math.max(1, vals.length - hours);
-  const sampleInterval = hours <= 24 ? 1 : 2;
+  const start = windowStartIdx(timestamps, hours);
+  const width = bucketMs(hours);
+  const scale = Math.pow(10, precision);
   const points: TempDataPoint[] = [];
-  let prev = vals[startIdx - 1];
-  for (let i = startIdx; i < vals.length; i += sampleInterval) {
+  let bucket = Number.NaN;
+  // Baseline = last non-null reading before the window opens.
+  let prev: number | null = null;
+  for (let i = start - 1; i >= 0; i--) {
+    if (vals[i] !== null) { prev = vals[i]; break; }
+  }
+  for (let i = start; i < vals.length; i++) {
     const cur = vals[i];
-    if (cur !== null && prev !== null) {
-      const diff = cur - prev;
-      const delta = diff > 0 ? diff : 0;
-      points.push({
-        timestamp: timestamps[i],
-        value: Math.round(delta * Math.pow(10, precision)) / Math.pow(10, precision),
-      });
-      prev = cur;
-    } else if (cur !== null) {
-      // First valid reading after a gap — start a new baseline
-      prev = cur;
+    if (cur === null) continue;
+    const delta = prev !== null && cur > prev ? cur - prev : 0;
+    prev = cur;
+    const b = Math.floor(Date.parse(timestamps[i]) / width);
+    if (b !== bucket) {
+      points.push({ timestamp: timestamps[i], value: Math.round(delta * scale) / scale });
+      bucket = b;
+    } else {
+      const last = points[points.length - 1];
+      last.value = Math.round((last.value + delta) * scale) / scale;
+      last.timestamp = timestamps[i];
     }
   }
-  return points;
-}
-
-function hourlyPoints(vals: (number | null)[], timestamps: string[], hours: number): TempDataPoint[] {
-  const startIdx = Math.max(0, vals.length - hours);
-  const sampleInterval = hours <= 24 ? 1 : 2;
-  const points: TempDataPoint[] = [];
-
-  for (let i = startIdx; i < vals.length; i += sampleInterval) {
-    if (vals[i] !== null) {
-      points.push({ timestamp: timestamps[i], value: Math.round(vals[i]!) });
-    }
-  }
-
-  // Always include the most recent
-  if (vals.length > 0 && vals[vals.length - 1] !== null) {
-    const lastTs = timestamps[timestamps.length - 1];
-    if (!points.length || points[points.length - 1].timestamp !== lastTs) {
-      points.push({ timestamp: lastTs, value: Math.round(vals[vals.length - 1]!) });
-    }
-  }
-
   return points;
 }
 
@@ -415,9 +474,12 @@ function getWindDirection(degrees: number | null): string | null {
   return directions[Math.round(degrees / 45) % 8];
 }
 
-function predominantWindDir(vals: (number | null)[], hours: number): string | null {
-  const slice = vals.slice(-hours);
-  const valid = slice.filter((v): v is number => v !== null);
+function predominantWindDir(
+  vals: (number | null)[],
+  timestamps: string[],
+  hours: number,
+): string | null {
+  const valid = validInWindow(vals, timestamps, hours);
   if (valid.length === 0) return null;
 
   const radians = valid.map(v => v * Math.PI / 180);

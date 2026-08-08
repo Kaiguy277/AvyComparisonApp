@@ -1,16 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Linking, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
-import {
-  getZoneSnapshotForDate,
-  loadSnapshot,
-  type FavoritesSnapshot,
-} from "@/lib/offlineCache";
-import { getZoneSession } from "@/lib/zoneSession";
+import { useZoneBundle } from "@/hooks/useZoneBundle";
 import { AVAILABLE_ZONES } from "@/lib/zones";
 import {
   ZoneScreenHeader,
@@ -30,20 +25,8 @@ export default function ZoneNwsScreen() {
     zoneId: string;
     date?: string;
   }>();
-  const [snap, setSnap] = useState<FavoritesSnapshot | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    loadSnapshot().then((s) => {
-      setSnap(s);
-      setLoaded(true);
-    });
-  }, []);
-
-  const bundle = snap ? getZoneSnapshotForDate(snap, zoneId, date) : undefined;
-  const session = getZoneSession(zoneId);
-  const zone = bundle?.forecast ?? session?.forecast;
-  const nws: NwsForecast | undefined =
-    bundle?.weather?.nwsForecast ?? session?.weather?.nwsForecast;
+  const { forecast: zone, weather, loaded } = useZoneBundle(zoneId, date);
+  const nws: NwsForecast | undefined = weather?.nwsForecast;
   const displayName =
     zone?.name ??
     AVAILABLE_ZONES.find((z) => z.id === zoneId)?.name ??

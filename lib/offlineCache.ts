@@ -4,11 +4,11 @@ import type {
   WeatherObservation,
   ZoneWeatherForecast,
 } from "./api/avalanche";
+import { addDaysKey, formatDayKey, toKey, todayKey } from "./dates";
 
 // Storage keys
 const FAVORITES_KEY = "avy-favorites";
 const SNAPSHOT_KEY = "avy-favorites-snapshot";
-const AUTO_REFRESH_KEY = "avy-auto-refresh-favorites";
 
 // Snapshot age past which we mark the data as "stale" in the UI. Doesn't
 // delete anything — last-known-good is always more useful than nothing
@@ -67,10 +67,11 @@ export async function saveFavorites(ids: string[]): Promise<void> {
 
 // ────────── Snapshot (bundles indexed by zoneId × date) ──────────
 
+// Local day key for a Date or ISO string (see lib/dates.ts on why local).
 function isoDate(d: Date | string): string {
   const x = typeof d === "string" ? new Date(d) : d;
-  if (isNaN(x.getTime())) return new Date().toISOString().slice(0, 10);
-  return x.toISOString().slice(0, 10);
+  if (isNaN(x.getTime())) return todayKey();
+  return toKey(x);
 }
 
 // Read & migrate-from-flat-shape if needed. The old shape was
@@ -114,6 +115,63 @@ export async function saveSnapshot(snapshot: FavoritesSnapshot): Promise<void> {
   }
 }
 
+// Serializes every read-modify-write cycle on the snapshot behind a
+// single promise chain. The app has four independent wake sources that
+// can write concurrently — bg-task, silent push, location wake, and the
+// foreground refresh — and each previously did its own load → build →
+// save, so two overlapping writers would each start from the same base
+// and the later save would silently drop the earlier one's zones. All
+// snapshot mutations must go through here.
+//
+// The mutator receives the freshly-loaded current snapshot and returns
+// the next one (it may return the same reference to signal "no change",
+// in which case nothing is written). Prune inside the mutator if needed.
+let snapshotWriteChain: Promise<unknown> = Promise.resolve();
+
+export function mutateSnapshot(
+  mutator: (current: FavoritesSnapshot) => FavoritesSnapshot,
+): Promise<FavoritesSnapshot> {
+  const run = async (): Promise<FavoritesSnapshot> => {
+    const current = (await loadSnapshot()) || { fetchedAt: "", zones: {} };
+    const next = mutator(current);
+    if (next !== current) await saveSnapshot(next);
+    return next;
+  };
+  // Chain regardless of whether the prior write resolved or rejected, so
+  // one failure doesn't wedge the queue.
+  const result = snapshotWriteChain.then(run, run);
+  snapshotWriteChain = result.catch(() => {});
+  return result;
+}
+
+// Merge one zone+date bundle into a snapshot immutably, preserving any
+// fields the patch doesn't supply. Shared by every writer so the nested
+// spread + preserve-existing logic lives in exactly one place.
+export function mergeZoneBundle(
+  snap: FavoritesSnapshot,
+  zoneId: string,
+  date: string,
+  patch: Partial<ZoneSnapshot>,
+  nowIso: string,
+): FavoritesSnapshot {
+  const existing = snap.zones[zoneId]?.[date];
+  return {
+    fetchedAt: nowIso,
+    zones: {
+      ...snap.zones,
+      [zoneId]: {
+        ...(snap.zones[zoneId] || {}),
+        [date]: {
+          forecast: patch.forecast ?? existing?.forecast,
+          stations: patch.stations ?? existing?.stations,
+          weather: patch.weather ?? existing?.weather,
+          cachedAt: nowIso,
+        },
+      },
+    },
+  };
+}
+
 // Find the bundle for a given zone+date. Pass undefined for date to get
 // the most recent bundle the phone knows about for that zone.
 export function getZoneSnapshotForDate(
@@ -131,39 +189,6 @@ export function getZoneSnapshotForDate(
   return byDate[dates[dates.length - 1]];
 }
 
-// List the dates the phone has cached for a given zone, newest first.
-export function listSnapshotDates(
-  snap: FavoritesSnapshot | null,
-  zoneId: string,
-): string[] {
-  if (!snap?.zones?.[zoneId]) return [];
-  return Object.keys(snap.zones[zoneId]).sort().reverse();
-}
-
-// Insert / update a single (zoneId, date) bundle into the snapshot.
-export function upsertSnapshotZoneDate(
-  snap: FavoritesSnapshot | null,
-  zoneId: string,
-  date: string,
-  patch: Partial<ZoneSnapshot> & { forecast?: AvalancheZone },
-): FavoritesSnapshot {
-  const next: FavoritesSnapshot = snap
-    ? { ...snap, zones: { ...snap.zones } }
-    : { fetchedAt: "", zones: {} };
-  const existing = next.zones[zoneId]?.[date];
-  next.zones[zoneId] = {
-    ...(next.zones[zoneId] || {}),
-    [date]: {
-      forecast: patch.forecast ?? existing?.forecast,
-      stations: patch.stations ?? existing?.stations,
-      weather: patch.weather ?? existing?.weather,
-      cachedAt: new Date().toISOString(),
-    },
-  };
-  next.fetchedAt = new Date().toISOString();
-  return next;
-}
-
 // Drop archive days older than OFFLINE_HISTORY_DAYS for every zone, and
 // drop entire zones that aren't in the favorites set. Call after every
 // snapshot mutation so AsyncStorage doesn't grow without bound.
@@ -173,9 +198,8 @@ export function pruneSnapshot(
   historyDays = OFFLINE_HISTORY_DAYS,
 ): FavoritesSnapshot {
   const favSet = new Set(favoriteZoneIds);
-  const cutoff = new Date();
-  cutoff.setUTCDate(cutoff.getUTCDate() - historyDays + 1);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // Local cutoff — keep today plus (historyDays − 1) prior local days.
+  const cutoffStr = addDaysKey(todayKey(), -(historyDays - 1));
 
   const nextZones: typeof snap.zones = {};
   for (const [zoneId, byDate] of Object.entries(snap.zones)) {
@@ -187,38 +211,6 @@ export function pruneSnapshot(
     if (Object.keys(kept).length > 0) nextZones[zoneId] = kept;
   }
   return { ...snap, zones: nextZones };
-}
-
-// Convenience: merge + prune + save in one shot.
-export async function persistSnapshotZoneDate(
-  zoneId: string,
-  date: string,
-  patch: Partial<ZoneSnapshot> & { forecast?: AvalancheZone },
-  favoriteZoneIds: string[],
-): Promise<FavoritesSnapshot> {
-  const current = await loadSnapshot();
-  const merged = upsertSnapshotZoneDate(current, zoneId, date, patch);
-  const pruned = pruneSnapshot(merged, favoriteZoneIds);
-  await saveSnapshot(pruned);
-  return pruned;
-}
-
-// ────────── Auto-refresh preference ──────────
-
-export async function loadAutoRefresh(): Promise<boolean> {
-  try {
-    const raw = await AsyncStorage.getItem(AUTO_REFRESH_KEY);
-    if (raw === null) return true; // default on
-    return raw === "true";
-  } catch {
-    return true;
-  }
-}
-
-export async function saveAutoRefresh(on: boolean): Promise<void> {
-  try {
-    await AsyncStorage.setItem(AUTO_REFRESH_KEY, String(on));
-  } catch {}
 }
 
 // ────────── Helpers ──────────
@@ -243,20 +235,8 @@ export function formatAge(iso: string | undefined): string {
   return `${Math.round(h / 24)}d ago`;
 }
 
-// Format YYYY-MM-DD for display ("MAY 1", "TUE · APR 30") in the hero.
-export function formatDateLabel(date: string): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  if (isNaN(d.getTime())) return date;
-  const month = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][d.getUTCMonth()];
-  return `${month} ${d.getUTCDate()}`;
-}
-
-export function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export function addDaysIso(date: string, delta: number): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
-}
+// Date helpers now live in lib/dates.ts (single local convention). These
+// re-exports keep the historical names working for existing callers.
+export const formatDateLabel = formatDayKey;
+export const todayIsoDate = todayKey;
+export const addDaysIso = addDaysKey;

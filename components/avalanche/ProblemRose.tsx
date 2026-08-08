@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import Svg, { Circle, Path, Text as SvgText, Line } from "react-native-svg";
 import { palette } from "@/constants/design";
+import { elevationRingIndex } from "@/lib/avalanche/elevationBand";
 import type { AspectElevation } from "@/lib/api/avalanche";
 
 // Standard avalanche rose: 8 aspect octants × 3 elevation rings = 24 cells.
@@ -25,13 +26,6 @@ const ASPECT_BASE_ANGLE: Record<string, number> = {
   NW: 315,
 };
 
-function elevationToRingIndex(elev: string): number {
-  const e = elev.toLowerCase();
-  if (e.includes("alpine") || e.includes("above")) return 0; // inner
-  if (e.includes("below")) return 2; // outer
-  return 1; // treeline / middle
-}
-
 interface Props {
   aspects: AspectElevation[];
   size?: number;
@@ -54,7 +48,7 @@ export function ProblemRose({ aspects, size = 96, fillColor }: Props) {
   // Build a quick lookup of which ring/aspect cells are active.
   const active = new Set<string>();
   for (const ae of aspects) {
-    const ring = elevationToRingIndex(ae.elevation);
+    const ring = elevationRingIndex(ae.elevation);
     for (const a of ae.aspects) {
       active.add(`${ring}|${a.toUpperCase()}`);
     }
