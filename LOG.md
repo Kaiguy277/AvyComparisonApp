@@ -21,6 +21,31 @@ Format per entry:
 
 ---
 
+## 2026-08-07 — Backlog cleanup (branch `chore/backlog-cleanup`)
+- **Lint → 0 errors / 0 warnings.** `eslint.config.js` now ignores `supabase/functions`
+  (Deno; its https:// imports caused 17 false `import/no-unresolved`), `.expo`,
+  `graphify-out` — matching tsconfig. Escaped 5 JSX apostrophes/quotes. Removed in-file
+  dead code (index.tsx unused Card/Checkbox imports + orphan `Meta`, PhotoLightbox
+  `screen`/Dimensions, WeatherStationCard `_TempDataPoint`, AvalancheEntry FieldLabel);
+  deleting the Card imports orphaned `components/ui/Card.tsx` (reachability-confirmed) →
+  deleted. **Fixed B14** (stale-closure trap): the 2 observation effects guarded on
+  captured `obs` state with only `[zoneId]` deps → now resolve from the session cache
+  fresh (keyed by zoneId[/obsId]), fixing the bug AND exhaustive-deps with no refetch
+  loop. Stabilized the nws `periods` useMemo.
+- **CI:** `.github/workflows/ci.yml` gates typecheck + `eslint --max-warnings=0` + tests
+  on push-to-main and every PR. Static commands only (no injection surface).
+- **Button loading spinner fixed** (theme migration): spinner colors were pre-migration
+  dark-theme hexes → invisible in 3 of 4 variants; now derived from each variant's text
+  color. The rest of the stale-hex migration (MetricChart axes, WindCompass, ZoneMapPicker
+  WebView) deferred — aesthetic tuning that needs on-device verification.
+- **Observation-flow bugs:** A5 (manual lat/lng ate decimals — local text state now the
+  field source of truth), B8 (schema rejects {0,0} → no more Null-Island submits), B15
+  (validate the MERGED form so section-notes count), B19 (center picker always shown so a
+  pre-filled center can be corrected). +4 schema + 6 elevation-band-era tests → **57 total**.
+- **Still deferred (need a device / decision):** device smoke test of the TanStack
+  conversion; the visual hex migration; App Store Always-location call. §2.4 per-zone
+  forecast dates + the physical zone-catalogue merge remain deliberate future changes.
+
 ## 2026-08-07 — Tier 3: consolidation (branch `chore/tier3-consolidation`)
 - **Deleted ~2,700 lines of verified-dead code.** Built an import-reachability
   analysis from the `app/` entry points (routes auto-discovered by expo-router),

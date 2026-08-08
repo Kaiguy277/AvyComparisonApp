@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
 import { Text } from "./Text";
+import { palette } from "@/constants/design";
 
 export type ButtonVariant = "primary" | "outline" | "ghost" | "frost";
 export type ButtonSize = "default" | "sm" | "lg";
@@ -19,26 +20,31 @@ interface ButtonProps {
   haptic?: boolean;
 }
 
+// Spinner color must match the variant's TEXT color (from the palette),
+// or the loading indicator is invisible. The old hardcoded hexes were
+// pre-migration dark-theme values: near-black on the dark primary button,
+// near-white on the light paper background for outline/ghost — a blank
+// pill in three of four variants.
 const variantStyles: Record<ButtonVariant, { container: string; text: string; spinner: string }> = {
   primary: {
     container: "bg-ink-50 active:bg-ink-100",
     text: "text-ink-950",
-    spinner: "#070A14",
+    spinner: palette.ink[950],
   },
   outline: {
     container: "border border-ink-600 bg-transparent active:bg-ink-800",
     text: "text-ink-100",
-    spinner: "#E1E7F0",
+    spinner: palette.ink[100],
   },
   ghost: {
     container: "bg-transparent active:bg-ink-800",
     text: "text-ink-200",
-    spinner: "#B8C2D6",
+    spinner: palette.ink[200],
   },
   frost: {
     container: "bg-frost-400/15 border border-frost-400/40 active:bg-frost-400/25",
     text: "text-frost-400",
-    spinner: "#67D5F0",
+    spinner: palette.frost[400],
   },
 };
 

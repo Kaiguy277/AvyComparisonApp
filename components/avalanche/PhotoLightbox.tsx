@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Dimensions,
   Modal,
   Pressable,
   StatusBar,
@@ -52,7 +51,6 @@ export function PhotoLightbox({
   }, [initialIndex]);
 
   const insets = useSafeAreaInsets();
-  const screen = Dimensions.get("window");
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 

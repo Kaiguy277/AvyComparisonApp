@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { DateField } from "./DateField";
-import { FieldLabel, TextField } from "./formPrimitives";
+import { TextField } from "./formPrimitives";
 import { PhotoPicker } from "./PhotoPicker";
 import { SelectField } from "./SelectField";
 import {

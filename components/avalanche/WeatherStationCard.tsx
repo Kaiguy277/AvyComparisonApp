@@ -7,7 +7,7 @@ import { MetricChart } from "./MetricChart";
 import { WindCompass } from "./WindCompass";
 import { WindDirectionRow } from "./WindDirectionRow";
 import { palette } from "@/constants/design";
-import type { TempDataPoint, WeatherObservation } from "@/lib/api/avalanche";
+import type { WeatherObservation } from "@/lib/api/avalanche";
 
 type Period = 24 | 72;
 
@@ -588,6 +588,3 @@ function DataNote({ children }: { children: string }) {
     </Text>
   );
 }
-
-// Suppress unused-var: TempDataPoint kept for type clarity above
-type _TempDataPoint = TempDataPoint;

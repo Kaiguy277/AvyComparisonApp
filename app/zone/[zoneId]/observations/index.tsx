@@ -44,7 +44,13 @@ export default function ZoneObservationsScreen() {
   } | null>(null);
 
   useEffect(() => {
-    if (obs !== null) {
+    // Guard on the session cache (keyed by zoneId) rather than the
+    // captured `obs` state — reading `obs` here with only [zoneId] in the
+    // deps was a stale-closure trap (B14): a zoneId change could early-
+    // return with the previous zone's observations.
+    const cached = getZoneSession(zoneId)?.observations;
+    if (cached) {
+      setObs(cached);
       setLoaded(true);
       return;
     }

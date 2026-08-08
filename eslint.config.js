@@ -5,6 +5,15 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    // supabase/functions is Deno (remote https:// imports the RN resolver
+    // can't follow → false import/no-unresolved); .expo and graphify-out
+    // are generated. tsconfig already excludes supabase — match it here.
+    ignores: [
+      'dist/*',
+      'supabase/functions/**',
+      '.expo/**',
+      'graphify-out/**',
+      'test/mocks/**',
+    ],
   },
 ]);

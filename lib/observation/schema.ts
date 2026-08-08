@@ -64,10 +64,20 @@ export type ObserverProfile = z.infer<typeof observerProfileSchema>;
 
 // ───────────────────────────── form: lat/lng + photos ───────────────────────
 
-export const locationPointSchema = z.object({
-  lat: z.number({ error: required }).min(-90).max(90),
-  lng: z.number({ error: required }).min(-180).max(180),
-});
+export const locationPointSchema = z
+  .object({
+    lat: z.number({ error: required }).min(-90).max(90),
+    lng: z.number({ error: required }).min(-180).max(180),
+  })
+  // The form defaults to {0,0} before a location is picked, and 0,0 is a
+  // real point (Null Island, off West Africa) — nobody observes an
+  // avalanche there. Reject it so a fix-less submit fails validation
+  // instead of shipping bogus coordinates to the avalanche center.
+  .refine((p) => !(p.lat === 0 && p.lng === 0), {
+    message:
+      "Pick a location — tap “Use my current location” or type the coordinates.",
+    path: ["lat"],
+  });
 export type LocationPoint = z.infer<typeof locationPointSchema>;
 
 // Local image asset shape — what expo-image-picker returns plus a caption.
