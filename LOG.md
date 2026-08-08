@@ -21,6 +21,49 @@ Format per entry:
 
 ---
 
+## 2026-08-07 — SESSION SUMMARY (stabilization pass → merged to main)
+
+First working session on this project with the new-generation agent. Started from a
+full-codebase audit (verdict: continue, don't fork — but stabilize before features),
+then worked down the ship-blocker list and into the data-layer refactor. **All of the
+below is committed and merged to `main`.** Detailed per-item entries follow below.
+
+**Backend / security (live on Supabase project `tfvxhsgwrwvendrnbrgf`):**
+- Discovered the project was auto-**paused** (prod dead since ~May); restored it.
+- Confirmed the two orphan cache tables **don't exist in prod** → that code is dead.
+- `device_tokens` locked down: dropped anon SELECT/UPDATE (push-token harvest hole).
+- Shared-secret `x-cron-key` gate on the 4 publicly-invokable maintenance functions;
+  deployed all touched edge functions; updated the 3 pg_cron jobs. Verified live.
+- `refresh-stations-cache` no longer overwrites good cache with empty payloads.
+
+**Safety-grade correctness:**
+- Synoptic 24/72hr snow/precip/temp now computed by timestamp, not array index
+  (a 10-min station's "24hr" was really ~4hr).
+- Zone detail can no longer show today's danger under an archive date (`useZoneBundle`).
+- Avalanche-problem card matched elevation bands by substring ("Treeline" caught
+  "Below Treeline") and disagreed with the rose — unified via `lib/avalanche/elevationBand`.
+
+**App data layer:**
+- Observation submit flow: cancel actually cancels, drafts wired end-to-end, success
+  can't report as failure, retry race fixed, photo-privacy preference respected.
+- One local date convention (`lib/dates.ts`); fixed the 3 PM Alaska pager rollover.
+- One serialized snapshot writer (`mutateSnapshot`) — killed the 3 hand-copied
+  read-modify-write copies and the lost-update race.
+- Forecast fetching moved onto **TanStack Query** (`loadForecastBundle`) — fixed the
+  fetch race + viewedDate hijack, error-vs-empty, offline→online recovery. index.tsx
+  2,675 → 2,294 lines. **Still needs a device smoke test** (assumed passing per Kai).
+
+**Infrastructure:**
+- Tracking set up (LOG/JOURNAL/CLAUDE.md) + graphify knowledge graph committed.
+- **Vitest harness + 47 logic tests** (dates, snapshot merge/race, loadForecastBundle
+  decision tree, synoptic timestamp math, elevation band). `npm test` / `typecheck`.
+
+**Still open (next sessions):** device smoke test; Tier 2 backend cleanup (delete
+orphan-table code, CORS Allow-Methods, redact logged Synoptic token, Alaska-time
+freshness stamps); Tier 3 consolidation (~2,500 dead lines incl. ZoneCard, 7× zone
+catalogue); CI; §2.4 per-zone forecast dates; remaining observation bugs; App Store
+Always-location decision. Full prioritized tiers in JOURNAL.
+
 ## 2026-08-07 — Tier 1: avalanche-problem elevation-band safety fix
 - **Fixed A1 (safety): the problem card showed problems at the wrong elevation band,
   and disagreed with the rose beside it.** `AvalancheProblemCard.tsx:95` matched bands
