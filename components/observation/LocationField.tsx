@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -27,6 +27,36 @@ export function LocationField({ value, onChange, error }: Props) {
   const [busy, setBusy] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
 
+  // Raw text is the source of truth for the manual fields — a controlled
+  // `String(value.lat)` round-trip ate decimal points ("47." → 47 → "47")
+  // and made the fields impossible to type into. We reconcile FROM `value`
+  // only when it changes externally (e.g. a GPS read), detected by the
+  // parsed text no longer matching — so typing never clobbers itself.
+  const hasFix = !(value.lat === 0 && value.lng === 0);
+  const [latText, setLatText] = useState(hasFix ? String(value.lat) : "");
+  const [lngText, setLngText] = useState(hasFix ? String(value.lng) : "");
+
+  useEffect(() => {
+    if (parseFloat(latText) !== value.lat) {
+      setLatText(hasFix ? String(value.lat) : "");
+    }
+    if (parseFloat(lngText) !== value.lng) {
+      setLngText(hasFix ? String(value.lng) : "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.lat, value.lng]);
+
+  const onLatText = (t: string) => {
+    setLatText(t);
+    const n = parseFloat(t);
+    onChange({ ...value, lat: Number.isFinite(n) ? n : 0 });
+  };
+  const onLngText = (t: string) => {
+    setLngText(t);
+    const n = parseFloat(t);
+    onChange({ ...value, lng: Number.isFinite(n) ? n : 0 });
+  };
+
   const useCurrentLocation = async () => {
     setPermError(null);
     setBusy(true);
@@ -51,8 +81,6 @@ export function LocationField({ value, onChange, error }: Props) {
       setBusy(false);
     }
   };
-
-  const hasFix = !(value.lat === 0 && value.lng === 0);
 
   return (
     <View>
@@ -129,13 +157,8 @@ export function LocationField({ value, onChange, error }: Props) {
         <View style={{ flex: 1 }}>
           <TextField
             label="Latitude"
-            value={hasFix ? String(value.lat) : ""}
-            onChangeText={(t) => {
-              const n = parseFloat(t);
-              if (!isNaN(n)) onChange({ ...value, lat: n });
-              else if (t === "" || t === "-")
-                onChange({ ...value, lat: 0 });
-            }}
+            value={latText}
+            onChangeText={onLatText}
             keyboardType="numbers-and-punctuation"
             autoCapitalize="none"
             autoCorrect={false}
@@ -145,13 +168,8 @@ export function LocationField({ value, onChange, error }: Props) {
         <View style={{ flex: 1 }}>
           <TextField
             label="Longitude"
-            value={hasFix ? String(value.lng) : ""}
-            onChangeText={(t) => {
-              const n = parseFloat(t);
-              if (!isNaN(n)) onChange({ ...value, lng: n });
-              else if (t === "" || t === "-")
-                onChange({ ...value, lng: 0 });
-            }}
+            value={lngText}
+            onChangeText={onLngText}
             keyboardType="numbers-and-punctuation"
             autoCapitalize="none"
             autoCorrect={false}

@@ -378,7 +378,13 @@ export default function ObservationNewScreen() {
   }, [form, sectionNotes]);
 
   const onSubmit = useCallback(() => {
-    const result = observationFormSchema.safeParse(form);
+    // Validate the MERGED form — the same object runSubmit sends. Section
+    // notes get folded into observation_summary, so validating the raw
+    // form would reject a submit whose summary is empty but whose per-
+    // section notes have plenty of content (and vice-versa for max-length).
+    const result = observationFormSchema.safeParse(
+      mergeSectionNotes(form, sectionNotes),
+    );
     if (!result.success) {
       const next: Record<string, string> = {};
       for (const issue of result.error.issues) {
@@ -406,7 +412,7 @@ export default function ObservationNewScreen() {
     }
     setErrors({});
     void runSubmit();
-  }, [form, runSubmit, scrollToSection]);
+  }, [form, sectionNotes, runSubmit, scrollToSection]);
 
   const onCancelSubmission = useCallback(() => {
     abortRef.current?.abort();
@@ -614,13 +620,14 @@ export default function ObservationNewScreen() {
               autoCapitalize="words"
               error={errors.location_name}
             />
-            {!form.center_id ? (
-              <CenterPicker
-                value={form.center_id}
-                onChange={(v) => update("center_id", v)}
-                error={errors.center_id}
-              />
-            ) : null}
+            {/* Always shown (even when pre-filled from a zone) so the user
+                can correct the center — e.g. entered from a Turnagain zone
+                but actually reporting from Hatcher Pass. */}
+            <CenterPicker
+              value={form.center_id}
+              onChange={(v) => update("center_id", v)}
+              error={errors.center_id}
+            />
           </CollapsibleSection>
 
           {/* OBSERVATION */}
