@@ -45,8 +45,15 @@ Format per entry:
   after prefs load (baseline = the defaults seed, so the seed never triggers it); catches
   the star tap and the pickers. Gated iOS-only, once (persistent `avy-location-prompt-
   shown-v1` flag + in-memory ref), skipped if already granted. "Not now" dismisses without
-  re-nagging; a partial grant still surfaces the existing home banner to finish. Helpers
+  re-nagging. Helpers
   `hasShownLocationPrompt`/`markLocationPromptShown`/`isLocationWakeGranted` in locationWake.
+- **Reworked the home `LocationWakeBanner` into a real "location off" reminder.** It used to
+  key off a stale diagnostic (appeared only after a *denied OS prompt*), so a "Not now" left
+  no nudge. Now it reflects actual state: shows when iOS + the explainer's been seen +
+  Always-location not granted + not snoozed. Tap → `promptOrOpenLocationSettings` (requests,
+  or deep-links to Settings if iOS won't prompt again); the × snoozes it 3 days so it's a
+  gentle periodic nudge, not a permanent fixture. New helpers `promptOrOpenLocationSettings`/
+  `snoozeLocationBanner`/`isLocationBannerSnoozed`.
 - **App Review note drafted:** `docs/APP_REVIEW_NOTES.md` — paste-ready text for App Store
   Connect explaining the Always-location usage (trigger only, no collection/storage/
   transmission, opt-in) plus how a reviewer can verify it. Heads off the Guideline 5.1.1

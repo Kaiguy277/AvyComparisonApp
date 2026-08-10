@@ -60,11 +60,11 @@ import {
 } from "@/lib/pushNotifications";
 import {
   hasShownLocationPrompt,
+  isLocationBannerSnoozed,
   isLocationWakeGranted,
   markLocationPromptShown,
-  readLocationDiagnostic,
-  requestAndRegisterLocationWake,
-  type LocationDiagnostic,
+  promptOrOpenLocationSettings,
+  snoozeLocationBanner,
 } from "@/lib/locationWake";
 import { LocationPrompt } from "@/components/onboarding/LocationPrompt";
 import {
@@ -248,7 +248,7 @@ export default function Index() {
   const onEnableLocation = useCallback(async () => {
     setLocationPromptBusy(true);
     try {
-      await requestAndRegisterLocationWake();
+      await promptOrOpenLocationSettings();
     } finally {
       setLocationPromptBusy(false);
       setShowLocationPrompt(false);
@@ -2221,48 +2221,53 @@ function ObservationDraftsBanner() {
   );
 }
 
+// Gentle "location off, missing full utility" reminder. Shows only once
+// the user has met the feature (seen the first-favorite explainer) and
+// hasn't enabled Always location — and it reflects the ACTUAL permission
+// state rather than a stale diagnostic, so it also appears after a
+// "Not now". Dismiss snoozes it for a few days (a nudge, not a fixture).
 function LocationWakeBanner() {
-  const [diag, setDiag] = useState<LocationDiagnostic | null>(null);
+  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const reload = useCallback(() => {
-    readLocationDiagnostic().then(setDiag);
+  const reload = useCallback(async () => {
+    if (Platform.OS !== "ios") return setShow(false);
+    const [prompted, granted, snoozed] = await Promise.all([
+      hasShownLocationPrompt(),
+      isLocationWakeGranted(),
+      isLocationBannerSnoozed(),
+    ]);
+    setShow(prompted && !granted && !snoozed);
   }, []);
 
   useEffect(() => {
     reload();
-    // Re-check periodically so the banner disappears the moment
-    // registration completes (e.g., right after the user grants
-    // permission via the Settings → app → Location escalation).
+    // Re-check periodically so the banner disappears the moment the
+    // permission is granted (e.g. via the Settings escalation).
     const t = setInterval(reload, 5000);
     return () => clearInterval(t);
   }, [reload]);
 
-  // Only surface the banner for states the user can act on (grant the
-  // permission, or retry a failed registration). "ok" and the
-  // non-actionable "skipped-*" states (unsupported platform, Expo Go)
-  // show nothing — otherwise Android / the dev client would nag forever
-  // over something tapping can't fix.
-  if (!diag || diag.step === "ok" || diag.step.startsWith("skipped")) {
-    return null;
-  }
+  if (!show) return null;
 
-  const onTap = async () => {
+  const onEnable = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      await requestAndRegisterLocationWake();
-      reload();
+      await promptOrOpenLocationSettings();
+      await reload();
     } finally {
       setBusy(false);
     }
   };
+  const onDismiss = async () => {
+    await snoozeLocationBanner();
+    setShow(false);
+  };
 
   return (
-    <Pressable
-      onPress={onTap}
-      disabled={busy}
-      style={({ pressed }) => ({
+    <View
+      style={{
         marginTop: 8,
         marginHorizontal: 16,
         paddingVertical: 12,
@@ -2270,45 +2275,41 @@ function LocationWakeBanner() {
         borderRadius: 12,
         borderWidth: 0.5,
         borderColor: palette.frost[500],
-        backgroundColor: pressed
-          ? palette.frost[500] + "26"
-          : palette.frost[500] + "1A",
+        backgroundColor: palette.frost[500] + "1A",
         opacity: busy ? 0.6 : 1,
-      })}
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      }}
     >
-      <View className="flex-row items-center gap-2">
-        <Ionicons
-          name="location-outline"
-          size={16}
-          color={palette.frost[400]}
-        />
+      <Pressable
+        onPress={onEnable}
+        disabled={busy}
+        style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
+      >
+        <Ionicons name="location-outline" size={16} color={palette.frost[400]} />
         <View style={{ flex: 1 }}>
           <Text
             variant="mono"
             weight="bold"
-            style={{
-              fontSize: 11,
-              letterSpacing: 1.4,
-              color: palette.frost[400],
-            }}
+            style={{ fontSize: 11, letterSpacing: 1.4, color: palette.frost[400] }}
           >
-            BACKGROUND REFRESH LIMITED
+            LOCATION OFF · LIMITED REFRESH
           </Text>
           <Text
             className="text-ink-200"
             style={{ fontSize: 12, lineHeight: 16, marginTop: 2 }}
           >
-            Tap to enable Always Location — the only iOS hook that keeps
-            data fresh after you force-quit the app.
+            Tap to turn on Always Location so your favorites stay fresh even
+            after you close the app or drop out of service.
           </Text>
         </View>
-        <Ionicons
-          name="chevron-forward"
-          size={16}
-          color={palette.frost[400]}
-        />
-      </View>
-    </Pressable>
+      </Pressable>
+      {/* Dismiss (snooze) */}
+      <Pressable onPress={onDismiss} disabled={busy} hitSlop={8}>
+        <Ionicons name="close" size={16} color={palette.ink[400]} />
+      </Pressable>
+    </View>
   );
 }
 
