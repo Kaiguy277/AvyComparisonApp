@@ -151,7 +151,7 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
           <PermissionRow
             icon="refresh-outline"
             title="Background App Refresh"
-            body="Lets iOS run a backup refresh task on its own schedule. Belt-and-suspenders for when the silent push gets held back."
+            body="Lets iOS run a backup refresh task on its own schedule. Belt-and-suspenders for when the silent push gets held back. Heads up: iOS turns this off automatically in Low Power Mode or when your battery runs low."
             ctaHint={
               Platform.OS === "ios"
                 ? "TAP TO OPEN iOS SETTINGS · GENERAL → BACKGROUND APP REFRESH"
