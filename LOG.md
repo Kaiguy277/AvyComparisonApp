@@ -21,6 +21,17 @@ Format per entry:
 
 ---
 
+## 2026-08-10 — TestFlight build pushed (manual prod action)
+- **`eas build -p ios --profile production --auto-submit` from `main` @ `dccfb39`.**
+  Build **#19**, version 1.0.0 (build number auto-incremented; `appVersionSource: remote`).
+  Auto-submit to TestFlight scheduled — ASC API key was already stored on EAS (no
+  interactive credential setup). Carries everything merged this session: security
+  lockdowns, safety fixes, TanStack data layer, dead-code removal, and the new
+  contextual location UX. Build: expo.dev/.../builds/d4f69ca6; submission:
+  expo.dev/.../submissions/a70f37da. First real device exercise of the session's work —
+  spot-check the TanStack date paging / offline, the observation flow (submits to NAC
+  **staging**), and the first-favorite location prompt + reminder banner.
+
 ## 2026-08-10 — Location-wake: iOS-only + App Review note (branch `fix/location-wake-ios-only`)
 - **Decision (Kai + review of the code):** KEEP the Always-location background refresh.
   It's the only iOS mechanism that survives force-quit, and it's well-matched to the core
