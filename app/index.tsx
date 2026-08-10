@@ -7,6 +7,7 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -58,10 +59,14 @@ import {
   type PushDiagnostic,
 } from "@/lib/pushNotifications";
 import {
+  hasShownLocationPrompt,
+  isLocationWakeGranted,
+  markLocationPromptShown,
   readLocationDiagnostic,
   requestAndRegisterLocationWake,
   type LocationDiagnostic,
 } from "@/lib/locationWake";
+import { LocationPrompt } from "@/components/onboarding/LocationPrompt";
 import {
   readLastRefresh,
   refreshFavoritesSnapshot,
@@ -207,6 +212,52 @@ export default function Index() {
     markOnboardingComplete().catch(() => {});
     setShowOnboarding(false);
   }, []);
+
+  // Contextual "enable Always location" explainer — shown the first time
+  // the user favorites a zone, NOT at launch. Location is the one
+  // permission that reads as invasive, so we ask for it only once the
+  // value is concrete (you just saved a zone worth keeping fresh).
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [locationPromptBusy, setLocationPromptBusy] = useState(false);
+  const locationPromptHandledRef = useRef(false);
+  const prevFavCountRef = useRef<number | null>(null);
+
+  const maybePromptLocation = useCallback(async () => {
+    if (Platform.OS !== "ios") return;
+    if (locationPromptHandledRef.current) return;
+    if (await hasShownLocationPrompt()) return;
+    if (await isLocationWakeGranted()) return;
+    locationPromptHandledRef.current = true;
+    await markLocationPromptShown();
+    setShowLocationPrompt(true);
+  }, []);
+
+  // Fire when the favorites set GROWS from a user action. The first
+  // observation after prefs load is the baseline (defaults seed / restored
+  // list) and is skipped, so only a deliberate add — via the star or the
+  // pickers — triggers the prompt.
+  useEffect(() => {
+    if (!prefsLoaded || showOnboarding !== false) return;
+    const prev = prevFavCountRef.current;
+    prevFavCountRef.current = favoriteZoneIds.length;
+    if (prev !== null && favoriteZoneIds.length > prev) {
+      void maybePromptLocation();
+    }
+  }, [favoriteZoneIds, prefsLoaded, showOnboarding, maybePromptLocation]);
+
+  const onEnableLocation = useCallback(async () => {
+    setLocationPromptBusy(true);
+    try {
+      await requestAndRegisterLocationWake();
+    } finally {
+      setLocationPromptBusy(false);
+      setShowLocationPrompt(false);
+    }
+  }, []);
+  const onDismissLocationPrompt = useCallback(() => {
+    if (locationPromptBusy) return;
+    setShowLocationPrompt(false);
+  }, [locationPromptBusy]);
 
   // Subtle reveal anim when results arrive
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -600,6 +651,12 @@ export default function Index() {
       <PermissionsIntro
         visible={showOnboarding === true}
         onComplete={dismissOnboarding}
+      />
+      <LocationPrompt
+        visible={showLocationPrompt}
+        busy={locationPromptBusy}
+        onEnable={onEnableLocation}
+        onDismiss={onDismissLocationPrompt}
       />
       <TopoBackground height={320} intensity="low" />
 

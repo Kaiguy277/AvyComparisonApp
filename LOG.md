@@ -36,6 +36,17 @@ Format per entry:
   Play-Store-scrutinized permission). And made `LocationWakeBanner` hide for the
   non-actionable `skipped-*` states so Android / Expo Go don't nag over something a tap
   can't fix.
+- **Location prompt moved from launch → contextual (on first favorite).** Kai's call:
+  don't cold-prompt for Always-location at app open. Removed the "Location · Always" row
+  from onboarding (`PermissionsIntro` now asks only Push + Background App Refresh). New
+  `components/onboarding/LocationPrompt.tsx` explainer modal fires the first time the user
+  deliberately favorites a zone — framed at the moment the value is concrete ("keep this
+  zone fresh off-grid"). Trigger: an effect in index.tsx watching `favoriteZoneIds` GROW
+  after prefs load (baseline = the defaults seed, so the seed never triggers it); catches
+  the star tap and the pickers. Gated iOS-only, once (persistent `avy-location-prompt-
+  shown-v1` flag + in-memory ref), skipped if already granted. "Not now" dismisses without
+  re-nagging; a partial grant still surfaces the existing home banner to finish. Helpers
+  `hasShownLocationPrompt`/`markLocationPromptShown`/`isLocationWakeGranted` in locationWake.
 - **App Review note drafted:** `docs/APP_REVIEW_NOTES.md` — paste-ready text for App Store
   Connect explaining the Always-location usage (trigger only, no collection/storage/
   transmission, opt-in) plus how a reviewer can verify it. Heads off the Guideline 5.1.1

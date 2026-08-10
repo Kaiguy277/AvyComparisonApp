@@ -10,12 +10,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
-import * as Location from "expo-location";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { registerPushNotifications } from "@/lib/pushNotifications";
-import { requestAndRegisterLocationWake } from "@/lib/locationWake";
 
 interface Props {
   visible: boolean;
@@ -31,7 +29,6 @@ type PermState = "idle" | "granted" | "denied";
 export function PermissionsIntro({ visible, onComplete }: Props) {
   const insets = useSafeAreaInsets();
   const [pushState, setPushState] = useState<PermState>("idle");
-  const [locationState, setLocationState] = useState<PermState>("idle");
   const [busy, setBusy] = useState(false);
 
   const handleEnableNotifications = async () => {
@@ -51,30 +48,6 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
       const after = await Notifications.getPermissionsAsync();
       setPushState(after.granted ? "granted" : "denied");
       if (granted) console.log("[onboarding] push token registered");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleEnableLocation = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      // Same Settings-redirect rule as notifications. iOS shows the
-      // foreground prompt once and the background ("Always") prompt
-      // once; after either is dismissed the only path is Settings.
-      const fg = await Location.getForegroundPermissionsAsync();
-      const bg = await Location.getBackgroundPermissionsAsync();
-      const fgBlocked = !fg.granted && !fg.canAskAgain;
-      const bgBlocked = !bg.granted && !bg.canAskAgain;
-      if (fgBlocked || bgBlocked) {
-        Linking.openSettings().catch(() => {});
-        return;
-      }
-      await requestAndRegisterLocationWake();
-      const after = await Location.getBackgroundPermissionsAsync();
-      setLocationState(after.granted ? "granted" : "denied");
-      if (after.granted) console.log("[onboarding] location wake registered");
     } finally {
       setBusy(false);
     }
@@ -161,8 +134,8 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
           >
             This app keeps avalanche + weather data fresh in the background
             so you have the latest forecast even when you drop out of
-            service. Three iOS settings stack together to make that
-            reliable — the more you grant, the fresher your offline cache.
+            service. These two iOS settings make that reliable — the more
+            you grant, the fresher your offline cache.
           </Text>
 
           <PermissionRow
@@ -187,16 +160,6 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
             onPress={
               Platform.OS === "ios" ? handleOpenSettings : undefined
             }
-          />
-
-          <PermissionRow
-            icon="location-outline"
-            title="Location · Always"
-            body="The only iOS mechanism that keeps refreshing data even after you force-quit the app. We never read or store your location — registering it is just how iOS lets us wake to update the cache."
-            state={locationState}
-            busy={busy && locationState === "idle"}
-            ctaHint="TAP TO ENABLE · CHOOSE “ALWAYS” WHEN iOS PROMPTS"
-            onPress={handleEnableLocation}
           />
 
           <Pressable

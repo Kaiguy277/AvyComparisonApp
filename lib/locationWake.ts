@@ -27,6 +27,34 @@ import { refreshFavoritesSnapshot } from "./backgroundRefresh";
 export const LOCATION_TASK_NAME = "avy.location-wake";
 
 const LOCATION_DIAG_KEY = "avy-location-diagnostic-v1";
+// Set once we've shown the contextual "enable Always location" explainer
+// (on the user's first favorite). Prevents re-popping the modal.
+const LOCATION_PROMPT_KEY = "avy-location-prompt-shown-v1";
+
+export async function hasShownLocationPrompt(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(LOCATION_PROMPT_KEY)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export async function markLocationPromptShown(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LOCATION_PROMPT_KEY, "1");
+  } catch {}
+}
+
+// True when the background-location authorization is already granted, so
+// the contextual explainer can be skipped entirely.
+export async function isLocationWakeGranted(): Promise<boolean> {
+  if (!isSupported) return false;
+  try {
+    return (await Location.getBackgroundPermissionsAsync()).granted;
+  } catch {
+    return false;
+  }
+}
 
 const isExpoGo = Constants.appOwnership === "expo";
 
