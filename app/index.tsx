@@ -2181,7 +2181,14 @@ function LocationWakeBanner() {
     return () => clearInterval(t);
   }, [reload]);
 
-  if (!diag || diag.step === "ok") return null;
+  // Only surface the banner for states the user can act on (grant the
+  // permission, or retry a failed registration). "ok" and the
+  // non-actionable "skipped-*" states (unsupported platform, Expo Go)
+  // show nothing — otherwise Android / the dev client would nag forever
+  // over something tapping can't fix.
+  if (!diag || diag.step === "ok" || diag.step.startsWith("skipped")) {
+    return null;
+  }
 
   const onTap = async () => {
     if (busy) return;

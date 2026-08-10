@@ -79,8 +79,13 @@ if (!isExpoGo) {
   });
 }
 
-const isSupported =
-  !isExpoGo && (Platform.OS === "ios" || Platform.OS === "android");
+// iOS only. The whole mechanism relies on
+// startMonitoringSignificantLocationChanges surviving force-quit, which
+// is an iOS behavior. On Android, startLocationUpdatesAsync additionally
+// requires a foregroundService config we don't set — it would throw at
+// start and leave the diagnostic banner nagging. So Android cleanly
+// no-ops ("skipped-unsupported") rather than erroring.
+const isSupported = !isExpoGo && Platform.OS === "ios";
 
 // Try to start location-driven background wake if the user has already
 // granted Always permission. Never prompts. Safe to call on every launch.
