@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { AVAILABLE_ZONES, ZONE_TO_CENTER } from "./zones";
+import { AVAILABLE_ZONES, nearestCenter, ZONE_TO_CENTER } from "./zones";
 // The zone catalogue is duplicated across the app and the Deno edge
 // functions (two runtimes can't share one import). The audit's finding:
 // "that sync is luck, not structure — adding one zone needs six
@@ -57,5 +57,33 @@ describe("zone catalogue is internally consistent across copies", () => {
     for (const z of WEATHER_STATION_CONFIG) {
       expect(appIds, `station config zone ${z.zoneId}`).toContain(z.zoneId);
     }
+  });
+});
+
+describe("nearestCenter", () => {
+  it("resolves an Alaska (Turnagain area) coord to CNFAIC", () => {
+    // Girdwood / Turnagain Pass.
+    expect(nearestCenter(60.78, -149.13)).toBe("CNFAIC");
+  });
+
+  it("resolves a Colorado (Aspen area) coord to CAIC", () => {
+    expect(nearestCenter(39.19, -106.82)).toBe("CAIC");
+  });
+
+  it("resolves a Wasatch (Salt Lake) coord to UAC", () => {
+    expect(nearestCenter(40.6, -111.6)).toBe("UAC");
+  });
+
+  it("resolves a Mount Washington (NH) coord to MWAC", () => {
+    expect(nearestCenter(44.27, -71.3)).toBe("MWAC");
+  });
+
+  it("returns null for a point implausibly far from any center", () => {
+    expect(nearestCenter(48.85, 2.35)).toBeNull(); // Paris
+    expect(nearestCenter(0, 0)).toBeNull(); // Null Island
+  });
+
+  it("returns null for invalid input", () => {
+    expect(nearestCenter(NaN, -149)).toBeNull();
   });
 });

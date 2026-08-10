@@ -1839,17 +1839,15 @@ export default function Index() {
             justifyContent: "center",
             gap: 10,
             borderRadius: 30,
-            // Burnt-sienna pill — warm, saturated, can't blend into
-            // the warm page background. Inverted shadow + thick edge
-            // ring define the pill shape no matter how the OS renders
-            // shadows on this device.
-            backgroundColor: pressed ? palette.aspen[500] : palette.aspen[400],
-            borderWidth: 2,
-            borderColor: "#FFFFFF",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.4,
-            shadowRadius: 14,
+            // Solid burnt-sienna pill. The old white border diluted it
+            // into a "sticker" that read as white-outlined on the warm
+            // page — dropped it so the saturated fill and a strong drop
+            // shadow carry the pop.
+            backgroundColor: pressed ? palette.aspen[600] : palette.aspen[500],
+            shadowColor: palette.aspen[600],
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.5,
+            shadowRadius: 12,
             elevation: 12,
           })}
         >
