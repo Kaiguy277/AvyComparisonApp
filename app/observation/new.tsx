@@ -64,7 +64,7 @@ import {
   summarizeWhen,
   summarizeWhere,
 } from "@/lib/observation/summaries";
-import { AVAILABLE_ZONES, ZONE_TO_CENTER } from "@/lib/zones";
+import { AVAILABLE_ZONES, nearestCenter, ZONE_TO_CENTER } from "@/lib/zones";
 
 // Submit observation form. Every field a center wants is visible —
 // no separate "pro" expansion. Each section is its own collapsible
@@ -607,7 +607,24 @@ export default function ObservationNewScreen() {
           >
             <LocationField
               value={form.location_point}
-              onChange={(p) => update("location_point", p)}
+              onChange={(p) =>
+                setForm((prev) => {
+                  // Auto-fill the forecast center from the location when
+                  // the user hasn't set one — e.g. filing from the
+                  // home-screen FAB (no zone context) and tapping "Use my
+                  // current location". Smart default; the picker below
+                  // stays editable and we never override an existing choice.
+                  if (prev.center_id || p.lat === 0 || p.lng === 0) {
+                    return { ...prev, location_point: p };
+                  }
+                  const center = nearestCenter(p.lat, p.lng);
+                  return {
+                    ...prev,
+                    location_point: p,
+                    center_id: center ?? prev.center_id,
+                  };
+                })
+              }
               error={errors["location_point.lat"] ?? errors.location_point}
             />
             <TextField

@@ -390,3 +390,42 @@ for (const region of REGION_STRUCTURE) {
 export const DEFAULT_ZONE_IDS = AVAILABLE_ZONES.filter((z) => z.center === "CNFAIC").map(
   (z) => z.id,
 );
+
+// Great-circle distance in km between two lat/lon points.
+function haversineKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// Best-guess forecast center for a coordinate: the geographically nearest
+// center by distance to its centroid. Used to auto-select the center when
+// an observation is filed from the home screen (no zone context) and the
+// user drops a GPS/manual location. It's a smart default the user can
+// override — center regions are areas, not points, so a spot near a
+// boundary may resolve to a neighbor. Returns null for invalid input or a
+// point implausibly far from any center (> ~600 km — likely not in a
+// covered area), so we don't auto-fill a wildly-wrong center.
+export function nearestCenter(lat: number, lon: number): string | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let best: string | null = null;
+  let bestKm = Infinity;
+  for (const [centerId, c] of Object.entries(CENTER_COORDS)) {
+    const km = haversineKm(lat, lon, c.lat, c.lon);
+    if (km < bestKm) {
+      bestKm = km;
+      best = centerId;
+    }
+  }
+  return bestKm <= 600 ? best : null;
+}

@@ -21,6 +21,17 @@ Format per entry:
 
 ---
 
+## 2026-08-10 — From TestFlight testing: FAB pop + location→center auto-fill
+- **REPORT OBS FAB now pops** (device feedback: "white on a clear background"). The 2px
+  white border diluted the sienna into a white-outlined sticker; dropped it, went to a
+  solid darker sienna (aspen[500]/[600]) with a sienna-tinted drop shadow. Needs the
+  next build to eyeball.
+- **New feature: auto-select the forecast center from the observation's location.** When
+  filing from the home-screen FAB (no zone context), dropping a GPS/manual fix now
+  auto-fills `center_id` via `nearestCenter(lat,lon)` (haversine over `CENTER_COORDS`,
+  null past ~600 km / for invalid input). Only fills when the user hasn't already set a
+  center; the picker stays editable. +6 tests (63 total). tsc + lint clean.
+
 ## 2026-08-10 — TestFlight build pushed (manual prod action)
 - **`eas build -p ios --profile production --auto-submit` from `main` @ `dccfb39`.**
   Build **#19**, version 1.0.0 (build number auto-incremented; `appVersionSource: remote`).
