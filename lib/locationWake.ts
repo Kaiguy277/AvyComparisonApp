@@ -1,6 +1,6 @@
 import * as TaskManager from "expo-task-manager";
 import * as Location from "expo-location";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -27,6 +27,79 @@ import { refreshFavoritesSnapshot } from "./backgroundRefresh";
 export const LOCATION_TASK_NAME = "avy.location-wake";
 
 const LOCATION_DIAG_KEY = "avy-location-diagnostic-v1";
+// Set once we've shown the contextual "enable Always location" explainer
+// (on the user's first favorite). Prevents re-popping the modal.
+const LOCATION_PROMPT_KEY = "avy-location-prompt-shown-v1";
+
+export async function hasShownLocationPrompt(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(LOCATION_PROMPT_KEY)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export async function markLocationPromptShown(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LOCATION_PROMPT_KEY, "1");
+  } catch {}
+}
+
+// True when the background-location authorization is already granted, so
+// the contextual explainer can be skipped entirely.
+export async function isLocationWakeGranted(): Promise<boolean> {
+  if (!isSupported) return false;
+  try {
+    return (await Location.getBackgroundPermissionsAsync()).granted;
+  } catch {
+    return false;
+  }
+}
+
+// Enable action for the reminder banner: if iOS can still show a prompt,
+// request it; if the user previously denied and iOS won't prompt again,
+// deep-link to Settings (the only path left). Returns true if wake is
+// active afterward.
+export async function promptOrOpenLocationSettings(): Promise<boolean> {
+  if (!isSupported) return false;
+  try {
+    const fg = await Location.getForegroundPermissionsAsync();
+    const bg = await Location.getBackgroundPermissionsAsync();
+    const blocked =
+      (!fg.granted && !fg.canAskAgain) || (!bg.granted && !bg.canAskAgain);
+    if (blocked) {
+      Linking.openSettings().catch(() => {});
+      return false;
+    }
+  } catch {
+    // fall through to the request path
+  }
+  return requestAndRegisterLocationWake();
+}
+
+// Snooze for the "location off" reminder banner. Dismissing hides it for
+// a few days so it's a gentle periodic nudge, not a permanent fixture.
+const LOCATION_BANNER_SNOOZE_KEY = "avy-location-banner-snoozed-at-v1";
+const BANNER_SNOOZE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+export async function snoozeLocationBanner(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(
+      LOCATION_BANNER_SNOOZE_KEY,
+      String(Date.now()),
+    );
+  } catch {}
+}
+
+export async function isLocationBannerSnoozed(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(LOCATION_BANNER_SNOOZE_KEY);
+    if (!raw) return false;
+    return Date.now() - Number(raw) < BANNER_SNOOZE_MS;
+  } catch {
+    return false;
+  }
+}
 
 const isExpoGo = Constants.appOwnership === "expo";
 
@@ -79,8 +152,13 @@ if (!isExpoGo) {
   });
 }
 
-const isSupported =
-  !isExpoGo && (Platform.OS === "ios" || Platform.OS === "android");
+// iOS only. The whole mechanism relies on
+// startMonitoringSignificantLocationChanges surviving force-quit, which
+// is an iOS behavior. On Android, startLocationUpdatesAsync additionally
+// requires a foregroundService config we don't set — it would throw at
+// start and leave the diagnostic banner nagging. So Android cleanly
+// no-ops ("skipped-unsupported") rather than erroring.
+const isSupported = !isExpoGo && Platform.OS === "ios";
 
 // Try to start location-driven background wake if the user has already
 // granted Always permission. Never prompts. Safe to call on every launch.

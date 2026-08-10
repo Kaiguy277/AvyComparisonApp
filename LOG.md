@@ -21,6 +21,44 @@ Format per entry:
 
 ---
 
+## 2026-08-10 — Location-wake: iOS-only + App Review note (branch `fix/location-wake-ios-only`)
+- **Decision (Kai + review of the code):** KEEP the Always-location background refresh.
+  It's the only iOS mechanism that survives force-quit, and it's well-matched to the core
+  use case — significant-location-change (cell-tower handoff) fires as the user drives
+  toward a no-service trailhead, refreshing the saved-zones snapshot right before signal
+  is lost. The code never reads coordinates; the event is a pure "moved → refresh"
+  heartbeat. Background App Refresh + silent push cover the (common) non-force-quit case.
+- **Fixed B12 (Android path was broken):** `locationWake.ts` claimed Android support but
+  `startLocationUpdatesAsync` on Android needs a `foregroundService` config we don't set →
+  it threw at start and left the diagnostic banner nagging. Gated `isSupported` to iOS
+  only → Android cleanly no-ops (`skipped-unsupported`). Also set
+  `isAndroidBackgroundLocationEnabled: false` in app.json (don't declare an unused,
+  Play-Store-scrutinized permission). And made `LocationWakeBanner` hide for the
+  non-actionable `skipped-*` states so Android / Expo Go don't nag over something a tap
+  can't fix.
+- **Location prompt moved from launch → contextual (on first favorite).** Kai's call:
+  don't cold-prompt for Always-location at app open. Removed the "Location · Always" row
+  from onboarding (`PermissionsIntro` now asks only Push + Background App Refresh). New
+  `components/onboarding/LocationPrompt.tsx` explainer modal fires the first time the user
+  deliberately favorites a zone — framed at the moment the value is concrete ("keep this
+  zone fresh off-grid"). Trigger: an effect in index.tsx watching `favoriteZoneIds` GROW
+  after prefs load (baseline = the defaults seed, so the seed never triggers it); catches
+  the star tap and the pickers. Gated iOS-only, once (persistent `avy-location-prompt-
+  shown-v1` flag + in-memory ref), skipped if already granted. "Not now" dismisses without
+  re-nagging. Helpers
+  `hasShownLocationPrompt`/`markLocationPromptShown`/`isLocationWakeGranted` in locationWake.
+- **Reworked the home `LocationWakeBanner` into a real "location off" reminder.** It used to
+  key off a stale diagnostic (appeared only after a *denied OS prompt*), so a "Not now" left
+  no nudge. Now it reflects actual state: shows when iOS + the explainer's been seen +
+  Always-location not granted + not snoozed. Tap → `promptOrOpenLocationSettings` (requests,
+  or deep-links to Settings if iOS won't prompt again); the × snoozes it 3 days so it's a
+  gentle periodic nudge, not a permanent fixture. New helpers `promptOrOpenLocationSettings`/
+  `snoozeLocationBanner`/`isLocationBannerSnoozed`.
+- **App Review note drafted:** `docs/APP_REVIEW_NOTES.md` — paste-ready text for App Store
+  Connect explaining the Always-location usage (trigger only, no collection/storage/
+  transmission, opt-in) plus how a reviewer can verify it. Heads off the Guideline 5.1.1
+  rejection this pattern invites. tsc + lint + 57 tests green.
+
 ## 2026-08-07 — Backlog cleanup (branch `chore/backlog-cleanup`)
 - **Lint → 0 errors / 0 warnings.** `eslint.config.js` now ignores `supabase/functions`
   (Deno; its https:// imports caused 17 false `import/no-unresolved`), `.expo`,
