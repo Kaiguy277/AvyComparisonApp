@@ -31,6 +31,8 @@ Format per entry:
   auto-fills `center_id` via `nearestCenter(lat,lon)` (haversine over `CENTER_COORDS`,
   null past ~600 km / for invalid input). Only fills when the user hasn't already set a
   center; the picker stays editable. +6 tests (63 total). tsc + lint clean.
+- **Shipped as TestFlight build #20** (`main` @ 361de2b, `eas build --auto-submit`) — plus
+  the Low-Power-Mode note on Background App Refresh. Build 2da8959d.
 
 ## 2026-08-10 — TestFlight build pushed (manual prod action)
 - **`eas build -p ios --profile production --auto-submit` from `main` @ `dccfb39`.**
