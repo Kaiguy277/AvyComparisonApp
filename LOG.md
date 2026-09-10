@@ -21,6 +21,38 @@ Format per entry:
 
 ---
 
+## 2026-09-10 — Device feedback on build #21 → rebrand, tap-to-own gear, solid FAB
+- **Kai's notes from build #21:** (1) add-observation bubble still reads transparent;
+  (2) don't brand it "trip planning" — it's about alerting your people; (3) profile
+  should be set up once, then *tap icons for what you have*, saved car + plate should
+  prepopulate and just need confirming; (4) actually look at the screens.
+- **Screens rendered here for the first time** via Expo web (`web.output: "single"` —
+  the earlier `static` → `single` app.json change I reverted on 09-09 was deliberate;
+  static pre-renders in Node and AsyncStorage dies on `window`). Playwright at 390×844.
+  Shots kept in `docs/screens/`. Web can't run SecureStore/contacts/datetime pickers,
+  but layout, copy, and flow are all visible.
+- **FAB:** on web the pill is solid, so the iOS "transparent" look is the wide
+  sienna-on-sienna glow blurring the edge. Restructured: opaque View with a 1px
+  darker rim + tight neutral shadow, Pressable only drives opacity. The zone
+  observations list's outlined REPORT pill (which *was* literally transparent) is
+  now solid too.
+- **Rebrand:** "Trip Plan" → **"Your People"** everywhere user-facing (eyebrow), home
+  card "Let your people know where you're going before you lose signal", hub title
+  "Let your people know", composer "Where are you going?", buttons NEW TRIP / SEND TO
+  MY PEOPLE / CANCEL TRIP, share text "Kai is heading to Turnagain Pass, back by…",
+  page title "Where Kai is — <area>". Routes/tables keep the `trip` name.
+- **Tap-to-own gear:** `lib/tripPlan/gear.ts` (15-item catalogue, MaterialCommunity
+  icons, per-item follow-up field) + `components/trip/GearGrid.tsx` (3-col tiles).
+  `GearProfile.inventory: string[]` added; legacy beacon/shovel/probe/airbag booleans
+  kept in sync (first toggle migrates them). Packet page lists "Carrying".
+- **Vehicles as cards:** `components/trip/VehicleCards.tsx`; profile shows cards
+  (tap to edit, MAKE DEFAULT), composer asks "Which one are you taking?" with the
+  saved cards + "Dropped off" + "Different vehicle today →". Saved people now
+  prefill WHO TO TELL; a resumed draft no longer wipes profile defaults.
+- **Composer bug found by screenshot:** LocationField hardcoded "Location · Where did
+  the observation happen?" → added label/hint/required props.
+- Gates: tsc, eslint (0 warnings), Vitest 110/110. Shipping as build #22.
+
 ## 2026-09-09 — Trip plan feature: build started (branch `feature/trip-plan`)
 - **Kai's added requirement:** sending must be easy *on the way to the trailhead* —
   once set up, the user picks a saved/favorite trip and only confirms times + contacts.

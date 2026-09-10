@@ -11,6 +11,9 @@ import { palette } from "@/constants/design";
 import { ZoneScreenContainer, ZoneScreenHeader } from "@/components/avalanche/ZoneScreenChrome";
 import { CollapsibleSection } from "@/components/observation/CollapsibleSection";
 import { AddButton, ContactsEditor, GearEditor, PartyEditor, SubjectEditor, VehicleEditor } from "@/components/trip/editors";
+import { VehicleCard } from "@/components/trip/VehicleCards";
+import { gearSummary } from "@/lib/tripPlan/gear";
+import { gearProfileSchema } from "@/lib/tripPlan/schema";
 import { newId } from "@/lib/tripPlan/ids";
 import { emptyProfile, loadProfile, saveProfile, type TripProfile } from "@/lib/tripPlan/store";
 
@@ -21,6 +24,7 @@ export default function TripProfileScreen() {
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState<Set<Section>>(new Set(["you"]));
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -57,11 +61,11 @@ export default function TripProfileScreen() {
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
-      <ZoneScreenHeader eyebrow="TRIP PLAN" title="Your profile" />
+      <ZoneScreenHeader eyebrow="YOUR PEOPLE" title="Your profile" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 64 }} keyboardShouldPersistTaps="handled">
           <Text className="text-ink-300" style={{ fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
-            This is what Search and Rescue asks a reporting party for. Fill in what you can; every trip plan
+            This is what Search and Rescue asks a reporting party for. Fill in what you can; every trip
             starts from here. Medical notes, address, and date of birth are kept in the device keychain and only
             leave the phone inside a plan you send.
             {savedAt ? `\nSaved ${savedAt}.` : ""}
@@ -85,18 +89,33 @@ export default function TripProfileScreen() {
             onToggle={() => toggle("vehicles")}
           >
             <View style={{ gap: 12 }}>
+              <Text className="text-ink-300" style={{ fontSize: 12, lineHeight: 17 }}>
+                Tap a vehicle to edit it. The default is what a new trip starts with.
+              </Text>
               {profile.vehicles.map((v, i) => (
-                <View key={v.id} style={{ gap: 10, padding: 12, borderRadius: 10, backgroundColor: palette.ink[900] }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <Pressable onPress={() => update((p) => ({ ...p, defaultVehicleId: v.id }))} hitSlop={8} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Ionicons name={profile.defaultVehicleId === v.id ? "radio-button-on" : "radio-button-off"} size={18} color={palette.frost[400]} />
-                      <Text variant="mono" style={{ fontSize: 10, letterSpacing: 1.2, color: palette.ink[400] }}>DEFAULT</Text>
-                    </Pressable>
-                    <Pressable onPress={() => update((p) => ({ ...p, vehicles: p.vehicles.filter((_, j) => j !== i) }))} hitSlop={10}>
-                      <Ionicons name="close-circle-outline" size={20} color={palette.ink[400]} />
-                    </Pressable>
-                  </View>
-                  <VehicleEditor value={v} onChange={(nv) => update((p) => ({ ...p, vehicles: p.vehicles.map((x, j) => (j === i ? nv : x)) }))} />
+                <View key={v.id} style={{ gap: 10 }}>
+                  <VehicleCard
+                    vehicle={v}
+                    selected={profile.defaultVehicleId === v.id}
+                    onPress={() => setEditingVehicle(editingVehicle === v.id ? null : v.id)}
+                    trailing={
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                        <Pressable onPress={() => update((p) => ({ ...p, defaultVehicleId: v.id }))} hitSlop={8}>
+                          <Text variant="mono" style={{ fontSize: 10, letterSpacing: 1.2, color: profile.defaultVehicleId === v.id ? palette.frost[500] : palette.ink[400] }}>
+                            {profile.defaultVehicleId === v.id ? "DEFAULT" : "MAKE DEFAULT"}
+                          </Text>
+                        </Pressable>
+                        <Pressable onPress={() => update((p) => ({ ...p, vehicles: p.vehicles.filter((_, j) => j !== i) }))} hitSlop={10}>
+                          <Ionicons name="close-circle-outline" size={20} color={palette.ink[400]} />
+                        </Pressable>
+                      </View>
+                    }
+                  />
+                  {editingVehicle === v.id ? (
+                    <View style={{ padding: 12, borderRadius: 10, backgroundColor: palette.ink[900] }}>
+                      <VehicleEditor value={v} onChange={(nv) => update((p) => ({ ...p, vehicles: p.vehicles.map((x, j) => (j === i ? nv : x)) }))} />
+                    </View>
+                  ) : null}
                 </View>
               ))}
               <AddButton
@@ -104,6 +123,7 @@ export default function TripProfileScreen() {
                 onPress={() =>
                   update((p) => {
                     const id = newId();
+                    setEditingVehicle(id);
                     return {
                       ...p,
                       vehicles: [...p.vehicles, { id, label: "", type: "truck" }],
@@ -116,13 +136,13 @@ export default function TripProfileScreen() {
           </CollapsibleSection>
 
           <CollapsibleSection
-            eyebrow="GEAR & COMMS"
-            summary={profile.gear.satDeviceType ? `Sat: ${profile.gear.satDeviceType}` : profile.gear.overnightGear ? "Set" : null}
+            eyebrow="WHAT YOU CARRY"
+            summary={gearSummary(profile.gear)}
             open={open.has("gear")}
-            complete={!!(profile.gear.satDeviceType || profile.gear.overnightGear || profile.gear.clothingColors)}
+            complete={(profile.gear.inventory ?? []).length > 0}
             onToggle={() => toggle("gear")}
           >
-            <GearEditor value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: g }))} />
+            <GearEditor value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: gearProfileSchema.parse(g) }))} />
           </CollapsibleSection>
 
           <CollapsibleSection
@@ -133,7 +153,7 @@ export default function TripProfileScreen() {
             onToggle={() => toggle("people")}
           >
             <Text className="text-ink-300" style={{ fontSize: 12, lineHeight: 17, marginBottom: 4 }}>
-              The people you&apos;d hand a trip plan to. Pick from them in one tap when you send.
+              The people you&apos;d want called if you didn&apos;t come back. Pick from them in one tap when you send.
             </Text>
             <ContactsEditor
               value={profile.contacts}

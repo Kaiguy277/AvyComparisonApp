@@ -33,6 +33,8 @@ import {
   SubjectEditor,
   VehicleEditor,
 } from "@/components/trip/editors";
+import { VehicleCard, vehicleLine } from "@/components/trip/VehicleCards";
+import { gearSummary } from "@/lib/tripPlan/gear";
 import {
   TRAVEL_MODE_OPTIONS,
   TRIP_LIMITS,
@@ -73,6 +75,7 @@ export default function TripNewScreen() {
   const [open, setOpen] = useState<Set<SectionKey>>(new Set(ORDER));
   const [sending, setSending] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [editVehicle, setEditVehicle] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   // ── seed: template > zone param > saved draft > profile defaults ──────
@@ -86,8 +89,8 @@ export default function TripNewScreen() {
       ]);
       if (active && active.status !== "closed") {
         Alert.alert(
-          "You already have a live plan",
-          `Check in on the ${active.areaName} plan first, or cancel it.`,
+          "You already have a live trip",
+          `Check in on the ${active.areaName} trip first, or cancel it.`,
           [{ text: "OK", onPress: () => router.back() }],
         );
         return;
@@ -102,7 +105,8 @@ export default function TripNewScreen() {
         vehicle: defaultVehicle,
         clothingToday: {},
         party: [],
-        contacts: [],
+        // Saved people are the default recipients — confirm, don't retype.
+        contacts: p.contacts.slice(0, TRIP_LIMITS.maxContacts),
       });
       const tpl = params.templateId ? templates.find((t) => t.id === params.templateId) : undefined;
       const collapsed = new Set<SectionKey>();
@@ -137,7 +141,17 @@ export default function TripNewScreen() {
         next = { ...base, zoneId: params.zoneId, areaName: z?.name ?? "" };
       } else {
         const saved = await loadDraft();
-        if (saved) next = { ...base, ...saved, subject: { ...p.subject, ...saved.subject } };
+        if (saved) {
+          next = {
+            ...base,
+            ...saved,
+            subject: { ...p.subject, ...saved.subject },
+            // A resumed draft never overrides profile defaults with nothing.
+            vehicle: saved.vehicle ?? defaultVehicle,
+            gear: { ...p.gear, ...saved.gear },
+            contacts: saved.contacts && saved.contacts.length > 0 ? saved.contacts : base.contacts,
+          };
+        }
       }
       if (next.vehicle && (next.vehicle.color || next.vehicle.make)) collapsed.add("vehicle");
       if (p.gear.satDeviceType || p.gear.overnightGear) collapsed.add("gear");
@@ -251,7 +265,7 @@ export default function TripNewScreen() {
       if (!online) {
         Alert.alert(
           "Saved — not sent yet",
-          "You're offline. The plan will send as soon as you have signal, and you'll be able to text the links from the Trip Plan screen.",
+          "You're offline. It will send as soon as you have signal, and you'll be able to text the links from the Your People screen.",
           [{ text: "OK", onPress: () => router.replace("/trip" as never) }],
         );
         return;
@@ -263,8 +277,8 @@ export default function TripNewScreen() {
         Alert.alert(
           "Saved — sending",
           after?.sync === "failed"
-            ? `The server rejected the plan: ${after.syncError ?? "unknown error"}.`
-            : "The server hasn't confirmed yet. Links will appear on the Trip Plan screen once it does.",
+            ? `The server rejected it: ${after.syncError ?? "unknown error"}.`
+            : "The server hasn't confirmed yet. Links will appear on the Your People screen once it does.",
           [{ text: "OK", onPress: () => router.replace("/trip" as never) }],
         );
         return;
@@ -279,7 +293,7 @@ export default function TripNewScreen() {
           timezone: active.timezone,
           url: c.shareUrl!,
         });
-        const res = await Share.share({ message }, { subject: `${active.subjectName}'s trip plan` });
+        const res = await Share.share({ message }, { subject: `Where ${active.subjectName} is going` });
         if (res.action === Share.sharedAction) await markShared(active.planId, c.id);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -308,13 +322,13 @@ export default function TripNewScreen() {
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
-      <ZoneScreenHeader eyebrow="TRIP PLAN" title={draft.areaName || "New trip plan"} />
+      <ZoneScreenHeader eyebrow="YOUR PEOPLE" title={draft.areaName || "Where are you going?"} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
           <View style={{ paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, borderRadius: 10, backgroundColor: palette.frost[400] + "15", borderWidth: 0.5, borderColor: palette.frost[400] + "55", flexDirection: "row", gap: 8, alignItems: "center" }}>
             <Ionicons name="cellular-outline" size={16} color={palette.frost[400]} />
             <Text className="text-ink-200" style={{ fontSize: 12, lineHeight: 17, flex: 1 }}>
-              Send this while you still have signal. Your contacts get a link that works without the app.
+              Send this while you still have signal. Your people get a link that works without the app.
             </Text>
           </View>
 
@@ -341,14 +355,14 @@ export default function TripNewScreen() {
             />
             <TextField label="Area name" required value={draft.areaName} onChangeText={(t) => set("areaName", t)} error={errors.areaName} placeholder="Turnagain Pass" />
             <TextField label="Trailhead / parking" required value={draft.trailheadName} onChangeText={(t) => set("trailheadName", t)} error={errors.trailheadName} placeholder="Tincan lot, mile 68" />
-            <View>
-              <FieldLabel label="Trailhead pin" hint="Tap 'use current location' when you're parked, or type it." />
-              <LocationField
-                value={draft.trailhead ?? { lat: 0, lng: 0 }}
-                onChange={(p) => set("trailhead", p.lat === 0 && p.lng === 0 ? undefined : p)}
-                error={errors["trailhead.lat"]}
-              />
-            </View>
+            <LocationField
+              label="Trailhead pin"
+              hint="Tap 'use my current location' when you're parked, or type it."
+              required={false}
+              value={draft.trailhead ?? { lat: 0, lng: 0 }}
+              onChange={(p) => set("trailhead", p.lat === 0 && p.lng === 0 ? undefined : p)}
+              error={errors["trailhead.lat"]}
+            />
             <TextField label="Route / objective" required multiline rows={3} value={draft.route} onChangeText={(t) => set("route", t)} error={errors.route} placeholder="Up the common track to treeline, ski the low-angle glades, back the same way." />
             <TextField label="Alternate plans" multiline rows={2} value={draft.alternates ?? ""} onChangeText={(t) => set("alternates", t)} placeholder="If the wind's up we'll go to Sunburst instead." />
             <View>
@@ -437,36 +451,49 @@ export default function TripNewScreen() {
           {/* VEHICLE */}
           <CollapsibleSection
             eyebrow="VEHICLE"
-            summary={draft.travelMode === "foot" && !draft.vehicle ? "On foot" : draft.vehicle ? [draft.vehicle.color, draft.vehicle.make, draft.vehicle.model, draft.vehicle.plate].filter(Boolean).join(" ") || draft.vehicle.label || null : null}
+            summary={draft.vehicle ? `${vehicleLine(draft.vehicle)}${draft.vehicle.plate ? ` · ${draft.vehicle.plate}` : ""}` : draft.travelMode === "foot" ? "On foot" : null}
             open={open.has("vehicle")}
-            complete={!!draft.vehicle && (!!draft.vehicle.color || draft.vehicle.type === "dropped_off")}
+            complete={!!draft.vehicle && (!!draft.vehicle.color || !!draft.vehicle.make || draft.vehicle.type === "dropped_off")}
             onToggle={() => toggle("vehicle")}
           >
-            {profile.vehicles.length > 1 ? (
-              <View>
-                <FieldLabel label="Saved vehicles" />
-                <ChipPicker
-                  options={profile.vehicles.map((v) => ({ value: v.id, label: v.label || v.model || v.type }))}
-                  selected={draft.vehicle?.id}
-                  onSelect={(id) => set("vehicle", profile.vehicles.find((v) => v.id === id) ?? null)}
-                  size="sm"
+            {profile.vehicles.length > 0 ? (
+              <View style={{ gap: 8 }}>
+                <FieldLabel label="Which one are you taking?" />
+                {profile.vehicles.map((v) => (
+                  <VehicleCard
+                    key={v.id}
+                    vehicle={v}
+                    selected={draft.vehicle?.id === v.id}
+                    onPress={() => { set("vehicle", v); setEditVehicle(false); }}
+                  />
+                ))}
+                <VehicleCard
+                  vehicle={{ id: "__dropped", label: "", type: "dropped_off" }}
+                  selected={draft.vehicle?.type === "dropped_off"}
+                  onPress={() => { set("vehicle", { id: newId(), label: "", type: "dropped_off" }); setEditVehicle(false); }}
                 />
+                <Pressable onPress={() => { if (!draft.vehicle || profile.vehicles.some((v) => v.id === draft.vehicle?.id)) set("vehicle", { id: newId(), label: "", type: "truck" }); setEditVehicle(true); }} hitSlop={8}>
+                  <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>DIFFERENT VEHICLE TODAY →</Text>
+                </Pressable>
               </View>
             ) : null}
-            <VehicleEditor value={vehicle} onChange={(v) => set("vehicle", v)} error={errors.vehicle} />
+            {profile.vehicles.length === 0 || editVehicle ? (
+              <VehicleEditor value={vehicle} onChange={(v) => set("vehicle", v)} error={errors.vehicle} />
+            ) : null}
             <TextField label="Where it's parked" value={draft.parkedAt ?? ""} onChangeText={(t) => set("parkedAt", t)} placeholder="Defaults to the trailhead" />
           </CollapsibleSection>
 
           {/* GEAR + CLOTHING */}
           <CollapsibleSection
             eyebrow="GEAR & WHAT YOU'RE WEARING"
-            summary={[draft.clothingToday?.shell && `${draft.clothingToday.shell} jacket`, draft.gear?.satDeviceType].filter(Boolean).join(" · ") || null}
+            summary={[draft.clothingToday?.shell && `${draft.clothingToday.shell} jacket`, gearSummary(draft.gear)].filter(Boolean).join(" · ") || null}
             open={open.has("gear")}
             complete={!!(draft.clothingToday?.shell || draft.clothingToday?.pack || draft.gear?.clothingColors)}
             onToggle={() => toggle("gear")}
           >
             <FieldLabel label="Today's colors" hint="What a helicopter would see." />
             <ClothingEditor value={draft.clothingToday ?? {}} onChange={(c) => set("clothingToday", c)} />
+            <FieldLabel label="Confirm what's in the pack today" hint="Prefilled from your profile — tap to change." />
             <GearEditor value={{ beacon: true, shovel: true, probe: true, airbag: false, ...draft.gear }} onChange={(g) => set("gear", g)} compact />
           </CollapsibleSection>
 
@@ -522,7 +549,7 @@ export default function TripNewScreen() {
               </Text>
             ) : null}
             <Text className="text-ink-300" style={{ fontSize: 12, lineHeight: 17 }}>
-              Everything above goes to the contacts you chose, via a link that works without the app, for the trip plus 7 days.
+              Everything above goes to the people you chose, via a link that works without the app, for the trip plus 7 days.
             </Text>
           </View>
 

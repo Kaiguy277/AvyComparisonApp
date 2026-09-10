@@ -102,22 +102,24 @@ export default function ZoneObservationsScreen() {
               flexDirection: "row",
               alignItems: "center",
               gap: 4,
-              paddingHorizontal: 10,
-              paddingVertical: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
               borderRadius: 999,
-              borderWidth: 0.5,
-              borderColor: palette.frost[400],
-              backgroundColor: pressed ? palette.frost[400] + "33" : "transparent",
+              borderWidth: 1,
+              borderColor: palette.aspen[600],
+              // Solid, like the home FAB — the outlined version read as
+              // a transparent bubble on device.
+              backgroundColor: pressed ? palette.aspen[600] : palette.aspen[500],
             })}
           >
-            <Ionicons name="add" size={14} color={palette.frost[400]} />
+            <Ionicons name="add" size={14} color="#FFFFFF" />
             <Text
               variant="mono"
-              weight="medium"
+              weight="bold"
               style={{
                 fontSize: 10,
                 letterSpacing: 1.4,
-                color: palette.frost[400],
+                color: "#FFFFFF",
               }}
             >
               REPORT

@@ -143,7 +143,7 @@ details summary{cursor:pointer;font-weight:600}img.photo{max-width:160px;border-
 `;
 
 function page(title: string, body: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title><style>${CSS}</style></head><body><main>${body}<p class="small" style="margin-top:32px">Avy Comparison trip plan · This page is a planning aid shared by the person named above. It does not monitor their safety or contact rescuers.</p></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title><style>${CSS}</style></head><body><main>${body}<p class="small" style="margin-top:32px">Sent from Avy Comparison · This page was shared by the person named above so you know where they are and what to do if they don't come back. It does not monitor their safety or contact rescuers.</p></main></body></html>`;
 }
 
 function row(label: string, value: unknown): string {
@@ -235,7 +235,7 @@ function render(
 
   const body = `
 ${flash ? `<p class="flash">${esc(flash)}</p>` : ""}
-<p class="small">Trip plan shared with <b>${esc(me.display_name)}</b> · status: <b>${status.toUpperCase()}</b></p>
+<p class="small">Shared with <b>${esc(me.display_name)}</b> · status: <b>${status.toUpperCase()}</b></p>
 <h1>${esc(name)}</h1>
 <div class="status"><div><b>Expected back</b>${fmt(plan.return_by, tz)}</div><div><b>Worry by</b>${fmt(plan.worry_by, tz)}</div><div><b>Area</b>${esc(d.areaName)}</div><div><b>Cell</b>${tel}</div></div>
 ${g.satShareUrl ? `<p><b>Satellite device:</b> ${esc(g.satDeviceType ?? "")} — <a href="${esc(g.satShareUrl)}">live share page</a>${g.satMessageAddress ? ` · message: ${esc(g.satMessageAddress)}` : ""}</p>` : ""}
@@ -257,7 +257,7 @@ ${s.photoUrl ? `<img class="photo" src="${esc(s.photoUrl)}" alt="photo">` : ""}
 <dl>${row("Age / DOB", s.dateOfBirth)}${row("Sex", s.sex)}${row("Height", s.height)}${row("Weight", s.weight)}${row("Build", s.build)}${row("Hair", s.hair)}${row("Eyes", s.eyes)}${row("Distinguishing marks", s.distinguishingMarks)}${row("As seen from the air", fromAir || g.clothingColors)}${row("Home address", s.homeAddress)}</dl>
 
 <h2>5. Gear and comms</h2>
-<dl>${row("Beacon / shovel / probe", `${g.beacon ? "beacon" : "NO beacon"}, ${g.shovel ? "shovel" : "no shovel"}, ${g.probe ? "probe" : "no probe"}${g.airbag ? ", airbag pack" : ""}`)}${row("Satellite device", g.satDeviceType)}${row("Sat share page", g.satShareUrl)}${row("Sat message address", g.satMessageAddress)}${row("Radio", g.radio)}${row("Cell carrier", s.cellCarrier)}${row("Overnight gear", g.overnightGear)}${row("Food for", g.foodDays)}${row("Fire / stove", g.fireAndStove)}${row("Navigation", g.navigation)}${row("Skis / board / sled", g.skiOrSledDescription)}${row("Firearm", g.firearm)}${row("Other", g.other)}</dl>
+<dl>${row("Beacon / shovel / probe", `${g.beacon ? "beacon" : "NO beacon"}, ${g.shovel ? "shovel" : "no shovel"}, ${g.probe ? "probe" : "no probe"}${g.airbag ? ", airbag pack" : ""}`)}${row("Carrying", (g.inventory ?? []).map((k: string) => ({beacon:"beacon",shovel:"shovel",probe:"probe",airbag:"airbag",sat:"satellite device",radio:"radio",first_aid:"first aid",headlamp:"headlamp",stove:"stove/fire",overnight:"overnight kit",map:"map/GPS",helmet:"helmet",repair:"repair kit",skins:"skins",firearm:"firearm"} as Record<string,string>)[k] ?? k).join(", "))}${row("Satellite device", g.satDeviceType)}${row("Sat share page", g.satShareUrl)}${row("Sat message address", g.satMessageAddress)}${row("Radio", g.radio)}${row("Cell carrier", s.cellCarrier)}${row("Overnight gear", g.overnightGear)}${row("Food for", g.foodDays)}${row("Fire / stove", g.fireAndStove)}${row("Navigation", g.navigation)}${row("Skis / board / sled", g.skiOrSledDescription)}${row("Firearm", g.firearm)}${row("Other", g.other)}</dl>
 
 <h2>6. Health</h2>
 <dl>${row("Medical conditions", s.medicalConditions)}${row("Medications", s.medications)}${row("Allergies", s.allergies)}${row("Eyesight", s.eyesightNote)}</dl>
@@ -272,7 +272,7 @@ ${s.photoUrl ? `<img class="photo" src="${esc(s.photoUrl)}" alt="photo">` : ""}
 ${timeline}
 <p class="small noprint">Tip: use your browser's Print / Save as PDF so you can read from paper if your phone dies.</p>`;
 
-  return page(`${name} — trip plan`, body);
+  return page(`Where ${name} is — ${d.areaName}`, body);
 }
 
 function describeEvent(

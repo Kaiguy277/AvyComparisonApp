@@ -203,6 +203,9 @@ export const vehicleProfileSchema = z.object({
 export type VehicleProfile = z.infer<typeof vehicleProfileSchema>;
 
 export const gearProfileSchema = z.object({
+  // Tap-to-own inventory (keys from lib/tripPlan/gear.ts GEAR_ITEMS). The
+  // four booleans below are kept in sync for older packets/pages.
+  inventory: z.array(z.string()).default([]),
   beacon: z.boolean().default(true),
   shovel: z.boolean().default(true),
   probe: z.boolean().default(true),
@@ -221,7 +224,7 @@ export const gearProfileSchema = z.object({
   firearm: optionalText(120),
   other: optionalText(500),
 });
-export type GearProfile = z.infer<typeof gearProfileSchema>;
+export type GearProfile = z.input<typeof gearProfileSchema>;
 
 export const partyMemberSchema = z.object({
   name: text(120).pipe(z.string().min(1, required)),

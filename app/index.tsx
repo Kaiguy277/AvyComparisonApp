@@ -1826,49 +1826,60 @@ export default function Index() {
           elevation: 1000,
         }}
       >
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-              () => {},
-            );
-            router.push("/observation/new" as never);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Report a new observation"
-          style={({ pressed }) => ({
-            height: 60,
-            minWidth: 168,
-            paddingHorizontal: 24,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
+        {/* Opaque pill on a plain View (static style — no pressed-state
+            function, no same-color glow). Device feedback across builds
+            #20/#21 was that the button read as translucent: the wide
+            sienna-on-sienna shadow blurred its edge into the warm page.
+            Now: solid fill, 1px darker rim for a crisp edge, tight
+            neutral shadow, and press feedback via opacity only. */}
+        <View
+          style={{
             borderRadius: 30,
-            // Solid burnt-sienna pill. The old white border diluted it
-            // into a "sticker" that read as white-outlined on the warm
-            // page — dropped it so the saturated fill and a strong drop
-            // shadow carry the pop.
-            backgroundColor: pressed ? palette.aspen[600] : palette.aspen[500],
-            shadowColor: palette.aspen[600],
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.5,
-            shadowRadius: 12,
-            elevation: 12,
-          })}
+            backgroundColor: palette.aspen[500],
+            borderWidth: 1,
+            borderColor: palette.aspen[600],
+            shadowColor: "#000000",
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.28,
+            shadowRadius: 5,
+            elevation: 8,
+          }}
         >
-          <Ionicons name="add" size={26} color="#FFFFFF" />
-          <Text
-            variant="mono"
-            weight="bold"
-            style={{
-              fontSize: 14,
-              letterSpacing: 1.6,
-              color: "#FFFFFF",
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+                () => {},
+              );
+              router.push("/observation/new" as never);
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Report a new observation"
+            style={({ pressed }) => ({
+              height: 60,
+              minWidth: 168,
+              paddingHorizontal: 24,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              borderRadius: 30,
+              opacity: pressed ? 0.85 : 1,
+            })}
           >
-            REPORT OBS
-          </Text>
-        </Pressable>
+            <Ionicons name="add" size={26} color="#FFFFFF" />
+            <Text
+              variant="mono"
+              weight="bold"
+              style={{
+                fontSize: 14,
+                letterSpacing: 1.6,
+                color: "#FFFFFF",
+              }}
+            >
+              REPORT OBS
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <Modal

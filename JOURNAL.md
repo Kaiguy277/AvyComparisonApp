@@ -16,6 +16,32 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-10 — Seeing the screens changed the work
+
+Kai's build-#21 notes were short but they landed on the exact seam I'd been guessing
+across: the composer was built from a spec, not from a phone. His "tap icons for what
+you have" is a different mental model from "fill in the gear fields" — ownership is a
+checklist, not a form — and once I rendered the screens on Expo web the wall of text
+fields on the profile page made the point without him needing to. The gear grid took
+an hour; the insight was free the moment I could see it.
+
+Two things worth remembering. First, the `web.output: "single"` change I'd dismissed as
+tool noise on 09-09 was Kai making web rendering work; "static" pre-renders the app in
+Node where AsyncStorage has no window. I reverted an intentional change because it
+looked like a serializer artifact. Lesson: an unexplained diff in a config file is a
+question for the log, not a cleanup target. Second, the "transparent FAB" bug I could
+not reproduce on web — and that's the diagnosis. The pill is opaque; what iOS draws
+is a wide, half-opacity sienna shadow around a sienna pill, which reads as a
+translucent blob with no edge. Same-color glows are a trap on warm paper.
+
+The rebrand is more than words. "Trip plan" put the emphasis on the plan; "let your
+people know" puts it on the people, which is also what the page and the emails are
+for. It nudged copy everywhere: the share text now says where Kai is heading, not
+what document he made.
+
+Still unverified on a device: the share-sheet loop, SecureStore, contacts picker, the
+datetime spinner. Build #22 is the first chance.
+
 ## 2026-09-09 — Building the trip plan: the trailhead constraint shaped everything
 
 Kai's mid-build addition — "make sure a user can send this easily while on their way

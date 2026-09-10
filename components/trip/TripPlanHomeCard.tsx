@@ -1,4 +1,4 @@
-// Home-screen card for the trip plan feature. Three states: no plan
+// Home-screen card for the "let your people know" feature. Three states: no plan
 // (invite), live plan (status + big I'M BACK), closed plan (summary +
 // dismiss). Designed to be glanceable from a truck seat.
 
@@ -43,10 +43,10 @@ export function TripPlanHomeCard() {
         <Ionicons name="paper-plane-outline" size={18} color={palette.frost[400]} />
         <View style={{ flex: 1 }}>
           <Text variant="mono" weight="medium" style={{ fontSize: 11, letterSpacing: 1.4, color: palette.frost[400] }}>
-            TRIP PLAN
+            YOUR PEOPLE
           </Text>
           <Text className="text-ink-200" style={{ fontSize: 12, marginTop: 2 }}>
-            Tell someone where you&apos;re going before you lose signal.
+            Let your people know where you&apos;re going before you lose signal.
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={palette.ink[400]} />
@@ -98,10 +98,10 @@ export function TripPlanHomeCard() {
               : overdue
                 ? "OVERDUE · CONTACTS NUDGED"
                 : plan.sync === "pending"
-                  ? "TRIP PLAN · NOT SENT YET"
+                  ? "YOUR PEOPLE · NOT SENT YET"
                   : plan.sync === "failed"
-                    ? "TRIP PLAN · SEND FAILED"
-                    : "TRIP PLAN · LIVE"}
+                    ? "YOUR PEOPLE · SEND FAILED"
+                    : "YOUR PEOPLE · LIVE"}
           </Text>
           <Text className="text-ink-200" style={{ fontSize: 12, marginTop: 2 }} numberOfLines={1}>
             {plan.areaName} · back by {back}

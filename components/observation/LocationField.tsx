@@ -21,9 +21,21 @@ interface Props {
   value: LocationPoint;
   onChange: (next: LocationPoint) => void;
   error?: string;
+  // Label overrides — the default copy is observation-specific; the
+  // trip composer reuses the field for the trailhead pin.
+  label?: string;
+  hint?: string;
+  required?: boolean;
 }
 
-export function LocationField({ value, onChange, error }: Props) {
+export function LocationField({
+  value,
+  onChange,
+  error,
+  label = "Location",
+  hint = "Where did the observation happen?",
+  required = true,
+}: Props) {
   const [busy, setBusy] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
 
@@ -84,11 +96,7 @@ export function LocationField({ value, onChange, error }: Props) {
 
   return (
     <View>
-      <FieldLabel
-        label="Location"
-        required
-        hint="Where did the observation happen?"
-      />
+      <FieldLabel label={label} required={required} hint={hint} />
 
       {/* GPS button + current value display */}
       <Pressable

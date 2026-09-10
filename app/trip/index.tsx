@@ -66,9 +66,9 @@ export default function TripHubScreen() {
   };
 
   const confirmCancel = () => {
-    Alert.alert("Cancel this trip plan?", "Your contacts will be told the trip is off.", [
+    Alert.alert("Cancel this trip?", "Your people will be told the trip is off.", [
       { text: "Keep it", style: "cancel" },
-      { text: "Cancel plan", style: "destructive", onPress: () => cancel() },
+      { text: "Cancel trip", style: "destructive", onPress: () => cancel() },
     ]);
   };
 
@@ -76,8 +76,8 @@ export default function TripHubScreen() {
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
       <ZoneScreenHeader
-        eyebrow="TRIP PLAN"
-        title={live ? plan!.areaName : "Tell someone"}
+        eyebrow="YOUR PEOPLE"
+        title={live ? plan!.areaName : "Let your people know"}
         rightAction={
           <Pressable onPress={() => router.push("/trip/profile" as never)} hitSlop={10}>
             <Ionicons name="person-circle-outline" size={26} color={palette.ink[200]} />
@@ -90,7 +90,7 @@ export default function TripHubScreen() {
             plan={plan}
             pending={pendingActions}
             onCheckIn={() =>
-              Alert.alert("You're back?", "Tell your contacts you're back safe and close this plan.", [
+              Alert.alert("You're back?", "Tell your people you're back safe.", [
                 { text: "Not yet", style: "cancel" },
                 { text: "I'm back", onPress: () => checkIn() },
               ])
@@ -106,8 +106,8 @@ export default function TripHubScreen() {
             {!hasProfile ? (
               <Card accent={palette.aspen[400]} eyebrow="FIRST TIME · 2 MINUTES">
                 <Text className="text-ink-200" style={{ fontSize: 14, lineHeight: 20 }}>
-                  Set up your profile once — name, cell, vehicle, gear, medical, your people — and every
-                  trip plan after this is a couple of taps from the truck.
+                  Set up your profile once — you, your car, your gear, your people — and every trip after
+                  this is a couple of taps from the truck.
                 </Text>
                 <Button variant="primary" className="mt-3" onPress={() => router.push("/trip/profile" as never)}>
                   SET UP MY PROFILE
@@ -168,13 +168,13 @@ export default function TripHubScreen() {
             ) : null}
 
             <Button variant={recent ? "outline" : "primary"} size="lg" onPress={() => router.push("/trip/new" as never)}>
-              NEW TRIP PLAN
+              NEW TRIP
             </Button>
 
             <Text className="text-ink-400" style={{ fontSize: 12, lineHeight: 17, marginTop: 4 }}>
-              Your contacts get a link with everything Search and Rescue will ask for, plus a reminder if you
-              haven&apos;t checked in by your worry-by time. Make the plan while you still have signal. This app
-              does not contact rescuers — your person does, with the packet in hand.
+              Your people get a link with everything Search and Rescue will ask for, plus a reminder if you
+              haven&apos;t checked in by your worry-by time. Send it while you still have signal. This app
+              does not contact rescuers — your person does, with everything in hand.
             </Text>
           </>
         ) : null}
@@ -207,18 +207,18 @@ function PlanCard({
   const fmt = (iso: string) => formatLocal(iso, plan.timezone, { withDate: true });
   const statusLine = closed
     ? {
-        checked_in: "You checked in. Plan closed.",
-        cancelled_by_user: "You cancelled this plan.",
-        contact_heard_from: "A contact marked that they heard from you. Plan closed.",
-        search_started: "A contact has started a search. If you are safe, call them now.",
-        expired: "This plan expired without a check-in.",
+        checked_in: "You checked in. Your people were told.",
+        cancelled_by_user: "You cancelled this trip.",
+        contact_heard_from: "One of your people marked that they heard from you.",
+        search_started: "One of your people has started a search. If you are safe, call them now.",
+        expired: "This trip expired without a check-in.",
       }[plan.closeReason ?? "expired"] ?? "Plan closed."
     : overdue
-      ? "Past your worry-by time. Your contacts have been reminded."
+      ? "Past your worry-by time. Your people have been reminded."
       : plan.sync === "pending"
         ? "Not sent yet — connect to the internet to send it."
         : plan.sync === "failed"
-          ? `Couldn't send: ${plan.syncError ?? "unknown error"}. Try again from a new plan.`
+          ? `Couldn't send: ${plan.syncError ?? "unknown error"}. Try again from a new trip.`
           : "Live. Tap I'M BACK when you're out.";
 
   return (
@@ -238,7 +238,7 @@ function PlanCard({
       <Text className="text-ink-200" style={{ fontSize: 13, lineHeight: 19 }}>{statusLine}</Text>
 
       <View style={{ gap: 8 }}>
-        <Eyebrow>CONTACTS</Eyebrow>
+        <Eyebrow>YOUR PEOPLE</Eyebrow>
         {plan.contacts.map((c) => (
           <View key={c.id} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             <Ionicons
@@ -292,7 +292,7 @@ function PlanCard({
             </Text>
           </Pressable>
           <Pressable onPress={onCancel} hitSlop={8} style={{ alignSelf: "center", padding: 8 }}>
-            <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.ink[400] }}>CANCEL PLAN</Text>
+            <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.ink[400] }}>CANCEL TRIP</Text>
           </Pressable>
         </>
       ) : (

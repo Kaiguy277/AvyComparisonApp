@@ -15,6 +15,7 @@ import {
   TextField,
   YesNoSwitch,
 } from "@/components/observation/formPrimitives";
+import { GearGrid } from "@/components/trip/GearGrid";
 import {
   EXPERIENCE_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
@@ -88,7 +89,7 @@ export function SubjectEditor({
             <TextField label="Eyes" value={value.eyes ?? ""} onChangeText={(t) => set("eyes", t)} />
           </Row>
           <TextField label="Distinguishing marks" value={value.distinguishingMarks ?? ""} onChangeText={(t) => set("distinguishingMarks", t)} placeholder="Tattoos, scars, glasses…" />
-          <TextField label="Medical conditions" hint="Stored in the device keychain. Only shared inside a trip plan." value={value.medicalConditions ?? ""} onChangeText={(t) => set("medicalConditions", t)} multiline rows={2} />
+          <TextField label="Medical conditions" hint="Stored in the device keychain. Only shared with your people when you send a trip." value={value.medicalConditions ?? ""} onChangeText={(t) => set("medicalConditions", t)} multiline rows={2} />
           <TextField label="Medications" hint="Include what happens if a dose is missed." value={value.medications ?? ""} onChangeText={(t) => set("medications", t)} multiline rows={2} />
           <TextField label="Allergies" value={value.allergies ?? ""} onChangeText={(t) => set("allergies", t)} />
           <TextField label="Eyesight" value={value.eyesightNote ?? ""} onChangeText={(t) => set("eyesightNote", t)} placeholder="Contacts, spares in pack" />
@@ -168,39 +169,19 @@ export function GearEditor({
   compact?: boolean;
 }) {
   const set = <K extends keyof GearProfile>(k: K, v: GearProfile[K]) => onChange({ ...value, [k]: v });
-  const toggles: { key: "beacon" | "shovel" | "probe" | "airbag"; label: string }[] = [
-    { key: "beacon", label: "BEACON" },
-    { key: "shovel", label: "SHOVEL" },
-    { key: "probe", label: "PROBE" },
-    { key: "airbag", label: "AIRBAG" },
-  ];
   return (
     <View style={{ gap: 14 }}>
       <View>
-        <FieldLabel label="Rescue gear" hint="Tap what you're carrying." />
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {toggles.map((t) => (
-            <Chip key={t.key} label={t.label} selected={!!value[t.key]} onPress={() => set(t.key, !value[t.key])} size="sm" />
-          ))}
-        </View>
+        <FieldLabel label="Tap what you carry" hint="Owned items light up. A few ask one follow-up question." />
+        <GearGrid value={value} onChange={onChange} />
       </View>
-      <TextField label="Satellite device" value={value.satDeviceType ?? ""} onChangeText={(t) => set("satDeviceType", t)} placeholder="inReach Mini 2, Zoleo, iPhone SOS…" />
-      <TextField label="Satellite share page URL" hint="Garmin MapShare link — lets your contact and SAR see your track." value={value.satShareUrl ?? ""} onChangeText={(t) => set("satShareUrl", t)} autoCapitalize="none" keyboardType="url" />
-      <TextField label="Satellite message address" value={value.satMessageAddress ?? ""} onChangeText={(t) => set("satMessageAddress", t)} autoCapitalize="none" placeholder="name@inreach.garmin.com" />
-      <TextField label="Radio + channel" value={value.radio ?? ""} onChangeText={(t) => set("radio", t)} placeholder="BCA Link 2.0, ch 1" />
-      <TextField label="Overnight gear" value={value.overnightGear ?? ""} onChangeText={(t) => set("overnightGear", t)} placeholder="Bivy, stove, puffy, extra food" />
       {!compact ? (
         <>
-          <Row>
-            <TextField label="Food for" value={value.foodDays ?? ""} onChangeText={(t) => set("foodDays", t)} placeholder="1 day" />
-            <TextField label="Fire / stove" value={value.fireAndStove ?? ""} onChangeText={(t) => set("fireAndStove", t)} placeholder="Lighter, Jetboil" />
-          </Row>
-          <TextField label="Navigation" value={value.navigation ?? ""} onChangeText={(t) => set("navigation", t)} placeholder="Gaia on phone, paper map, compass" />
           <TextField label="Skis / board / sled description" value={value.skiOrSledDescription ?? ""} onChangeText={(t) => set("skiOrSledDescription", t)} placeholder="Orange Skidoo Summit 850 · white Blizzard skis" />
-          <TextField label="Tent / bivy color" value={value.tentColor ?? ""} onChangeText={(t) => set("tentColor", t)} />
-          <TextField label="Firearm" value={value.firearm ?? ""} onChangeText={(t) => set("firearm", t)} />
           <TextField label="Usual clothing colors" hint="Default for 'as seen from the air'. You can change it per trip." value={value.clothingColors ?? ""} onChangeText={(t) => set("clothingColors", t)} placeholder="Red shell, black pants, orange pack" />
-          <TextField label="Other" value={value.other ?? ""} onChangeText={(t) => set("other", t)} />
+          <TextField label="Tent / bivy color" value={value.tentColor ?? ""} onChangeText={(t) => set("tentColor", t)} />
+          <TextField label="Food for" value={value.foodDays ?? ""} onChangeText={(t) => set("foodDays", t)} placeholder="1 day" />
+          <TextField label="Anything else" value={value.other ?? ""} onChangeText={(t) => set("other", t)} />
         </>
       ) : null}
     </View>

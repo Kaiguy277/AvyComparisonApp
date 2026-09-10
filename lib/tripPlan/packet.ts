@@ -50,7 +50,7 @@ export function completenessItems(d: TripPlanDraftInput): Weighted[] {
     { label: "Medical / medications", weight: 1, filled: has(s.medicalConditions) || has(s.medications) },
     { label: "Experience", weight: 1, filled: has(s.experienceLevel) },
     { label: "Satellite device", weight: 1, filled: has(g.satShareUrl) || has(g.satMessageAddress) },
-    { label: "Overnight gear", weight: 1, filled: has(g.overnightGear) },
+    { label: "Overnight gear", weight: 1, filled: has(g.overnightGear) || (g.inventory ?? []).includes("overnight") },
     { label: "Photo", weight: 1, filled: has(s.photoUri) },
   ];
 }
@@ -126,7 +126,7 @@ export function shareMessage(args: {
     withDate: !sameLocalDay(args.worryBy, args.returnBy, args.timezone),
   });
   return (
-    `${name}'s trip plan: ${args.areaName}, back by ${back}. ` +
+    `${name} is heading to ${args.areaName}, back by ${back}. ` +
     `If you haven't heard from ${name} by ${worry}, open this and follow the steps: ${args.url}`
   );
 }

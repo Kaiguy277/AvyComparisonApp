@@ -60,7 +60,7 @@ describe("formatting", () => {
       timezone: "America/Anchorage",
       url: "https://x.test/p?t=abc",
     });
-    expect(m).toContain("Kai's trip plan: Turnagain Pass");
+    expect(m).toContain("Kai is heading to Turnagain Pass");
     expect(m).toContain("by 9:00 PM");
     expect(m).toContain("https://x.test/p?t=abc");
   });
