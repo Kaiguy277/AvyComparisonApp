@@ -77,7 +77,14 @@ Format per entry:
   e5bdcca8. First build with the trip plan feature; screens have never rendered
   before this, so device smoke is the next gate (hub → profile → new plan → send →
   share sheet → I'M BACK; offline check-in queue).
-- **Not done / next:** (migration + deploy DONE, see above);
+- **Email live.** Resend account (kai.myers.a@gmail.com) key "TripPlanner" set as
+  `RESEND_API_KEY`; sender `TRIP_PLAN_EMAIL_FROM = Avy Comparison <trips@akrfp.com>`
+  (only verified domain on the account) — test send OK. Registered
+  `trips.kaiconsulting.ai` on Resend; DNS records + switch-over in
+  `docs/TRIP_PLAN_OPS.md`. Cron sweep verified for real: past-due smoke plan flipped
+  to `overdue` at the 01:50 tick and logged nudge_1. Old smoke plans deleted; one
+  past-due plan with Kai as contact seeded at 02:00Z for a real nudge email.
+- **Not done / next:** (migration + deploy + email DONE, see above);
   `supabase functions deploy trip-plans trip-plan-page trip-plan-sweeper --use-api`;
   set secrets `RESEND_API_KEY`, `TRIP_PLAN_EMAIL_FROM` (needs a verified Resend
   domain — none yet for this app), optional `TRIP_PLAN_PAGE_BASE`; curl smoke of
