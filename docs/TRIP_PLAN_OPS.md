@@ -18,8 +18,10 @@ Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
 - `TRIP_NUDGE_CHANNELS` — optional, default `email`. Add `sms` when Twilio lands.
 - `TRIP_PLAN_PAGE_BASE` — optional override for the share-link base.
 
-## Pending DNS for `trips.kaiconsulting.ai` (Resend domain 86d116fb…)
-Add at the DNS host for kaiconsulting.ai, then "Verify" in Resend → Domains:
+## DNS for `trips.kaiconsulting.ai` (Resend domain 86d116fb…)
+kaiconsulting.ai DNS is at **Porkbun** (login saved in Kai's Firefox; 2FA code goes to
+kai.myers.a@gmail.com). These three records were added 2026-09-09 and resolve on all
+four Porkbun nameservers:
 
 | Type | Name (relative to kaiconsulting.ai) | Value | Priority |
 |---|---|---|---|

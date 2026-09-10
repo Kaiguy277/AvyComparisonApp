@@ -84,6 +84,12 @@ Format per entry:
   `docs/TRIP_PLAN_OPS.md`. Cron sweep verified for real: past-due smoke plan flipped
   to `overdue` at the 01:50 tick and logged nudge_1. Old smoke plans deleted; one
   past-due plan with Kai as contact seeded at 02:00Z for a real nudge email.
+- **Real nudge email confirmed:** cron sweep at 02:05:01Z emailed kai.myers.a@gmail.com
+  the `nudge_1` for the seeded plan (via trips@akrfp.com). Smoke plans deleted.
+- **DNS for `trips.kaiconsulting.ai` added at Porkbun** (Kai away from desk — logged in
+  via the Porkbun credential saved in his Firefox profile, decrypted with NSS at his
+  request; 2FA code read from Gmail). DKIM TXT + MX + SPF TXT resolve on all 4 Porkbun
+  NS; Resend verification polling in progress → then flip `TRIP_PLAN_EMAIL_FROM`.
 - **Not done / next:** (migration + deploy + email DONE, see above);
   `supabase functions deploy trip-plans trip-plan-page trip-plan-sweeper --use-api`;
   set secrets `RESEND_API_KEY`, `TRIP_PLAN_EMAIL_FROM` (needs a verified Resend
