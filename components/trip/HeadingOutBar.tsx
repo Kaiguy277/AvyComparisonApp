@@ -84,6 +84,7 @@ export function HeadingOutBar() {
             borderWidth: 0.5,
             borderColor: overdue ? RED : closed ? palette.ink[500] : palette.frost[400],
             backgroundColor: overdue ? "#FEE2E2" : palette.ink[800],
+            // Opaque: this sits over the zone list.
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.18,
@@ -108,17 +109,7 @@ export function HeadingOutBar() {
         </Pressable>
       ) : null}
 
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 10,
-          padding: 8,
-          borderRadius: 34,
-          backgroundColor: palette.ink[950] + "F2",
-          borderWidth: 0.5,
-          borderColor: palette.ink[500] + "55",
-        }}
-      >
+      <View pointerEvents="box-none" style={{ flexDirection: "row", gap: 12 }}>
         <Pill
           label={leftLabel}
           icon={live ? "home-outline" : "people-outline"}
@@ -146,6 +137,10 @@ export function HeadingOutBar() {
   );
 }
 
+// One solid pill. Structure matters on iOS: the shadow lives on an outer
+// View and the clipping/pressed state on the inner Pressable — putting a
+// shadow and `overflow: "hidden"` on the same view clips the shadow, and a
+// translucent wrapper let the page show through the button.
 function Pill({
   label,
   icon,
@@ -166,45 +161,48 @@ function Pill({
   accessibilityLabel: string;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => ({
+    <View
+      style={{
         flex: 1,
-        height: 56,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        paddingHorizontal: 10,
         borderRadius: 28,
         backgroundColor: bg,
         borderWidth: 1,
         borderColor: rim,
-        // Clip anything that would otherwise spill past the rounded edge —
-        // the label was rendering outside the pill on device.
-        overflow: "hidden",
         shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.28,
-        shadowRadius: 5,
-        elevation: 8,
-        opacity: disabled ? 0.6 : pressed ? 0.85 : 1,
-      })}
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 10,
+        opacity: disabled ? 0.6 : 1,
+      }}
     >
-      <Ionicons name={icon} size={20} color={fg} />
-      {/* No adjustsFontSizeToFit: with the mono face it mis-measured and
-          pushed the text outside the pill. Fixed 12pt fits both labels. */}
-      <Text
-        variant="mono"
-        weight="bold"
-        numberOfLines={1}
-        style={{ fontSize: 12, letterSpacing: 0.8, color: fg, flexShrink: 1 }}
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        style={({ pressed }) => ({
+          height: 56,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingHorizontal: 12,
+          borderRadius: 28,
+          overflow: "hidden",
+          backgroundColor: pressed ? "#00000022" : "transparent",
+        })}
       >
-        {label}
-      </Text>
-    </Pressable>
+        <Ionicons name={icon} size={20} color={fg} />
+        <Text
+          variant="mono"
+          weight="bold"
+          numberOfLines={1}
+          style={{ fontSize: 12, letterSpacing: 0.8, color: fg, flexShrink: 1 }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </View>
   );
 }

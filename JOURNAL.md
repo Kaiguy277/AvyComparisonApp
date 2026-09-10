@@ -30,11 +30,21 @@ on a real screenshot from the phone before I call it done.
 
 The best catch of the night wasn't mine at all. Kai's home-screen photo had a red
 diagnostic line in it: push registration failing with "permission denied for table
-device_tokens". That's been broken since the August lockdown — the RLS policy survived
-but the INSERT grant didn't, and RLS needs both, so it failed closed and silently. The
-in-app diagnostic banner did its job; nobody was reading it. Worth remembering that
-this app already surfaces its own failures and I should read the screenshots for those
-lines, not just for the layout.
+device_tokens", broken since the August lockdown. My first fix was wrong in an
+instructive way. I saw an RLS policy with no matching grant, restored the grant, and
+declared it solved — without ever running the actual request. When Kai's next
+screenshot showed the same error I finally ran it as anon and got a hint I hadn't
+predicted: PostgREST wants SELECT to resolve an upsert's ON CONFLICT target. SELECT is
+the exact privilege the lockdown removed on purpose, because readable push tokens let
+anyone push to every device in the app. So the two requirements were in direct
+conflict and no amount of grant-shuffling would satisfy both.
+
+The way out was to stop asking the table to be both writable and unreadable by the same
+role: a SECURITY DEFINER function that takes a token, validates its shape, and upserts.
+anon gets EXECUTE and nothing else. It also quietly restored the last_seen refresh the
+lockdown had written off as acceptable collateral. Lesson, and it's the same one as
+the layout bugs: verify by executing, not by reading the schema. A grant table that
+looks right is not a request that succeeds.
 
 The profile-first flow is the structural fix behind the "I don't see a place to set up
 profile" note. Burying setup behind a person icon in a header was wrong: the first tap

@@ -55,7 +55,7 @@ export interface PushDiagnostic {
     | "permission-denied"
     | "no-project-id"
     | "expo-token-error"
-    | "supabase-upsert-error"
+    | "supabase-register-error"
     | "ok";
   message?: string;
   tokenPrefix?: string;
@@ -170,26 +170,20 @@ async function runRegistration(
 
     await Notifications.registerTaskAsync(PUSH_REFRESH_TASK);
 
-    // Insert-only registration (ON CONFLICT DO NOTHING). Anon has no
-    // SELECT/UPDATE on device_tokens anymore (tokens were world-readable
-    // — see migration 20260807000000), so re-registering an existing
-    // token must be a no-op rather than an update. Dead tokens are
-    // pruned server-side via DeviceNotRegistered on the push fan-out.
-    const { error: upsertError } = await supabase
-      .from("device_tokens")
-      .upsert(
-        {
-          token,
-          platform: Platform.OS,
-          last_seen: new Date().toISOString(),
-        },
-        { onConflict: "token", ignoreDuplicates: true },
-      );
+    // Registration goes through a SECURITY DEFINER RPC, not a direct
+    // upsert. PostgREST needs SELECT on the table to resolve an upsert's
+    // ON CONFLICT target, and anon must never be able to read this table
+    // (world-readable push tokens = anyone can push to every device — see
+    // migration 20260807000000). The RPC writes; anon still can't read.
+    const { error: upsertError } = await supabase.rpc("register_device_token", {
+      p_token: token,
+      p_platform: Platform.OS,
+    });
 
     if (upsertError) {
       const step = looksLikeNetworkError(upsertError.message)
         ? "skipped-offline"
-        : "supabase-upsert-error";
+        : "supabase-register-error";
       await writeDiagnostic({
         at,
         step,
