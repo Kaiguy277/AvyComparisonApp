@@ -72,6 +72,11 @@ Format per entry:
   form redirect used the runtime's internal path → now `pageBase()`. Email attempts
   correctly log `nudge_failed` ("RESEND_API_KEY not configured") pending Resend.
   Smoke plans (3) left in the table for the cron-sweep check; delete after.
+- **Merged to `main` (5badd15) and shipped as TestFlight build #21** —
+  `eas build -p ios --profile production --auto-submit`, build cb137ff2, submission
+  e5bdcca8. First build with the trip plan feature; screens have never rendered
+  before this, so device smoke is the next gate (hub → profile → new plan → send →
+  share sheet → I'M BACK; offline check-in queue).
 - **Not done / next:** (migration + deploy DONE, see above);
   `supabase functions deploy trip-plans trip-plan-page trip-plan-sweeper --use-api`;
   set secrets `RESEND_API_KEY`, `TRIP_PLAN_EMAIL_FROM` (needs a verified Resend
