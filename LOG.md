@@ -54,8 +54,8 @@ Format per entry:
   (name · N vehicles · N people · EDIT) so the one-time setup is always one tap away.
 - Gates: tsc, eslint 0 warnings, Vitest 110/110. Screens: `docs/screens/`
   {home, profile-intro, gear-grid, composer-pinned-profile}.png.
-- Shipped as build #25 (711bc8a) — superseded the same night by **#26** with the pill
-  and push fixes above.
+- Shipped as build #25 (711bc8a), superseded the same night by **TestFlight build #26**
+  (b4a621a, build cd2cfc72, submission 132d0472) with the pill and push fixes above.
 - **Lesson recorded:** Expo web is reliable for information architecture, not for
   measured layout — percentage widths and `adjustsFontSizeToFit` both rendered
   correctly on web and wrongly on device. Check those on a phone screenshot.
