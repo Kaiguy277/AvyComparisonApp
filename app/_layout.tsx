@@ -116,6 +116,9 @@ export default function RootLayout() {
             <Stack.Screen name="zone/[zoneId]/nws" />
             <Stack.Screen name="zone/[zoneId]/stations" />
             <Stack.Screen name="observation/new" />
+            <Stack.Screen name="trip/index" />
+            <Stack.Screen name="trip/new" />
+            <Stack.Screen name="trip/profile" />
           </Stack>
           <StatusBar style="dark" />
         </ThemeProvider>

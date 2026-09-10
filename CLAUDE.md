@@ -20,7 +20,7 @@ Working agreements for AI-assisted development on this project.
   iPhone-first, distributed via EAS Build → TestFlight (`com.kaimyers.avycomparison`).
 - Backend: self-owned Supabase (9 edge functions, pg_cron refresh, Postgres caches).
   Shared with the AvalancheComparison web app (`../AvalancheComparison`).
-- Current branch: `feature/observation-submit` (17 ahead of `main`).
+- Current branch: `main`. Work on short-lived branches, merge to `main`, delete the branch.
 - Knowledge graph: `graphify-out/` exists — for architecture questions, query it first
   (`/graphify query "..."`) instead of re-exploring.
 

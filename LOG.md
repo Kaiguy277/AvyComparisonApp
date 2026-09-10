@@ -21,6 +21,111 @@ Format per entry:
 
 ---
 
+## 2026-09-09 — Trip plan feature: build started (branch `feature/trip-plan`)
+- **Kai's added requirement:** sending must be easy *on the way to the trailhead* —
+  once set up, the user picks a saved/favorite trip and only confirms times + contacts.
+  Implemented as `TripTemplate`s (auto-saved per area+trailhead on every send, ranked
+  by use count), a "Repeat last trip" shortcut, and favorites-first area picks.
+- **Inspiration reviewed:** backcountrychecklist.com — one-question-per-screen, big
+  tap targets, gear chips, ends in a text-your-plan card. Borrowed: chip-style gear,
+  the "text someone your plan" framing, playful-but-direct copy; not borrowed: the
+  linear one-screen-per-question flow (too slow for the trailhead case).
+- **Domain layer (tested, 47 new tests → 110 total):** `lib/tripPlan/schema.ts` (zod;
+  E.164 phones via libphonenumber-js; time invariants), `state.ts` (pure lifecycle
+  machine, byte-identical copy at `supabase/functions/_shared/trip-plan-state.ts`
+  guarded by a drift test), `packet.ts` (completeness, share text), `outbox.ts`
+  (FIFO-per-plan offline queue, 5s·3^n backoff capped 15m, create gives up at 24h),
+  `store.ts` (AsyncStorage + SecureStore split; DOB/address/medical in the keychain),
+  `send.ts`/`useTripPlan.ts` (create → enqueue → flush → share; foreground/reconnect
+  sync; 60s poll while live).
+- **Backend written (not yet deployed):** migration `20260909000000_trip_plans.sql`
+  (4 tables, service-role only, rate-bump RPC, pg_cron sweep */5 + daily purge with
+  the cron key pulled from `function_secrets`), edge fns `trip-plans` (API),
+  `trip-plan-page` (server-rendered packet HTML + contact action forms),
+  `trip-plan-sweeper`, `_shared/trip-plan-notify.ts` (Resend email; push-to-owner
+  stub pending a device-id column on `device_tokens`).
+- **Design change vs spec §9.4:** contact share tokens are stored **raw** (not hashed)
+  in `trip_plan_contacts`. Reason: nudge emails need each contact's link, and the
+  table is already service-role-only and holds the packet itself, so a hash bought
+  nothing. Plan secrets stay hashed (the client holds the only copy).
+- **Client UI written:** `app/trip/index.tsx` (hub: live-plan card with contact
+  sent/opened receipts, RESEND per contact, I'M BACK, cancel, activity; else the fast
+  path: Repeat last trip → saved trips by use count → favorite zones → new plan, plus a
+  first-run profile nudge), `app/trip/new.tsx` (composer: 7 collapsible sections,
+  prefilled sections start collapsed; forecast snapshot from the offline cache; send
+  → outbox flush → sequential iOS share sheet per contact; offline → saved + explained),
+  `app/trip/profile.tsx` (vault: you / vehicles / gear / your people / usual partners,
+  autosaves), `components/trip/{editors,DateTimeField,TripPlanHomeCard}.tsx`. Home
+  card sits under the drafts banner in `app/index.tsx`; routes registered in `_layout`.
+- **Gates:** tsc clean, `expo lint` clean (0 warnings), Vitest 110/110. Not verified:
+  screens on a device, Deno compile of the 3 edge functions, the migration, Resend.
+- **Not done / next:** apply `20260909000000_trip_plans.sql` to the live project;
+  `supabase functions deploy trip-plans trip-plan-page trip-plan-sweeper --use-api`;
+  set secrets `RESEND_API_KEY`, `TRIP_PLAN_EMAIL_FROM` (needs a verified Resend
+  domain — none yet for this app), optional `TRIP_PLAN_PAGE_BASE`; curl smoke of
+  create → page → extend → check_in; TestFlight build; privacy-policy + label updates
+  (spec §15.4) before the App Store submission.
+- **Deps added:** expo-secure-store, expo-contacts (+ plugin permission string),
+  expo-sharing (unused so far — RN `Share` covers text; remove if it stays unused),
+  expo-crypto, libphonenumber-js.
+
+## 2026-09-09 — Roadmap set + stranded-state inventory (no code changes)
+- **Roadmap (Kai):** (1) get the app approved for the public App Store; (2) clean up
+  stranded branches/worktrees — incorporate what should land, delete scratch; (3) feature:
+  real observation submission to the avalanche centers (production NAC API access, or
+  per-center integrations if NAC won't cover it — needs outreach); (4) feature: trip plan /
+  "tell a loved one" — user pre-enters where they're going, ETA back, and a worry-by time,
+  plus the info a SAR team wants, so a contact can trigger a response fast. (4) needs a
+  full spec before any code.
+- **Stranded-state inventory (read-only, nothing deleted yet):**
+  - Worktrees `../AvyComparisonApp-dark-warm` (branch `redesign/dark-warm`, 1 commit,
+    2026-05-05, 71 behind main, clean) and `../AvyComparisonApp-parchment`
+    (`redesign/parchment`, 1 commit 2026-05-02 + 4 uncommitted files incl. the since-
+    deleted `ZoneCard.tsx`, 115 behind main). Both are pre-adoption design experiments;
+    dark-warm's substantive content (APNs priority-5, newest-bundle fallback) already
+    landed in main by other commits. Verdict: scratch — delete both worktrees + branches
+    (dark-warm also on origin). Awaiting Kai's OK since it's destructive.
+  - 8 local branches fully merged into main (chore/*, feature/*, fix/*) — safe to prune.
+  - Uncommitted `app.json` diff: web `output` static→single, em-dash re-escaped as
+    `\u2014`, trailing newline dropped. Looks like a tool serializing the file, not an
+    intended edit; no log entry explains it. Verdict: revert.
+  - `CLAUDE.md` still says current branch is `feature/observation-submit`; it's `main`.
+- **Cleanup executed (Kai's OK):** removed both redesign worktrees + branches (local and
+  `origin/redesign/dark-warm`), pruned the 8 merged local branches and their 5 origin
+  copies, reverted the tool-generated `app.json` diff, fixed the stale branch line in
+  `CLAUDE.md`. Repo is now `main` only, one worktree, clean tree apart from LOG/JOURNAL.
+- **Trip-plan spec written:** `docs/specs/2026-09-09-spec-trip-plan.md` (Draft v1,
+  ~1,150 lines). Further decisions from the session: v1 delivery = share sheet +
+  Resend email nudge + push, SMS later; 7-day retention after close; sat-messenger
+  URL/address as plain fields; packet = AK DPS trip plan ∪ DPS reporting list ∪ LPQ
+  sections C–G, I–K, M–N, rendered in IC-interview order. 5 open questions in §19.
+- **Trip-plan spec session started (`/write-spec`).** Decisions so far: alarm = server
+  (pg_cron) + contact; delivery = SMS w/ web link (Twilio later — start with a simpler
+  channel while 10DLC registers); explicit queued "I'm back" check-in; no-account path
+  required, account optionally prefills profile/gear/vehicle/favorite areas; multiple
+  contacts, any contact's "search started" / "subject is back" action notifies all;
+  contacts can extend worry-by from the link. Packet research: AK DPS Wilderness Trip
+  Plan (dps.alaska.gov, 2026-04 PDF) is the form Troopers ask reporters to hand over —
+  our packet should be a superset of it; AK DPS "info to provide" list; Latah SAR Lost
+  Person Questionnaire (long) = what an IC asks the reporting party. Copies in
+  scratchpad; field synthesis goes into the spec.
+- **NAC outreach prep:** `docs/NAC_PRODUCTION_ACCESS.md` — verified contacts
+  (`developer@nwac.us` first; NAC has no published dev email; HPAC `info@hpavalanche.org`),
+  what to ask, what to offer. Not yet sent.
+- **App Store Connect inventory (Kai logged in, Playwright):** version 1.0 is in
+  "Prepare for Submission" with essentially nothing filled: 0/10 screenshots, empty
+  description/keywords/promo text/copyright/support URL, no build attached, App Review
+  contact + notes empty and "Sign-in required" wrongly checked. App Information: no
+  category, no age rating, no content rights. App Privacy: not started, no privacy
+  policy URL. Pricing: no price, no availability set. Encryption is already declared
+  exempt in app.json (`ITSAppUsesNonExemptEncryption: false`). Checklist with draft copy, privacy-label answers derived from the code, and
+  an order of operations in `docs/APP_STORE_CHECKLIST.md`.
+- **Observation-submission finding:** the client already speaks the NAC observation API
+  (wire format from NWAC's open-source Avy app, `lib/observation/constants.ts`;
+  photo-upload + POST flow in `submitFlow.ts`), pointed at `staging-api.avalanche.org`
+  via `.env`. The blocker for (3) is production API credentials/permission from the
+  National Avalanche Center, not code — outreach first.
+
 ## 2026-08-10 — From TestFlight testing: FAB pop + location→center auto-fill
 - **REPORT OBS FAB now pops** (device feedback: "white on a clear background"). The 2px
   white border diluted the sienna into a white-outlined sticker; dropped it, went to a
