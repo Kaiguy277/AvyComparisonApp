@@ -49,7 +49,8 @@ Format per entry:
   RFP keys untouched, digests delivered today. `trips.kaiconsulting.ai` verified →
   sender flipped to `trips@trips.kaiconsulting.ai` (test send OK). No further use of
   the akrfp.com domain by this app.
-- Gates: tsc, eslint 0 warnings, Vitest 110/110. Shipping as build #23.
+- Gates: tsc, eslint 0 warnings, Vitest 110/110. **Shipped as TestFlight build #23**
+  (75bffe1, build 8369f1f7, submission 28cdeb87).
 
 ## 2026-09-10 — Device feedback on build #21 → rebrand, tap-to-own gear, solid FAB
 - **Kai's notes from build #21:** (1) add-observation bubble still reads transparent;
