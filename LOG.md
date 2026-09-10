@@ -41,9 +41,12 @@ Format per entry:
 - **Sender subdomain → `avycomparison.kaiconsulting.ai`** (Kai's call). Resend domain
   43bc39a8; DKIM + MX + SPF added at Porkbun under `*.avycomparison`, all resolving,
   DKIM byte-exact. `trips.kaiconsulting.ai` left in place as a fallback until the new
-  one has run a while. Secret flip pending Resend verification.
+  one has run a while. **Verified within minutes → `TRIP_PLAN_EMAIL_FROM` flipped to
+  `Avy Comparison <trips@avycomparison.kaiconsulting.ai>`, test send OK.** AK RFP Hub
+  untouched throughout (separate domain, separate keys, DNS at name.com).
 - Gates: tsc, eslint 0 warnings (whole tree), Vitest 110/110. Screens re-shot:
   `docs/screens/{profile-kit-details,profile-photo,observation}.png`.
+- **Shipped as TestFlight build #24** (177486a, build c40e3dfd, submission bf8ad2b1).
 
 ## 2026-09-10 (evening) — Build #22 feedback → IA rethink, bottom action bar, declutter
 - **Kai's notes on #22:** forms cluttered; per-trip questions (survive a night out) were
