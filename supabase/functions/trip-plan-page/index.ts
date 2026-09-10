@@ -225,7 +225,17 @@ function render(
     ? party.map((p, i) => `<dl>${row(`Member ${i + 2}`, p.name)}${row("Phone", p.phone)}${row("Their emergency contact", p.emergencyContact)}${row("Vehicle", p.vehicleNote)}</dl>`).join("<hr>")
     : '<p class="na">Travelling alone (no other party members listed).</p>';
 
-  const fromAir = [c.shell && `${c.shell} jacket`, c.pants && `${c.pants} pants`, c.pack && `${c.pack} pack`, c.helmet && `${c.helmet} helmet`, g.tentColor && `${g.tentColor} tent`].filter(Boolean).join(", ");
+  // Today's colors win; fall back to the profile's usual colors.
+  const u = g.usualColors ?? {};
+  const col = (k: "shell" | "pants" | "pack" | "helmet") => c[k] || u[k];
+  const fromAir = [
+    col("shell") && `${col("shell")} jacket`,
+    col("pants") && `${col("pants")} pants`,
+    col("pack") && `${col("pack")} pack`,
+    col("helmet") && `${col("helmet")} helmet`,
+    g.skiOrSledColor && `${g.skiOrSledColor} skis/sled`,
+    g.tentColor && `${g.tentColor} tent`,
+  ].filter(Boolean).join(", ");
 
   const timeline = events.length
     ? `<ul class="timeline">${[...events].reverse().map((e) => `<li><b>${fmt(e.at, tz)}</b> — ${esc(describeEvent(e, nameOf))}</li>`).join("")}</ul>`
@@ -253,11 +263,11 @@ ${forecast}
 ${v ? `<dl>${row("Type", v.type)}${row("Vehicle", [v.year, v.color, v.make, v.model].filter(Boolean).join(" "))}${row("Plate", v.plate ? `${v.plate}${v.plateState ? ` (${v.plateState})` : ""}` : "")}${row("Registration", v.registration)}${row("Notes", v.notes)}</dl>` : '<p class="na">No vehicle (on foot or dropped off).</p>'}
 
 <h2>4. Description of ${esc(first)}</h2>
-${s.photoUrl ? `<img class="photo" src="${esc(s.photoUrl)}" alt="photo">` : ""}
+${s.photoDataUri ? `<img class="photo" src="${esc(s.photoDataUri)}" alt="photo of ${esc(first)}">` : ""}
 <dl>${row("Age / DOB", s.dateOfBirth)}${row("Sex", s.sex)}${row("Height", s.height)}${row("Weight", s.weight)}${row("Build", s.build)}${row("Hair", s.hair)}${row("Eyes", s.eyes)}${row("Distinguishing marks", s.distinguishingMarks)}${row("As seen from the air", fromAir || g.clothingColors)}${row("Home address", s.homeAddress)}</dl>
 
 <h2>5. Gear and comms</h2>
-<dl>${row("Beacon / shovel / probe", `${g.beacon ? "beacon" : "NO beacon"}, ${g.shovel ? "shovel" : "no shovel"}, ${g.probe ? "probe" : "no probe"}${g.airbag ? ", airbag pack" : ""}`)}${row("Carrying", (g.inventory ?? []).map((k: string) => ({beacon:"beacon",shovel:"shovel",probe:"probe",airbag:"airbag",sat:"satellite device",radio:"radio",first_aid:"first aid",headlamp:"headlamp",stove:"stove/fire",overnight:"overnight kit",map:"map/GPS",helmet:"helmet",repair:"repair kit",skins:"skins",firearm:"firearm"} as Record<string,string>)[k] ?? k).join(", "))}${row("Satellite device", g.satDeviceType)}${row("Sat share page", g.satShareUrl)}${row("Sat message address", g.satMessageAddress)}${row("Radio", g.radio)}${row("Cell carrier", s.cellCarrier)}${row("Overnight gear", g.overnightGear)}${row("Food for", g.foodDays)}${row("Fire / stove", g.fireAndStove)}${row("Navigation", g.navigation)}${row("Skis / board / sled", g.skiOrSledDescription)}${row("Firearm", g.firearm)}${row("Other", g.other)}</dl>
+<dl>${row("Beacon / shovel / probe", `${g.beacon ? "beacon" : "NO beacon"}, ${g.shovel ? "shovel" : "no shovel"}, ${g.probe ? "probe" : "no probe"}${g.airbag ? ", airbag pack" : ""}`)}${row("Carrying", (g.inventory ?? []).map((k: string) => ({beacon:"beacon",shovel:"shovel",probe:"probe",airbag:"airbag",sat:"satellite device",radio:"radio",first_aid:"first aid",headlamp:"headlamp",stove:"stove/fire",overnight:"overnight kit",map:"map/GPS",helmet:"helmet",repair:"repair kit",skins:"skins",firearm:"firearm"} as Record<string,string>)[k] ?? k).join(", "))}${row("Satellite device", g.satDeviceType)}${row("Sat share page", g.satShareUrl)}${row("Sat message address", g.satMessageAddress)}${row("Radio", g.radio)}${row("Cell carrier", s.cellCarrier)}${row("Overnight gear", g.overnightGear)}${row("Food for", g.foodDays)}${row("Fire / stove", g.fireAndStove)}${row("Navigation", g.navigation)}${row("Skis / board / sled", [g.skiOrSledColor, g.skiOrSledDescription].filter(Boolean).join(" — "))}${row("Firearm", g.firearm)}${row("Other", g.other)}</dl>
 
 <h2>6. Health</h2>
 <dl>${row("Medical conditions", s.medicalConditions)}${row("Medications", s.medications)}${row("Allergies", s.allergies)}${row("Eyesight", s.eyesightNote)}</dl>

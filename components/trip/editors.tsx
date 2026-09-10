@@ -16,6 +16,7 @@ import {
   YesNoSwitch,
 } from "@/components/observation/formPrimitives";
 import { GearGrid } from "@/components/trip/GearGrid";
+import { PhotoField } from "@/components/trip/PhotoField";
 import {
   EXPERIENCE_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
@@ -59,7 +60,8 @@ export function ContactInfoEditor({ value, onChange, errors = {} }: SubjectProps
 export function DescriptionEditor({ value, onChange, errors = {} }: SubjectProps) {
   const set = useSet(value, onChange);
   return (
-    <View style={{ gap: 12 }}>
+    <View style={{ gap: 14 }}>
+      <PhotoField value={value.photoDataUri} onChange={(d) => set("photoDataUri", d)} />
       <Row>
         <TextField label="Date of birth" value={value.dateOfBirth ?? ""} onChangeText={(t) => set("dateOfBirth", t)} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" error={errors["subject.dateOfBirth"]} />
         <TextField label="Sex" value={value.sex ?? ""} onChangeText={(t) => set("sex", t)} />
@@ -196,15 +198,41 @@ export function ClothingEditor({
 }) {
   const set = <K extends keyof ClothingToday>(k: K, v: ClothingToday[K]) => onChange({ ...value, [k]: v });
   return (
+    <View style={{ gap: 12 }}>
+      <Row>
+        <TextField label="Jacket" value={value.shell ?? ""} onChangeText={(t) => set("shell", t)} placeholder="Red" />
+        <TextField label="Pants" value={value.pants ?? ""} onChangeText={(t) => set("pants", t)} placeholder="Black" />
+      </Row>
+      <Row>
+        <TextField label="Pack" value={value.pack ?? ""} onChangeText={(t) => set("pack", t)} placeholder="Orange" />
+        <TextField label="Helmet" value={value.helmet ?? ""} onChangeText={(t) => set("helmet", t)} placeholder="White" />
+      </Row>
+    </View>
+  );
+}
+
+// The optional "what my kit looks like" block on the profile: usual
+// colors, ski/board/sled, tent. None of it is required — but every field
+// here is something a searcher can spot from a helicopter.
+export function KitDetailsEditor({
+  value,
+  onChange,
+}: {
+  value: GearProfile;
+  onChange: (next: GearProfile) => void;
+}) {
+  const set = <K extends keyof GearProfile>(k: K, v: GearProfile[K]) => onChange({ ...value, [k]: v });
+  return (
     <View style={{ gap: 14 }}>
+      <View>
+        <FieldLabel label="Colors you usually wear" hint="Prefills each trip; you can change it on the day." />
+        <ClothingEditor value={value.usualColors ?? {}} onChange={(c) => set("usualColors", c)} />
+      </View>
       <Row>
-        <TextField label="Jacket color" value={value.shell ?? ""} onChangeText={(t) => set("shell", t)} />
-        <TextField label="Pants color" value={value.pants ?? ""} onChangeText={(t) => set("pants", t)} />
+        <TextField label="Ski / sled color" value={value.skiOrSledColor ?? ""} onChangeText={(t) => set("skiOrSledColor", t)} placeholder="Orange" />
+        <TextField label="Tent color" value={value.tentColor ?? ""} onChangeText={(t) => set("tentColor", t)} placeholder="Yellow" />
       </Row>
-      <Row>
-        <TextField label="Pack color" value={value.pack ?? ""} onChangeText={(t) => set("pack", t)} />
-        <TextField label="Helmet color" value={value.helmet ?? ""} onChangeText={(t) => set("helmet", t)} />
-      </Row>
+      <TextField label="Ski / board / sled" hint="Make, model, length, bindings — whatever you'd recognise at a trailhead."  value={value.skiOrSledDescription ?? ""} onChangeText={(t) => set("skiOrSledDescription", t)} placeholder="Ski-Doo Summit 850, 165cm Blizzard Rustlers, black bindings" />
     </View>
   );
 }

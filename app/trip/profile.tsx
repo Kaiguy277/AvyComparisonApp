@@ -12,13 +12,13 @@ import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { ZoneScreenContainer, ZoneScreenHeader } from "@/components/avalanche/ZoneScreenChrome";
 import { CollapsibleSection } from "@/components/observation/CollapsibleSection";
-import { TextField } from "@/components/observation/formPrimitives";
 import {
   AddButton,
   ContactInfoEditor,
   ContactsEditor,
   DescriptionEditor,
   ExperienceEditor,
+  KitDetailsEditor,
   MedicalEditor,
   PartyEditor,
   VehicleEditor,
@@ -87,7 +87,7 @@ export default function TripProfileScreen() {
     vehicles: profile.vehicles.length > 0,
     gear: (profile.gear.inventory ?? []).length > 0,
     medical: !!(s.medicalConditions || s.medications || s.allergies),
-    description: !!(s.height || s.hair || s.dateOfBirth),
+    description: !!(s.height || s.hair || s.dateOfBirth || s.photoDataUri),
     experience: !!s.experienceLevel,
     partners: profile.party.length > 0,
   };
@@ -199,15 +199,11 @@ export default function TripProfileScreen() {
             <GearGrid value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: gearProfileSchema.parse(g) }))} />
             <Pressable onPress={() => setMoreGear((m) => !m)} hitSlop={8}>
               <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>
-                {moreGear ? "LESS" : "SKIS / SLED, USUAL COLORS, TENT →"}
+                {moreGear ? "HIDE KIT DETAILS" : "ADD COLORS, SKIS / SLED, TENT →"}
               </Text>
             </Pressable>
             {moreGear ? (
-              <View style={{ gap: 12 }}>
-                <TextField label="Skis / board / sled" value={profile.gear.skiOrSledDescription ?? ""} onChangeText={(t) => update((p) => ({ ...p, gear: { ...p.gear, skiOrSledDescription: t } }))} placeholder="Orange Ski-Doo Summit 850 · white Blizzard skis" />
-                <TextField label="Usual clothing colors" value={profile.gear.clothingColors ?? ""} onChangeText={(t) => update((p) => ({ ...p, gear: { ...p.gear, clothingColors: t } }))} placeholder="Red shell, black pants, orange pack" />
-                <TextField label="Tent / bivy color" value={profile.gear.tentColor ?? ""} onChangeText={(t) => update((p) => ({ ...p, gear: { ...p.gear, tentColor: t } }))} />
-              </View>
+              <KitDetailsEditor value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: gearProfileSchema.parse(g) }))} />
             ) : null}
           </CollapsibleSection>
 
@@ -227,7 +223,7 @@ export default function TripProfileScreen() {
 
           <CollapsibleSection
             eyebrow="6 · WHAT YOU LOOK LIKE"
-            summary={done.description ? [s.height, s.build, s.hair].filter(Boolean).join(" · ") : null}
+            summary={done.description ? [s.photoDataUri ? "Photo" : null, s.height, s.build, s.hair].filter(Boolean).join(" · ") : null}
             open={open.has("description")}
             complete={done.description}
             onToggle={() => toggle("description")}

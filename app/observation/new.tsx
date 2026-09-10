@@ -258,8 +258,11 @@ export default function ObservationNewScreen() {
   // "Complete" is derived from form content, so a section header
   // shows a checkmark the moment its required fields are filled —
   // no explicit "Done" button needed.
+  // One section open at a time, like the profile/heading-out screens: a
+  // wall of nine expanded sections was the "cluttered" complaint. The
+  // first section that isn't complete opens on mount.
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
-    () => new Set<SectionKey>(SECTION_ORDER),
+    () => new Set<SectionKey>(["about"]),
   );
 
   // Per-section freeform notes. Folded into observation_summary at
@@ -341,15 +344,12 @@ export default function ObservationNewScreen() {
       instability: { ...prev.instability, [key]: value },
     }));
 
-  // Toggle: tap a header to flip that one section's open state.
-  // Other sections are unaffected.
+  // Toggle: one section open at a time. Tapping the open header closes
+  // it; tapping another header moves the focus there.
   const toggleSection = (key: SectionKey) => {
-    setOpenSections((cur) => {
-      const next = new Set(cur);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setOpenSections((cur) =>
+      cur.has(key) ? new Set<SectionKey>() : new Set<SectionKey>([key]),
+    );
   };
 
   // Submission. Section notes get folded into observation_summary
@@ -511,7 +511,7 @@ export default function ObservationNewScreen() {
           {/* ABOUT YOU */}
           <CollapsibleSection
             ref={setSectionRef("about")}
-            eyebrow="ABOUT YOU"
+            eyebrow="1 · ABOUT YOU"
             summary={summarizeAbout(form)}
             open={openSections.has("about")}
             complete={isSectionComplete(form, "about")}
@@ -554,7 +554,7 @@ export default function ObservationNewScreen() {
           {/* WHEN */}
           <CollapsibleSection
             ref={setSectionRef("when")}
-            eyebrow="WHEN"
+            eyebrow="2 · WHEN"
             summary={summarizeWhen(form)}
             open={openSections.has("when")}
             complete={isSectionComplete(form, "when")}
@@ -574,7 +574,7 @@ export default function ObservationNewScreen() {
           {/* ACTIVITY */}
           <CollapsibleSection
             ref={setSectionRef("activity")}
-            eyebrow="ACTIVITY"
+            eyebrow="3 · ACTIVITY"
             summary={summarizeActivity(form)}
             open={openSections.has("activity")}
             complete={isSectionComplete(form, "activity")}
@@ -597,7 +597,7 @@ export default function ObservationNewScreen() {
           {/* WHERE */}
           <CollapsibleSection
             ref={setSectionRef("where")}
-            eyebrow="WHERE"
+            eyebrow="4 · WHERE"
             summary={summarizeWhere(form)}
             open={openSections.has("where")}
             complete={isSectionComplete(form, "where")}
@@ -650,7 +650,7 @@ export default function ObservationNewScreen() {
           {/* OBSERVATION */}
           <CollapsibleSection
             ref={setSectionRef("observation")}
-            eyebrow="WHAT YOU SAW"
+            eyebrow="5 · WHAT YOU SAW"
             summary={summarizeObservation(form)}
             open={openSections.has("observation")}
             complete={isSectionComplete(form, "observation")}
@@ -679,7 +679,7 @@ export default function ObservationNewScreen() {
           {/* PHOTOS */}
           <CollapsibleSection
             ref={setSectionRef("photos")}
-            eyebrow="PHOTOS"
+            eyebrow="6 · PHOTOS"
             summary={summarizePhotos(form)}
             open={openSections.has("photos")}
             complete={isSectionComplete(form, "photos")}
@@ -696,7 +696,7 @@ export default function ObservationNewScreen() {
           {/* INSTABILITY */}
           <CollapsibleSection
             ref={setSectionRef("instability")}
-            eyebrow="SIGNS OF INSTABILITY"
+            eyebrow="7 · SIGNS OF INSTABILITY"
             summary={summarizeInstability(form)}
             open={openSections.has("instability")}
             complete={isSectionComplete(form, "instability")}
@@ -790,7 +790,7 @@ export default function ObservationNewScreen() {
           {/* AVALANCHES — only when avalanches_observed is true */}
           <CollapsibleSection
             ref={setSectionRef("avalanches")}
-            eyebrow="AVALANCHE DETAILS"
+            eyebrow="8 · AVALANCHE DETAILS"
             summary={summarizeAvalanches(form)}
             open={openSections.has("avalanches")}
             complete={isSectionComplete(form, "avalanches")}
@@ -898,7 +898,7 @@ export default function ObservationNewScreen() {
           {/* PRIVACY & CONTACT */}
           <CollapsibleSection
             ref={setSectionRef("privacy")}
-            eyebrow="PRIVACY & CONTACT"
+            eyebrow="9 · PRIVACY & CONTACT"
             summary={summarizePrivacy(form)}
             open={openSections.has("privacy")}
             complete={isSectionComplete(form, "privacy")}

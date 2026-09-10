@@ -16,6 +16,32 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-10 (late) — Comprehensive without being demanding
+
+Kai's framing was exactly right and worth keeping as a rule: *allow* the profile to be
+decently comprehensive, don't *force* it. So the kit block is behind one line of text
+("add colors, skis / sled, tent →"), and everything inside it is optional. Someone who
+fills in nothing still gets a working packet; someone who fills in "orange Ski-Doo
+Summit 850, red jacket, yellow tent" gives a helicopter crew something to actually look
+for. The completeness bar rewards the second person without blocking the first.
+
+The photo was the interesting engineering call. A face is one of the most useful things
+a searcher can have, but adding a storage bucket for it means a new public surface, new
+lifecycle, new purge path. Instead: shrink hard (480px, quality 0.45), keep it as a data
+URI inside the packet JSON, and raise the packet cap to 128 KB. It rides along with the
+plan it belongs to and dies with it at purge. No bucket, no orphan files, no extra
+retention policy. The 28 KB guard rejects the rare photo that won't compress.
+
+I deferred boot size deliberately. Kai floated it and then talked himself out of it in
+the same breath — it's a hiking-app field, not a skiing one. Writing it down here so if
+this ever expands to summer use, the reason it's missing is on record rather than
+looking like an oversight.
+
+The observation screen got the same treatment as the profile: numbered sections, one
+open at a time. That was cheap because the pattern already existed — the value was in
+deciding there *is* one pattern. Three screens that behave identically is worth more
+than three screens each locally optimised.
+
 ## 2026-09-10 (evening) — "What goes where" is the design
 
 Kai's second round of notes was really one note: the split between *profile* and

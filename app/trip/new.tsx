@@ -102,7 +102,8 @@ export default function TripNewScreen() {
         subject: p.subject,
         gear: p.gear,
         vehicle: defaultVehicle,
-        clothingToday: {},
+        // Today's colors start as your usual ones — change only what differs.
+        clothingToday: { ...(p.gear.usualColors ?? {}) },
         party: [],
         // Saved people are the default recipients — confirm, don't retype.
         contacts: p.contacts.slice(0, TRIP_LIMITS.maxContacts),
@@ -479,7 +480,7 @@ export default function TripNewScreen() {
             </View>
 
             <View>
-              <FieldLabel label="Wearing today" hint="What a helicopter would see." />
+              <FieldLabel label="Wearing today" hint="Prefilled from your usual colors — change what's different." />
               <ClothingEditor value={draft.clothingToday ?? {}} onChange={(c) => set("clothingToday", c)} />
             </View>
 

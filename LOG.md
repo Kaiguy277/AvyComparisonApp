@@ -21,6 +21,30 @@ Format per entry:
 
 ---
 
+## 2026-09-10 (late) — Comprehensive-but-optional kit, profile photo, obs screen aligned
+- **Kit details (optional) on the profile, §4 "What you own" → "ADD COLORS, SKIS /
+  SLED, TENT →":** structured `gear.usualColors` {jacket, pants, pack, helmet},
+  `gear.skiOrSledColor`, `tentColor`, and a free-text ski/board/sled description
+  (make, model, length, bindings). Nothing required. Today's colors in the composer
+  now prefill from `usualColors` so the per-trip step is "change what's different".
+  Packet page's "as seen from the air" line falls back profile→trip and includes the
+  ski/sled color. (Boot size deferred — it's a hiking-app field, noted in JOURNAL.)
+- **Profile photo:** `components/trip/PhotoField.tsx` — library or camera, resized to
+  480px long edge at JPEG 0.45, stored as `subject.photoDataUri` and carried inside
+  the packet JSON (no bucket, dies at purge). Rejected over `TRIP_LIMITS.maxPhotoChars`
+  (28 KB); packet cap raised 64 KB → 128 KB on client and edge to match. Packet page
+  renders it (CSP already allowed `img-src data:`).
+- **Observation screen aligned to the same pattern:** nine numbered sections
+  (1 · ABOUT YOU … 9 · PRIVACY & CONTACT), one open at a time, first incomplete open on
+  mount. Same collapsed-summary + Done→next rhythm as the profile and heading-out
+  screens; nine simultaneously-expanded sections was the "cluttered" complaint.
+- **Sender subdomain → `avycomparison.kaiconsulting.ai`** (Kai's call). Resend domain
+  43bc39a8; DKIM + MX + SPF added at Porkbun under `*.avycomparison`, all resolving,
+  DKIM byte-exact. `trips.kaiconsulting.ai` left in place as a fallback until the new
+  one has run a while. Secret flip pending Resend verification.
+- Gates: tsc, eslint 0 warnings (whole tree), Vitest 110/110. Screens re-shot:
+  `docs/screens/{profile-kit-details,profile-photo,observation}.png`.
+
 ## 2026-09-10 (evening) — Build #22 feedback → IA rethink, bottom action bar, declutter
 - **Kai's notes on #22:** forms cluttered; per-trip questions (survive a night out) were
   on the profile and profile things (car, plate, medical) felt buried; pill too small

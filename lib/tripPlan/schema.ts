@@ -24,7 +24,9 @@ export const TRIP_LIMITS = {
   defaultWorryOffsetHours: 3,
   defaultTripHours: 8,
   maxTextChars: 2000,
-  maxPacketBytes: 65_536,
+  maxPacketBytes: 131_072,
+  // Profile photo, base64 data URI. Kept well under the packet cap.
+  maxPhotoChars: 28_000,
   maxPartyMembers: 12,
 } as const;
 
@@ -176,6 +178,8 @@ export const subjectProfileSchema = z.object({
   eyes: optionalText(40),
   distinguishingMarks: optionalText(300),
   photoUri: z.string().optional(),
+  // Small JPEG data URI shown on the packet page so rescuers have a face.
+  photoDataUri: z.string().optional(),
   medicalConditions: optionalText(1000),
   medications: optionalText(1000),
   allergies: optionalText(500),
@@ -202,6 +206,17 @@ export const vehicleProfileSchema = z.object({
 });
 export type VehicleProfile = z.infer<typeof vehicleProfileSchema>;
 
+// Colors, as seen from the air. Used twice: `gear.usualColors` is what
+// you normally wear (profile), `draft.clothingToday` is what you have on
+// today (prefilled from the profile, editable per trip).
+export const clothingTodaySchema = z.object({
+  shell: optionalText(60),
+  pants: optionalText(60),
+  pack: optionalText(60),
+  helmet: optionalText(60),
+});
+export type ClothingToday = z.infer<typeof clothingTodaySchema>;
+
 export const gearProfileSchema = z.object({
   // Tap-to-own inventory (keys from lib/tripPlan/gear.ts GEAR_ITEMS). The
   // four booleans below are kept in sync for older packets/pages.
@@ -218,9 +233,13 @@ export const gearProfileSchema = z.object({
   foodDays: optionalText(20),
   fireAndStove: optionalText(120),
   navigation: optionalText(200),
+  // Legacy free-text colors (pre-2026-09-10). Kept so old profiles still
+  // render; `usualColors` is the structured replacement.
   clothingColors: optionalText(200),
+  usualColors: clothingTodaySchema.prefault({}),
   tentColor: optionalText(40),
   skiOrSledDescription: optionalText(300),
+  skiOrSledColor: optionalText(60),
   firearm: optionalText(120),
   other: optionalText(500),
 });
@@ -243,15 +262,6 @@ export const contactSchema = z.object({
   email: emailSchema,
 });
 export type Contact = z.infer<typeof contactSchema>;
-
-// Clothing "today" — the from-the-air description.
-export const clothingTodaySchema = z.object({
-  shell: optionalText(60),
-  pants: optionalText(60),
-  pack: optionalText(60),
-  helmet: optionalText(60),
-});
-export type ClothingToday = z.infer<typeof clothingTodaySchema>;
 
 // ───────────────────────────── the draft ───────────────────────────────────
 

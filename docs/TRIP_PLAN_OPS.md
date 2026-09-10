@@ -12,17 +12,29 @@ Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
 
 ## Secrets (Supabase → Edge Function secrets)
 - `RESEND_API_KEY` — Resend account kai.myers.a@gmail.com, key "TripPlanner".
-- `TRIP_PLAN_EMAIL_FROM` — `Avy Comparison <trips@trips.kaiconsulting.ai>` (verified
-  2026-09-10). The Resend account is shared with AK RFP Hub (akrfp.com, keys RFP_app/
+- `TRIP_PLAN_EMAIL_FROM` — `Avy Comparison <trips@avycomparison.kaiconsulting.ai>`
+  (Resend domain 43bc39a8, added 2026-09-10). The earlier `trips.kaiconsulting.ai`
+  domain (86d116fb) is superseded; its DNS records are still in place and can be
+  deleted from Porkbun once the new sender has run for a while. The Resend account is shared with AK RFP Hub (akrfp.com, keys RFP_app/
   RFP@/STT); this app only uses its own key "TripPlanner" and its own subdomain. Never
   send from akrfp.com again.
 - `TRIP_NUDGE_CHANNELS` — optional, default `email`. Add `sms` when Twilio lands.
 - `TRIP_PLAN_PAGE_BASE` — optional override for the share-link base.
 
-## DNS for `trips.kaiconsulting.ai` (Resend domain 86d116fb…)
+## DNS for the sending subdomains (Porkbun, kaiconsulting.ai)
 kaiconsulting.ai DNS is at **Porkbun** (login saved in Kai's Firefox; 2FA code goes to
 kai.myers.a@gmail.com). These three records were added 2026-09-09 and resolve on all
 four Porkbun nameservers:
+
+Current sender: **avycomparison.kaiconsulting.ai**
+
+| Type | Name (relative to kaiconsulting.ai) | Value | Priority |
+|---|---|---|---|
+| TXT | `resend._domainkey.avycomparison` | `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDARD74e0uPnWGO9JlUa7Y+REygJY2zTT8wlEaPrnJriY10S3lbq5Clv5ql9XVEkNwkye+SA5ynbM3z16CM/AR2lBGphocLiywWwVI9FDWSD/Vyb2SLUaRMCYbb2DAsf0CBKgyvqt28p4SnCr7F4M+wg50KY5+urump/WxiX+GCMQIDAQAB` | |
+| MX | `send.avycomparison` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
+| TXT | `send.avycomparison` | `v=spf1 include:amazonses.com ~all` | |
+
+Superseded (still present): **trips.kaiconsulting.ai**
 
 | Type | Name (relative to kaiconsulting.ai) | Value | Priority |
 |---|---|---|---|
