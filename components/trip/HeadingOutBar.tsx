@@ -15,6 +15,7 @@ import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { useTripPlan } from "@/lib/tripPlan/useTripPlan";
 import { formatLocal } from "@/lib/tripPlan/packet";
+import { loadProfile } from "@/lib/tripPlan/store";
 
 const RED = "#DC2626";
 
@@ -31,9 +32,13 @@ export function HeadingOutBar() {
     Haptics.selectionAsync().catch(() => {});
     router.push("/trip" as never);
   };
-  const goNew = () => {
+  // First run goes to the profile with its intro, not straight to the
+  // composer: there is nothing to confirm until the one-time setup exists.
+  const goNew = async () => {
     Haptics.selectionAsync().catch(() => {});
-    router.push("/trip/new" as never);
+    const p = await loadProfile().catch(() => null);
+    const ready = !!p?.subject.fullName && !!p?.subject.phone;
+    router.push((ready ? "/trip/new" : "/trip/profile?intro=1") as never);
   };
   const confirmBack = () => {
     if (!plan) return;
@@ -103,7 +108,17 @@ export function HeadingOutBar() {
         </Pressable>
       ) : null}
 
-      <View pointerEvents="box-none" style={{ flexDirection: "row", gap: 10 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 10,
+          padding: 8,
+          borderRadius: 34,
+          backgroundColor: palette.ink[950] + "F2",
+          borderWidth: 0.5,
+          borderColor: palette.ink[500] + "55",
+        }}
+      >
         <Pill
           label={leftLabel}
           icon={live ? "home-outline" : "people-outline"}
@@ -151,49 +166,45 @@ function Pill({
   accessibilityLabel: string;
 }) {
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => ({
         flex: 1,
-        borderRadius: 30,
+        height: 56,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        paddingHorizontal: 10,
+        borderRadius: 28,
         backgroundColor: bg,
         borderWidth: 1,
         borderColor: rim,
+        // Clip anything that would otherwise spill past the rounded edge —
+        // the label was rendering outside the pill on device.
+        overflow: "hidden",
         shadowColor: "#000000",
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.28,
         shadowRadius: 5,
         elevation: 8,
-        opacity: disabled ? 0.6 : 1,
-      }}
+        opacity: disabled ? 0.6 : pressed ? 0.85 : 1,
+      })}
     >
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        style={({ pressed }) => ({
-          height: 58,
-          paddingHorizontal: 14,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          borderRadius: 30,
-          opacity: pressed ? 0.85 : 1,
-        })}
+      <Ionicons name={icon} size={20} color={fg} />
+      {/* No adjustsFontSizeToFit: with the mono face it mis-measured and
+          pushed the text outside the pill. Fixed 12pt fits both labels. */}
+      <Text
+        variant="mono"
+        weight="bold"
+        numberOfLines={1}
+        style={{ fontSize: 12, letterSpacing: 0.8, color: fg, flexShrink: 1 }}
       >
-        <Ionicons name={icon} size={22} color={fg} />
-        <Text
-          variant="mono"
-          weight="bold"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}
-          style={{ fontSize: 13, letterSpacing: 1.2, color: fg }}
-        >
-          {label}
-        </Text>
-      </Pressable>
-    </View>
+        {label}
+      </Text>
+    </Pressable>
   );
 }

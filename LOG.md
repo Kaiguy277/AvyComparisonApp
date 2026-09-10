@@ -21,6 +21,31 @@ Format per entry:
 
 ---
 
+## 2026-09-10 (night) — Build #24 device notes: pills, gear borders, profile-first flow
+- **Push was broken in prod (found in Kai's screenshot, not by us):**
+  `PUSH · SUPABASE-UPSERT-ERROR · permission denied for table device_tokens`. The
+  2026-08-07 lockdown left the `anon insert` RLS policy in place but the table-level
+  INSERT grant was gone — RLS needs *both*, so every registration failed closed.
+  Migration `20260910190000_device_tokens_restore_anon_insert` restores the grant and
+  re-asserts the revokes. Verified: anon now has INSERT and nothing else.
+- **Bottom-bar pills overflowed on device.** `adjustsFontSizeToFit` + the JetBrains
+  mono face mis-measured, so the icon and label rendered outside the pill. Dropped it
+  for a fixed 12pt label with `flexShrink` and `overflow: "hidden"`, merged the wrapper
+  View into the Pressable, and put the pair on a soft page-colored band so they read as
+  one bar over the zone cards.
+- **Gear tiles ran together.** `width: "31%"` inside a wrapping flex row didn't resolve
+  on device (tiles collapsed to content width, six per row, no visible edges). Now the
+  row measures itself with `onLayout` and lays out fixed-width tiles: 3 columns, every
+  tile a bordered card (1px ink rim, surface fill; 2px frost + tint when owned).
+- **Profile-first flow (Kai's ask):** the first tap of HEADING OUT routes to
+  `/trip/profile?intro=1`, which shows a "HOW THIS WORKS" card explaining the feature
+  and that sections 1–2 are enough to send. A CTA at the bottom stays disabled until
+  those two are done, then continues to the composer. After that, HEADING OUT goes
+  straight to the composer, which now carries a **pinned profile bar** under the header
+  (name · N vehicles · N people · EDIT) so the one-time setup is always one tap away.
+- Gates: tsc, eslint 0 warnings, Vitest 110/110. Screens: `docs/screens/`
+  {home, profile-intro, gear-grid, composer-pinned-profile}.png.
+
 ## 2026-09-10 (late) — Comprehensive-but-optional kit, profile photo, obs screen aligned
 - **Kit details (optional) on the profile, §4 "What you own" → "ADD COLORS, SKIS /
   SLED, TENT →":** structured `gear.usualColors` {jacket, pants, pack, helmet},

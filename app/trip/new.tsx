@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
 
@@ -314,12 +315,49 @@ export default function TripNewScreen() {
   }
 
   const vehicle: VehicleProfile = draft.vehicle ?? { id: newId(), label: "", type: "truck" };
+  const profileLine = [
+    profile.subject.fullName,
+    profile.vehicles.length ? `${profile.vehicles.length} vehicle${profile.vehicles.length === 1 ? "" : "s"}` : null,
+    profile.contacts.length ? `${profile.contacts.length} ${profile.contacts.length === 1 ? "person" : "people"}` : null,
+  ].filter(Boolean).join(" · ") || "Tap to set up";
   const partySize = 1 + (draft.party?.length ?? 0);
 
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
       <ZoneScreenHeader eyebrow="HEADING OUT" title={draft.areaName || "Where are you going?"} />
+
+      {/* Pinned profile bar — the one-time setup stays one tap away from
+          every trip, so adding a vehicle or a medical note never means
+          hunting through menus. */}
+      <Pressable
+        onPress={() => router.push("/trip/profile" as never)}
+        accessibilityRole="button"
+        accessibilityLabel="Open your profile"
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          borderBottomWidth: 0.5,
+          borderColor: palette.ink[700],
+          backgroundColor: pressed ? palette.ink[900] : palette.ink[800],
+        })}
+      >
+        <Ionicons name="person-circle-outline" size={22} color={palette.frost[400]} />
+        <View style={{ flex: 1 }}>
+          <Text variant="mono" weight="medium" style={{ fontSize: 9, letterSpacing: 1.4, color: palette.ink[400] }}>
+            YOUR PROFILE
+          </Text>
+          <Text className="text-ink-200" style={{ fontSize: 12, marginTop: 1 }} numberOfLines={1}>
+            {profileLine}
+          </Text>
+        </View>
+        <Text variant="mono" weight="medium" style={{ fontSize: 10, letterSpacing: 1.2, color: palette.frost[400] }}>
+          EDIT
+        </Text>
+      </Pressable>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
           {/* WHERE */}

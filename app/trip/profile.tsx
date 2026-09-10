@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
@@ -34,6 +34,12 @@ type Section = "contact" | "people" | "vehicles" | "gear" | "medical" | "descrip
 const ORDER: Section[] = ["contact", "people", "vehicles", "gear", "medical", "description", "experience", "partners"];
 
 export default function TripProfileScreen() {
+  const router = useRouter();
+  // `intro=1` arrives from the first tap of HEADING OUT: explain what this
+  // is before asking for anything, and hand the user to the composer when
+  // the two essential sections are done.
+  const { intro } = useLocalSearchParams<{ intro?: string }>();
+  const isIntro = intro === "1";
   const [profile, setProfile] = useState<TripProfile>(emptyProfile());
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState<Set<Section>>(new Set());
@@ -96,7 +102,7 @@ export default function TripProfileScreen() {
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
-      <ZoneScreenHeader eyebrow="SET UP ONCE" title="Your profile" />
+      <ZoneScreenHeader eyebrow={isIntro ? "FIRST · SET UP ONCE" : "SET UP ONCE"} title="Your profile" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 64 }} keyboardShouldPersistTaps="handled">
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -107,10 +113,40 @@ export default function TripProfileScreen() {
               {doneCount}/{ORDER.length}{savedAt ? ` · SAVED ${savedAt.toUpperCase()}` : ""}
             </Text>
           </View>
-          <Text className="text-ink-300" style={{ fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
-            What rescuers ask for that doesn&apos;t change trip to trip. Fill in what you can, in any order.
-            The first two matter most.
-          </Text>
+          {isIntro ? (
+            <View
+              style={{
+                padding: 16,
+                borderRadius: 14,
+                borderWidth: 0.5,
+                borderColor: palette.frost[400] + "88",
+                backgroundColor: palette.frost[400] + "12",
+                marginBottom: 14,
+                gap: 8,
+              }}
+            >
+              <Text variant="mono" weight="medium" style={{ fontSize: 10, letterSpacing: 1.6, color: palette.frost[400] }}>
+                HOW THIS WORKS
+              </Text>
+              <Text className="text-ink-200" style={{ fontSize: 14, lineHeight: 20 }}>
+                Before a trip you pick who to tell, where you&apos;re going, and when to worry. They get a link
+                with everything Search and Rescue asks a reporting party for — and a reminder if you haven&apos;t
+                checked in by your worry-by time.
+              </Text>
+              <Text className="text-ink-200" style={{ fontSize: 14, lineHeight: 20 }}>
+                Most of that never changes, so you fill it in once here. After this, heading out is three taps.
+              </Text>
+              <Text className="text-ink-400" style={{ fontSize: 12, lineHeight: 17 }}>
+                Sections 1 and 2 are all you need to send your first trip. The rest you can add any time — the
+                more you fill in, the more rescuers have to work with.
+              </Text>
+            </View>
+          ) : (
+            <Text className="text-ink-300" style={{ fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
+              What rescuers ask for that doesn&apos;t change trip to trip. Fill in what you can, in any order.
+              The first two matter most.
+            </Text>
+          )}
 
           <CollapsibleSection
             eyebrow="1 · HOW TO REACH YOU"
@@ -254,6 +290,30 @@ export default function TripProfileScreen() {
           >
             <PartyEditor value={profile.party} onChange={(m) => update((p) => ({ ...p, party: m }))} />
           </CollapsibleSection>
+
+          {isIntro ? (
+            <Pressable
+              onPress={() => router.replace("/trip/new" as never)}
+              disabled={!done.contact || !done.people}
+              style={({ pressed }) => ({
+                marginTop: 6,
+                height: 56,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor:
+                  !done.contact || !done.people
+                    ? palette.ink[500]
+                    : pressed
+                      ? palette.frost[600]
+                      : palette.frost[500],
+              })}
+            >
+              <Text variant="mono" weight="bold" style={{ fontSize: 13, letterSpacing: 1.4, color: "#FFFFFF" }}>
+                {!done.contact || !done.people ? "FINISH 1 AND 2 TO CONTINUE" : "CONTINUE — PLAN A TRIP"}
+              </Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </ZoneScreenContainer>

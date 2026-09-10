@@ -16,6 +16,33 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-10 (night) — What the simulator can't tell you
+
+Three of tonight's four fixes were things web rendering showed as *fine*. The gear
+tiles laid out as neat 3-column cards on web and as a run-on field of glyphs on the
+phone, because a percentage width inside a wrapping flex row resolves differently
+there. The bottom-bar label sat inside its pill on web and outside it on the phone,
+because `adjustsFontSizeToFit` mis-measures the mono face. I had been treating the web
+renderer as a proxy for the device; it isn't. It's good for information architecture —
+what goes where, does the flow make sense — and unreliable for layout that depends on
+measurement. Rule going forward: anything sized by percentage or auto-fit gets checked
+on a real screenshot from the phone before I call it done.
+
+The best catch of the night wasn't mine at all. Kai's home-screen photo had a red
+diagnostic line in it: push registration failing with "permission denied for table
+device_tokens". That's been broken since the August lockdown — the RLS policy survived
+but the INSERT grant didn't, and RLS needs both, so it failed closed and silently. The
+in-app diagnostic banner did its job; nobody was reading it. Worth remembering that
+this app already surfaces its own failures and I should read the screenshots for those
+lines, not just for the layout.
+
+The profile-first flow is the structural fix behind the "I don't see a place to set up
+profile" note. Burying setup behind a person icon in a header was wrong: the first tap
+of HEADING OUT is exactly the moment the user has decided they want this, so that's
+when to explain it and ask. And the pinned bar afterwards means the profile is never
+more than one tap from the screen where you'd notice something is missing — you're
+confirming a vehicle and realise you never added the sled.
+
 ## 2026-09-10 (late) — Comprehensive without being demanding
 
 Kai's framing was exactly right and worth keeping as a rule: *allow* the profile to be
