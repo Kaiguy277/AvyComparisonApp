@@ -66,7 +66,14 @@
           "isAndroidBackgroundLocationEnabled": false
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-secure-store",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to pick the people you want to share your trip plan with. Contacts are only used to fill in a name, phone, and email you choose."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

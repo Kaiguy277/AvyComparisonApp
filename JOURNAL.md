@@ -16,6 +16,183 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-09 — Building the trip plan: the trailhead constraint shaped everything
+
+Kai's mid-build addition — "make sure a user can send this easily while on their way
+to the trailhead" — turned out to be the most useful design input of the day, because
+it forced a split I might otherwise have blurred: *setup* is slow and thorough (the
+profile vault, done once at home), *sending* is fast and shallow (pick a saved trip,
+glance at the times, confirm the people, send). The composer implements that with
+collapsible sections that start collapsed when a template or the profile already
+filled them, so the trailhead run is: WHEN open, WHO TO TELL open, everything else a
+one-line summary you can expand if today is different. Templates are auto-saved per
+area+trailhead on every send and ranked by use count; "Repeat last trip" is the first
+thing on the hub. No account needed for any of it — that's the anonymous path Kai
+wanted; the account layer later just syncs the same blocks.
+
+Backcountry Checklist (the inspiration) is a lovely one-question-per-screen flow that
+ends in a "text someone your plan" card. I borrowed the framing and the gear chips,
+not the linearity. Ten screens is right for a checklist you do at the kitchen table;
+it's wrong for a plan you send from a truck seat with gloves on.
+
+**Two design decisions that diverge from the spec, both logged in LOG:**
+
+1. Contact share tokens are stored raw, not hashed. The spec said hash. But the
+   overdue nudge email has to contain the contact's link, and once the table that
+   holds the token is service-role-only and already contains the full packet (medical
+   notes and all), hashing the token defends nothing the packet doesn't already
+   expose. The plan *secret* stays hashed because the client holds the only copy and
+   a leaked hash can't be replayed. Different threat, different answer.
+2. The push-to-owner path is a stub. Pushing "Alex opened your plan" to the user
+   needs a device-id → push-token mapping we don't have (device_tokens is insert-only
+   from anon and has no such column). Left as a best-effort lookup that no-ops, with
+   the column addition as a follow-up rather than widening device_tokens today.
+
+**What I can't verify from here, and what's next.** Same honesty as the TanStack
+entry: tsc, eslint, and 110 Vitest tests are green, including the outbox ordering,
+the state machine's every transition, and a byte-identical guard on the Deno copy of
+the state machine. But the screens have never rendered, the edge functions have
+never compiled (no local deno; deploy is the type gate), the migration hasn't run,
+Resend isn't provisioned, and `Share.share` sequencing across multiple contacts is a
+guess about iOS behavior. Order of operations next session: apply the migration
+against the live project → deploy the three functions + set RESEND_API_KEY and
+TRIP_PLAN_EMAIL_FROM → smoke the API with curl → TestFlight build → real plan to two
+real contacts. The email `from` address defaults to a domain we don't have verified
+on Resend yet; that's the first thing to fix before any nudge can send.
+
+## 2026-09-09 — Roadmap: App Store, cleanup, real submissions, and a trip-plan feature
+
+Kai set the next stretch of work today. Recording the reasoning around each item so the
+sessions that execute them start from the same picture.
+
+**App Store approval.** TestFlight builds #19/#20 exist, the App Review note for
+Always-location is drafted, and submit config (ASC app id, team id) is already in
+`eas.json`. What I don't see anywhere in the repo is the store-listing side: privacy
+nutrition labels, a privacy policy URL, support URL, screenshots, age rating. Those live
+in App Store Connect, not git, so the next session should inventory ASC directly rather
+than assume. The Always-location permission is the review risk; the note is written to
+pre-empt it. Also worth deciding before submission whether observation submit should
+ship pointed at NAC *staging* (it currently is, with a visible TEST MODE footer) — a
+reviewer poking that button sends a test observation to a staging server, which is
+harmless but might read as an unfinished feature.
+
+**Stranded state.** The two sibling worktrees (`-dark-warm`, `-parchment`) are the
+pre-adoption redesign experiments from early May. I checked whether either carries
+anything main lacks: dark-warm's one commit bundled real backend fixes (APNs priority-5
+for silent push, offline newest-bundle fallback) alongside ZoneTile styling, but those
+fixes are already in main under other commits. Parchment's uncommitted work edits
+`ZoneCard.tsx`, which main deleted as dead code in the Tier 3 pass. Neither branch
+rebases cleanly onto 71–115 newer commits and neither represents a direction Kai is
+pursuing. They're scratch. The `app.json` diff in the main tree is the odd one: the
+changes (web output mode, an escaped em-dash, no trailing newline) have the fingerprint
+of a tool round-tripping the JSON, probably an `eas`/`expo` command, not a human edit.
+Reverting it loses nothing anyone chose.
+
+**Real observation submissions.** The good news: this is much closer than "we don't
+know how." The form's wire format was lifted from NWAC's open-source Avy app and the
+submit flow already does the photo-upload-then-POST dance against
+`staging-api.avalanche.org`. The NAC API is one national platform that the avalanche.org
+member centers all sit behind — which is Kai's "single template for all the things,"
+already true for every center on the platform. The question is purely access: who at
+NAC grants production credentials, and whether each center has to opt in to receiving
+public observations through it. The Avy app's maintainers (NWAC) went through exactly
+this and are the natural first contact, alongside NAC directly. The "per-center systems"
+fallback only applies to centers not on avalanche.org — worth checking which of our 92
+zones' centers that is before assuming it's a big list. Alaska matters most for Kai's
+users: CNFAIC and HPAC are both avalanche.org centers, so the happy path likely covers
+them.
+
+**Trip plan / "tell a loved one."** This needs a spec (`/write-spec`), but one design
+constraint should be in the spec from the first line because it shapes everything:
+**the user's phone will be out of service when the alarm needs to fire.** The whole
+point is a backcountry trip, so the "worry-by" timer cannot live on the device. Either
+the contact holds the plan and the time (the app sends them the packet before the user
+leaves signal, and the contact is the alarm), or a server holds it (pg_cron on Supabase
+fires a push/SMS/email to the contact when the deadline passes without a check-in).
+Both probably: send the packet at plan-creation, and have the server nag the contact at
+the deadline. The check-in that cancels the alarm also has to work with flaky signal —
+a queued "I'm back" that sends on first reconnect, with the deadline padded accordingly.
+
+Second constraint: **the app must not claim to call SAR.** In Alaska that's the State
+Troopers via 911, and the value we add is that the contact makes that call with a
+complete packet in hand — vehicle, plate, trailhead, route, party size, gear, colors,
+medical notes, beacon frequency, planned return, last known contact time — instead of
+guessing under stress. Framing it as "give your person everything SAR will ask for" is
+both more honest and more useful than anything that sounds like a panic button.
+
+Third: the data is sensitive (medical notes, home contacts, live whereabouts) and
+mostly needs to be *readable by someone who doesn't have the app*. That points to a
+server-rendered share link or an SMS/email packet, which means a privacy-policy update
+and an App Store privacy-label change before it ships. Spec it with the loved one as a
+first-class user, not just the skier.
+
+## 2026-08-10 — First device feedback, and the Always-location decision
+
+Two things happened today that the log records but that deserve the reasoning written
+down: the first real device runs of the stabilization work (TestFlight builds #19 and
+#20), and a deliberate call on the most App-Review-sensitive feature in the app.
+
+**The location decision.** The audit had flagged Always-location background refresh as
+something to reconsider, and the easy move was to rip it out — it invites a Guideline
+5.1.1 rejection and it's the kind of permission users distrust. Kai and I read the code
+instead of the audit's summary. The event handler never reads coordinates; it's a pure
+"the phone moved, refresh the saved zones" heartbeat. And it's the only iOS mechanism
+that survives a force-quit, which matters for exactly our use case: significant-location-
+change fires on a cell-tower handoff, i.e. while the user is driving toward a trailhead
+that's about to lose service. That's the moment the snapshot most needs to be fresh.
+Background App Refresh and silent push cover the common case; this covers the case
+where the app was swiped away. So: keep it, but make it defensible. Three changes fell
+out of that framing rather than being separate tasks:
+
+- Gate it to iOS. The Android path was never actually working (`startLocationUpdatesAsync`
+  needs a `foregroundService` config we don't set, so it threw and left the diagnostic
+  banner nagging). Claiming support we don't have is worse than a clean no-op, and
+  declaring an unused background-location permission is a Play Store liability.
+- Ask contextually, not at launch. Kai's call: a cold "Always" prompt at first open is
+  the wrong moment — the user has no idea what they'd be trading it for. Moving the
+  explainer to the first deliberate favorite means the value is concrete when we ask
+  ("keep *this* zone fresh off-grid"). The implementation gotcha: favorites are seeded
+  with defaults on first load, so a naive "favorites grew" watcher would fire on the
+  seed. Baseline against the post-load defaults so only a user-initiated star or picker
+  add triggers it.
+- Make the reminder banner reflect real state. The old one keyed off a stale diagnostic
+  that only appeared after a *denied OS prompt*, so a "Not now" on our explainer left no
+  path back. Now it's derived from actual permission state, snoozable for 3 days, and
+  deep-links to Settings when iOS won't re-prompt. Gentle nudge, not a fixture.
+
+The App Review note (`docs/APP_REVIEW_NOTES.md`) is the fourth leg — the reviewer needs
+to be told the same thing I just wrote, in their terms, before they see the permission
+string and reach for the rejection template.
+
+**First device feedback.** Build #19 was the first time any of the session's work ran on
+a phone. The one piece of concrete feedback that came back fast: the REPORT FAB read as
+"white on a clear background." The 2px white border I'd added for contrast did the
+opposite — on the warm page it turned the sienna into a white-outlined sticker. Dropped
+it, went darker and solid with a sienna-tinted shadow. Small, but a reminder that
+contrast decisions made from a Linux box against hex values don't survive contact with
+the actual screen. The rest of the visual hex migration (MetricChart, WindCompass, the
+map picker WebView) stays deferred for the same reason: it needs eyes on a device, not
+more guessing.
+
+The other thing testing surfaced was a workflow gap, not a bug: filing an observation
+from the home FAB has no zone context, so the center picker started empty and the user
+had to scroll a long list. Added `nearestCenter(lat, lon)` — haversine over the
+centers' coordinates, null past ~600 km or on garbage input — and it auto-fills
+`center_id` the moment a GPS or manual fix lands, only if the user hasn't already picked
+one. Deliberately kept the picker editable rather than locking it; auto-select is a
+suggestion, and centers overlap at boundaries.
+
+Also learned from Kai's phone: iOS silently disables Background App Refresh in Low Power
+Mode, so the onboarding copy now says so. Otherwise the user sees stale data with no
+visible reason.
+
+**What builds #19/#20 have NOT yet told us.** No structured smoke-test results are
+logged. The paths I most want exercised remain the ones from the TanStack entry below:
+date paging archive↔today, pull-to-refresh, offline launch, offline→online. Plus the
+new location flow end-to-end (first favorite → explainer → OS prompt → banner states)
+and the snow-math golden-value check against a known station. Next session should
+either log those results or make a point of collecting them before more feature work.
+
 ## 2026-08-07 — Tier 3: deleting dead code without guessing, and knowing when to stop
 
 The project's own CLAUDE.md rule — "check reachability before touching a component,

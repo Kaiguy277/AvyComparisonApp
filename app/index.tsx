@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Collapsible } from "@/components/ui/Collapsible";
 import { Text } from "@/components/ui/Text";
+import { TripPlanHomeCard } from "@/components/trip/TripPlanHomeCard";
 import { FavoritesReorder } from "@/components/avalanche/FavoritesReorder";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
 import { ZoneMapPicker } from "@/components/avalanche/ZoneMapPicker";
@@ -755,6 +756,10 @@ export default function Index() {
             while offline and the form was queued locally. Tap goes
             back to the form so they can retry. */}
         <ObservationDraftsBanner />
+
+        {/* Trip plan — "tell someone where you're going". Live plan shows
+            status + I'M BACK; otherwise an invite. */}
+        <TripPlanHomeCard />
 
         {/* HEADER — wordmark + date pager on the top row, status meta
             (cached/live/offline + fetched time) on a small line below.
