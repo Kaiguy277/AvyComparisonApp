@@ -51,7 +51,12 @@ Format per entry:
   prefill WHO TO TELL; a resumed draft no longer wipes profile defaults.
 - **Composer bug found by screenshot:** LocationField hardcoded "Location · Where did
   the observation happen?" → added label/hint/required props.
-- Gates: tsc, eslint (0 warnings), Vitest 110/110. Shipping as build #22.
+- Gates: tsc, eslint (0 warnings), Vitest 110/110. **Shipped as TestFlight build #22**
+  (abd807a, build 6fa48962, submission 3fba47e7, auto-submit).
+- Resend: `trips.kaiconsulting.ai` DKIM still pending at 08:14Z (MX/SPF verified; the
+  record is byte-exact and public). Sender NOT flipped — Resend 403s sends from an
+  unverified domain, so flipping would break nudges. Re-check later; then the one-liner
+  in `docs/TRIP_PLAN_OPS.md`.
 
 ## 2026-09-09 — Trip plan feature: build started (branch `feature/trip-plan`)
 - **Kai's added requirement:** sending must be easy *on the way to the trailhead* —
