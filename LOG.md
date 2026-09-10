@@ -59,7 +59,20 @@ Format per entry:
   card sits under the drafts banner in `app/index.tsx`; routes registered in `_layout`.
 - **Gates:** tsc clean, `expo lint` clean (0 warnings), Vitest 110/110. Not verified:
   screens on a device, Deno compile of the 3 edge functions, the migration, Resend.
-- **Not done / next:** apply `20260909000000_trip_plans.sql` to the live project;
+- **DEPLOYED + SMOKED (manual prod actions):** committed as 8cdf0b6 on
+  `feature/trip-plan`. Migration `trip_plans` applied via MCP (4 tables, RPC, cron
+  `avy-trip-plan-sweep` */5 + `avy-trip-plan-purge` 09:15 UTC, both active — the
+  cron key was present in `function_secrets`). `trip-plans`, `trip-plan-sweeper`
+  deployed with JWT; **`trip-plan-page` deployed `--no-verify-jwt`** (contacts open it
+  from a bare browser — first deploy with JWT on would have 401'd every link). curl
+  smoke against prod: create 201 → replay 200 → get_status → bad secret 403 → check_in
+  closes; page renders all sections w/o headers; contact extend 200 / backwards 400
+  `extend_backwards`; HTML form heard_from 303 → page shows CLOSED; late check_in
+  `late:true`; bad token 404; sweeper w/o key 401. Fixed one bug found by the smoke:
+  form redirect used the runtime's internal path → now `pageBase()`. Email attempts
+  correctly log `nudge_failed` ("RESEND_API_KEY not configured") pending Resend.
+  Smoke plans (3) left in the table for the cron-sweep check; delete after.
+- **Not done / next:** (migration + deploy DONE, see above);
   `supabase functions deploy trip-plans trip-plan-page trip-plan-sweeper --use-api`;
   set secrets `RESEND_API_KEY`, `TRIP_PLAN_EMAIL_FROM` (needs a verified Resend
   domain — none yet for this app), optional `TRIP_PLAN_PAGE_BASE`; curl smoke of

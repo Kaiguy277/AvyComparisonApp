@@ -11,6 +11,7 @@ import {
   loadEvents,
   loadPlan,
   log,
+  pageBase,
   serviceClient,
   toState,
   type ContactRowFull,
@@ -60,7 +61,8 @@ serve(async (req) => {
       body: JSON.stringify(body),
     });
     const msg = res.ok ? "" : `Couldn't record that (${(await res.json().catch(() => ({ error: res.status }))).error}).`;
-    return Response.redirect(`${url.origin}${url.pathname}?t=${encodeURIComponent(token)}${msg ? `&m=${encodeURIComponent(msg)}` : ""}`, 303);
+    // Redirect to the public page URL, not the runtime's internal path.
+    return Response.redirect(`${pageBase()}?t=${encodeURIComponent(token)}${msg ? `&m=${encodeURIComponent(msg)}` : ""}`, 303);
   }
 
   const token = url.searchParams.get("t") ?? "";
