@@ -89,7 +89,13 @@ Format per entry:
 - **DNS for `trips.kaiconsulting.ai` added at Porkbun** (Kai away from desk — logged in
   via the Porkbun credential saved in his Firefox profile, decrypted with NSS at his
   request; 2FA code read from Gmail). DKIM TXT + MX + SPF TXT resolve on all 4 Porkbun
-  NS; Resend verification polling in progress → then flip `TRIP_PLAN_EMAIL_FROM`.
+  NS and public resolvers; DKIM value confirmed byte-exact after 255-char string
+  splitting. Resend: MX + SPF verified, DKIM still `pending` as of 06:05Z (their
+  checker's cadence — re-POSTing /verify resets the other records to pending, so
+  don't). Two background polls were killed by RAM pressure (Firefox + Playwright);
+  Playwright browser closed. **When Resend shows verified:**
+  `supabase secrets set --project-ref tfvxhsgwrwvendrnbrgf TRIP_PLAN_EMAIL_FROM="Avy Comparison <trips@trips.kaiconsulting.ai>"`
+  then a test send. Until then nudges go out from trips@akrfp.com and work.
 - **Not done / next:** (migration + deploy + email DONE, see above);
   `supabase functions deploy trip-plans trip-plan-page trip-plan-sweeper --use-api`;
   set secrets `RESEND_API_KEY`, `TRIP_PLAN_EMAIL_FROM` (needs a verified Resend
