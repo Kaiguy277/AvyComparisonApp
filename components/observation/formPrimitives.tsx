@@ -289,8 +289,8 @@ export function TextField({
               : palette.ink[500] + "66",
           borderRadius: 10,
           paddingHorizontal: 14,
-          paddingVertical: 14,
-          minHeight: multiline ? Math.max(96, rows * 22 + 28) : 52,
+          paddingVertical: 12,
+          minHeight: multiline ? Math.max(88, rows * 22 + 24) : 48,
           textAlignVertical: multiline ? "top" : "center",
         }}
       />

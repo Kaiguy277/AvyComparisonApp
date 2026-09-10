@@ -285,6 +285,9 @@ export const tripPlanDraftSchema = z
     vehicle: vehicleProfileSchema.nullable().default(null),
     parkedAt: optionalText(200),
 
+    // Today-specific readiness (asked per trip, not on the profile).
+    overnightCapable: z.boolean().optional(),
+
     // Subject + gear
     subject: subjectProfileSchema.prefault({}),
     gear: gearProfileSchema.prefault({}),

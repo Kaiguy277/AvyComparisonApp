@@ -12,7 +12,6 @@ import {
   Share,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
@@ -27,12 +26,12 @@ import { SelectField } from "@/components/observation/SelectField";
 import { DateTimeField } from "@/components/trip/DateTimeField";
 import {
   ClothingEditor,
+  ContactInfoEditor,
   ContactsEditor,
-  GearEditor,
   PartyEditor,
-  SubjectEditor,
   VehicleEditor,
 } from "@/components/trip/editors";
+import { GearGrid } from "@/components/trip/GearGrid";
 import { VehicleCard, vehicleLine } from "@/components/trip/VehicleCards";
 import { gearSummary } from "@/lib/tripPlan/gear";
 import {
@@ -60,8 +59,8 @@ import { getZoneSnapshotForDate, loadFavorites, loadSnapshot } from "@/lib/offli
 import { getZoneSession } from "@/lib/zoneSession";
 import { AVAILABLE_ZONES } from "@/lib/zones";
 
-type SectionKey = "where" | "when" | "party" | "vehicle" | "gear" | "you" | "contacts";
-const ORDER: SectionKey[] = ["where", "when", "party", "vehicle", "gear", "you", "contacts"];
+type SectionKey = "where" | "when" | "today" | "contacts";
+const ORDER: SectionKey[] = ["where", "when", "today", "contacts"];
 
 const H = 3_600_000;
 
@@ -135,7 +134,6 @@ export default function TripNewScreen() {
           worryBy: worryBy.toISOString(),
         };
         collapsed.add("where");
-        if ((next.party ?? []).length > 0) collapsed.add("party");
       } else if (params.zoneId) {
         const z = AVAILABLE_ZONES.find((x) => x.id === params.zoneId);
         next = { ...base, zoneId: params.zoneId, areaName: z?.name ?? "" };
@@ -153,9 +151,8 @@ export default function TripNewScreen() {
           };
         }
       }
-      if (next.vehicle && (next.vehicle.color || next.vehicle.make)) collapsed.add("vehicle");
-      if (p.gear.satDeviceType || p.gear.overnightGear) collapsed.add("gear");
-      if (p.subject.fullName && p.subject.phone) collapsed.add("you");
+      // TODAY always starts open: it's the confirm step (who, which car,
+      // what's in the pack). Recipients collapse when saved people exist.
       if ((next.contacts?.length ?? 0) > 0) collapsed.add("contacts");
       setOpen(new Set(ORDER.filter((k) => !collapsed.has(k))));
       setDraft(next);
@@ -233,8 +230,7 @@ export default function TripNewScreen() {
       const first = parsed.error.issues[0]?.path[0];
       const sec: SectionKey =
         first === "contacts" ? "contacts"
-        : first === "subject" ? "you"
-        : first === "vehicle" ? "vehicle"
+        : first === "subject" || first === "vehicle" || first === "party" ? "today"
         : first === "returnBy" || first === "worryBy" || first === "departAt" ? "when"
         : "where";
       setOpen((o) => new Set([...o, sec]));
@@ -322,16 +318,9 @@ export default function TripNewScreen() {
   return (
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
-      <ZoneScreenHeader eyebrow="YOUR PEOPLE" title={draft.areaName || "Where are you going?"} />
+      <ZoneScreenHeader eyebrow="HEADING OUT" title={draft.areaName || "Where are you going?"} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
-          <View style={{ paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, borderRadius: 10, backgroundColor: palette.frost[400] + "15", borderWidth: 0.5, borderColor: palette.frost[400] + "55", flexDirection: "row", gap: 8, alignItems: "center" }}>
-            <Ionicons name="cellular-outline" size={16} color={palette.frost[400]} />
-            <Text className="text-ink-200" style={{ fontSize: 12, lineHeight: 17, flex: 1 }}>
-              Send this while you still have signal. Your people get a link that works without the app.
-            </Text>
-          </View>
-
           {/* WHERE */}
           <CollapsibleSection
             eyebrow="WHERE"
@@ -419,101 +408,88 @@ export default function TripNewScreen() {
             />
           </CollapsibleSection>
 
-          {/* PARTY */}
+          {/* TODAY — the confirm step */}
           <CollapsibleSection
-            eyebrow="WHO'S GOING"
-            summary={partySize === 1 ? "Solo" : `${partySize} people`}
-            open={open.has("party")}
-            complete
-            onToggle={() => toggle("party")}
+            eyebrow="TODAY"
+            summary={[
+              partySize === 1 ? "Solo" : `${partySize} people`,
+              draft.vehicle ? vehicleLine(draft.vehicle) : null,
+              gearSummary(draft.gear),
+            ].filter(Boolean).join(" · ")}
+            open={open.has("today")}
+            complete={!!draft.vehicle && (draft.party?.length ?? 0) >= 0 && (draft.subject?.fullName ? true : false)}
+            onToggle={() => toggle("today")}
           >
-            {profile.party.length > 0 && (draft.party?.length ?? 0) === 0 ? (
-              <View>
-                <FieldLabel label="Usual partners" hint="Tap to add." />
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {profile.party.map((m) => (
-                    <Pressable key={m.name} onPress={() => set("party", [...(draft.party ?? []), m])} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 0.5, borderColor: palette.ink[500] + "66" }}>
-                      <Text variant="mono" weight="medium" style={{ fontSize: 12, letterSpacing: 1, color: palette.ink[200] }}>{m.name.toUpperCase()}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-            <PartyEditor value={draft.party ?? []} onChange={(m) => set("party", m)} />
-            {(draft.party?.length ?? 0) > 0 ? (
-              <>
-                <TextField label="Leader / most experienced" value={draft.leader ?? ""} onChangeText={(t) => set("leader", t)} />
-                <TextField label="Plan if separated" value={draft.ifSeparated ?? ""} onChangeText={(t) => set("ifSeparated", t)} placeholder="Regroup at the car by 5, otherwise call." />
-              </>
-            ) : null}
-          </CollapsibleSection>
-
-          {/* VEHICLE */}
-          <CollapsibleSection
-            eyebrow="VEHICLE"
-            summary={draft.vehicle ? `${vehicleLine(draft.vehicle)}${draft.vehicle.plate ? ` · ${draft.vehicle.plate}` : ""}` : draft.travelMode === "foot" ? "On foot" : null}
-            open={open.has("vehicle")}
-            complete={!!draft.vehicle && (!!draft.vehicle.color || !!draft.vehicle.make || draft.vehicle.type === "dropped_off")}
-            onToggle={() => toggle("vehicle")}
-          >
-            {profile.vehicles.length > 0 ? (
+            {!draft.subject?.fullName || !draft.subject?.phone ? (
               <View style={{ gap: 8 }}>
-                <FieldLabel label="Which one are you taking?" />
-                {profile.vehicles.map((v) => (
-                  <VehicleCard
-                    key={v.id}
-                    vehicle={v}
-                    selected={draft.vehicle?.id === v.id}
-                    onPress={() => { set("vehicle", v); setEditVehicle(false); }}
-                  />
-                ))}
-                <VehicleCard
-                  vehicle={{ id: "__dropped", label: "", type: "dropped_off" }}
-                  selected={draft.vehicle?.type === "dropped_off"}
-                  onPress={() => { set("vehicle", { id: newId(), label: "", type: "dropped_off" }); setEditVehicle(false); }}
-                />
-                <Pressable onPress={() => { if (!draft.vehicle || profile.vehicles.some((v) => v.id === draft.vehicle?.id)) set("vehicle", { id: newId(), label: "", type: "truck" }); setEditVehicle(true); }} hitSlop={8}>
-                  <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>DIFFERENT VEHICLE TODAY →</Text>
-                </Pressable>
+                <FieldLabel label="Who you are" hint="Saved to your profile for next time." />
+                <ContactInfoEditor value={draft.subject ?? {}} onChange={(v) => set("subject", v)} errors={errors} />
               </View>
             ) : null}
-            {profile.vehicles.length === 0 || editVehicle ? (
-              <VehicleEditor value={vehicle} onChange={(v) => set("vehicle", v)} error={errors.vehicle} />
-            ) : null}
+
+            <View>
+              <FieldLabel label="Who's going" />
+              {profile.party.length > 0 ? (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                  {profile.party.map((m) => {
+                    const on = (draft.party ?? []).some((x) => x.name === m.name);
+                    return (
+                      <Pressable
+                        key={m.name}
+                        onPress={() => set("party", on ? (draft.party ?? []).filter((x) => x.name !== m.name) : [...(draft.party ?? []), m])}
+                        style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: on ? 1 : 0.5, borderColor: on ? palette.frost[400] : palette.ink[500] + "66", backgroundColor: on ? palette.frost[400] + "26" : "transparent" }}
+                      >
+                        <Text variant="mono" weight={on ? "bold" : "medium"} style={{ fontSize: 12, letterSpacing: 1, color: on ? palette.frost[400] : palette.ink[200] }}>{m.name.toUpperCase()}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+              <PartyEditor value={draft.party ?? []} onChange={(m) => set("party", m)} />
+            </View>
+
+            <View>
+              <FieldLabel label="Which vehicle" />
+              {profile.vehicles.length > 0 ? (
+                <View style={{ gap: 8 }}>
+                  {profile.vehicles.map((v) => (
+                    <VehicleCard key={v.id} vehicle={v} selected={draft.vehicle?.id === v.id} onPress={() => { set("vehicle", v); setEditVehicle(false); }} />
+                  ))}
+                  <VehicleCard
+                    vehicle={{ id: "__dropped", label: "", type: "dropped_off" }}
+                    selected={draft.vehicle?.type === "dropped_off"}
+                    onPress={() => { set("vehicle", { id: newId(), label: "", type: "dropped_off" }); setEditVehicle(false); }}
+                  />
+                  <Pressable onPress={() => { if (!draft.vehicle || profile.vehicles.some((v) => v.id === draft.vehicle?.id)) set("vehicle", { id: newId(), label: "", type: "truck" }); setEditVehicle(true); }} hitSlop={8}>
+                    <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>DIFFERENT VEHICLE TODAY →</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {profile.vehicles.length === 0 || editVehicle ? (
+                <View style={{ marginTop: 8 }}>
+                  <VehicleEditor value={vehicle} onChange={(v) => set("vehicle", v)} error={errors.vehicle} />
+                </View>
+              ) : null}
+            </View>
             <TextField label="Where it's parked" value={draft.parkedAt ?? ""} onChangeText={(t) => set("parkedAt", t)} placeholder="Defaults to the trailhead" />
+
+            <View>
+              <FieldLabel label="What's in the pack" hint="Prefilled from what you own — tap to change." />
+              <GearGrid value={{ beacon: true, shovel: true, probe: true, airbag: false, ...draft.gear }} onChange={(g) => set("gear", g)} showDetails={false} />
+            </View>
+
+            <View>
+              <FieldLabel label="Wearing today" hint="What a helicopter would see." />
+              <ClothingEditor value={draft.clothingToday ?? {}} onChange={(c) => set("clothingToday", c)} />
+            </View>
+
+            <View>
+              <FieldLabel label="Could you survive a night out with what you have?" />
+              <YesNoSwitch value={draft.overnightCapable ?? false} onChange={(v) => set("overnightCapable", v)} />
+            </View>
           </CollapsibleSection>
 
-          {/* GEAR + CLOTHING */}
-          <CollapsibleSection
-            eyebrow="GEAR & WHAT YOU'RE WEARING"
-            summary={[draft.clothingToday?.shell && `${draft.clothingToday.shell} jacket`, gearSummary(draft.gear)].filter(Boolean).join(" · ") || null}
-            open={open.has("gear")}
-            complete={!!(draft.clothingToday?.shell || draft.clothingToday?.pack || draft.gear?.clothingColors)}
-            onToggle={() => toggle("gear")}
-          >
-            <FieldLabel label="Today's colors" hint="What a helicopter would see." />
-            <ClothingEditor value={draft.clothingToday ?? {}} onChange={(c) => set("clothingToday", c)} />
-            <FieldLabel label="Confirm what's in the pack today" hint="Prefilled from your profile — tap to change." />
-            <GearEditor value={{ beacon: true, shovel: true, probe: true, airbag: false, ...draft.gear }} onChange={(g) => set("gear", g)} compact />
-          </CollapsibleSection>
-
-          {/* YOU */}
-          <CollapsibleSection
-            eyebrow="ABOUT YOU"
-            summary={draft.subject?.fullName ? `${draft.subject.fullName}${draft.subject.phone ? ` · ${draft.subject.phone}` : ""}` : null}
-            open={open.has("you")}
-            complete={!!draft.subject?.fullName && !!draft.subject?.phone}
-            onToggle={() => toggle("you")}
-          >
-            <SubjectEditor value={draft.subject ?? {}} onChange={(s) => set("subject", s)} errors={errors} compact />
-            <Pressable onPress={() => router.push("/trip/profile" as never)} hitSlop={8}>
-              <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>
-                EDIT FULL PROFILE (DESCRIPTION, MEDICAL, EXPERIENCE) →
-              </Text>
-            </Pressable>
-          </CollapsibleSection>
-
-          {/* CONTACTS */}
+          {/* WHO TO TELL */}
           <CollapsibleSection
             eyebrow="WHO TO TELL"
             summary={(draft.contacts ?? []).length ? (draft.contacts ?? []).map((c) => c.displayName).join(", ") : null}
@@ -531,7 +507,7 @@ export default function TripNewScreen() {
               max={TRIP_LIMITS.maxContacts}
             />
             <TextField label="Others who know about this trip" value={draft.othersWhoKnow ?? ""} onChangeText={(t) => set("othersWhoKnow", t)} placeholder="Names + numbers" />
-            <TextField label="Local agency number (optional)" hint="Troopers post or ranger station for this area. 911 is always on the page." value={draft.localAgencyPhone ?? ""} onChangeText={(t) => set("localAgencyPhone", t)} keyboardType="phone-pad" error={errors.localAgencyPhone} />
+            <TextField label="Local agency number (optional)" hint="Troopers post or ranger station. 911 is always on the page." value={draft.localAgencyPhone ?? ""} onChangeText={(t) => set("localAgencyPhone", t)} keyboardType="phone-pad" error={errors.localAgencyPhone} />
           </CollapsibleSection>
 
           {/* REVIEW + SEND */}

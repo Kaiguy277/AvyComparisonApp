@@ -16,6 +16,35 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-10 (evening) — "What goes where" is the design
+
+Kai's second round of notes was really one note: the split between *profile* and
+*trip* was wrong, and every cluttered screen was a symptom. "Could you survive a night
+out with what you have" is a question about today's pack, not about the person; a
+license plate is a fact about the person's life, not about today. Once I sorted every
+field by "does this change trip to trip?", the two screens fell into shape on their
+own: eight numbered one-time sections on the profile, four sections on the trip, and
+the trip's middle section is literally called TODAY because that's the question it
+asks. Confirm the people going, tap the car you're taking, tap what's in the pack,
+say what you're wearing, answer the night-out question. Nothing to type.
+
+The entry point moved too. A card at the top of the home screen competed with the
+status banners and looked like another notice. The two things you do from the truck
+— tell your people, report an observation — now sit together in a bottom bar, and the
+left pill turns into I'M BACK when a trip is live. That also fixed the "pill too small"
+note for free: two pills in a row get equal width and the label auto-shrinks.
+
+Naming: I went with "Let your people know" as the feature name and Kai's "Plan for the
+worst, hope for the best" as the tagline on the hub, with the action verb "Heading out"
+on the button and the composer. Trip plan is gone from the UI entirely.
+
+On Resend: the account is shared with AK RFP Hub, which is a live product. I audited
+before touching anything else — its domain, keys, and DNS are untouched and it
+delivered digests today — and the one thing I had done that crossed the line (sending
+nudges from trips@akrfp.com while waiting on DNS) is now closed by the flip to
+trips@trips.kaiconsulting.ai. Lesson for the ops doc: shared account, separate key,
+separate subdomain, never borrow the other product's domain even for a day.
+
 ## 2026-09-10 — Seeing the screens changed the work
 
 Kai's build-#21 notes were short but they landed on the exact seam I'd been guessing

@@ -29,85 +29,84 @@ import {
 
 type Errors = Record<string, string>;
 
-// ─────────────────────────── subject ───────────────────────────────────────
+// ─────────────────────────── you: identity / medical / experience ──────────
 
-export function SubjectEditor({
-  value,
-  onChange,
-  errors = {},
-  compact,
-}: {
+type SubjectProps = {
   value: SubjectProfile;
   onChange: (next: SubjectProfile) => void;
   errors?: Errors;
-  // Composer shows the essentials; the profile screen shows everything.
-  compact?: boolean;
-}) {
-  const set = <K extends keyof SubjectProfile>(k: K, v: SubjectProfile[K]) =>
-    onChange({ ...value, [k]: v });
+};
+
+function useSet(value: SubjectProfile, onChange: (n: SubjectProfile) => void) {
+  return <K extends keyof SubjectProfile>(k: K, v: SubjectProfile[K]) => onChange({ ...value, [k]: v });
+}
+
+// Name + how to reach you. The two required-to-send fields live here.
+export function ContactInfoEditor({ value, onChange, errors = {} }: SubjectProps) {
+  const set = useSet(value, onChange);
   return (
-    <View style={{ gap: 14 }}>
-      <TextField
-        label="Full name"
-        required
-        value={value.fullName ?? ""}
-        onChangeText={(t) => set("fullName", t)}
-        error={errors["subject.fullName"]}
-        autoCapitalize="words"
-        textContentType="name"
-      />
-      <TextField
-        label="Your cell number"
-        required
-        hint="SAR can request a location ping from the carrier."
-        value={value.phone ?? ""}
-        onChangeText={(t) => set("phone", t)}
-        error={errors["subject.phone"]}
-        keyboardType="phone-pad"
-        textContentType="telephoneNumber"
-      />
-      <TextField
-        label="Cell carrier"
-        value={value.cellCarrier ?? ""}
-        onChangeText={(t) => set("cellCarrier", t)}
-        placeholder="GCI, Verizon, AT&T…"
-      />
-      {!compact ? (
-        <>
-          <Row>
-            <TextField label="Date of birth" value={value.dateOfBirth ?? ""} onChangeText={(t) => set("dateOfBirth", t)} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" error={errors["subject.dateOfBirth"]} />
-            <TextField label="Sex" value={value.sex ?? ""} onChangeText={(t) => set("sex", t)} />
-          </Row>
-          <TextField label="Home address" value={value.homeAddress ?? ""} onChangeText={(t) => set("homeAddress", t)} textContentType="fullStreetAddress" />
-          <Row>
-            <TextField label="Height" value={value.height ?? ""} onChangeText={(t) => set("height", t)} placeholder={"5'10\""} />
-            <TextField label="Weight" value={value.weight ?? ""} onChangeText={(t) => set("weight", t)} placeholder="170 lb" />
-          </Row>
-          <Row>
-            <TextField label="Build" value={value.build ?? ""} onChangeText={(t) => set("build", t)} />
-            <TextField label="Hair" value={value.hair ?? ""} onChangeText={(t) => set("hair", t)} />
-            <TextField label="Eyes" value={value.eyes ?? ""} onChangeText={(t) => set("eyes", t)} />
-          </Row>
-          <TextField label="Distinguishing marks" value={value.distinguishingMarks ?? ""} onChangeText={(t) => set("distinguishingMarks", t)} placeholder="Tattoos, scars, glasses…" />
-          <TextField label="Medical conditions" hint="Stored in the device keychain. Only shared with your people when you send a trip." value={value.medicalConditions ?? ""} onChangeText={(t) => set("medicalConditions", t)} multiline rows={2} />
-          <TextField label="Medications" hint="Include what happens if a dose is missed." value={value.medications ?? ""} onChangeText={(t) => set("medications", t)} multiline rows={2} />
-          <TextField label="Allergies" value={value.allergies ?? ""} onChangeText={(t) => set("allergies", t)} />
-          <TextField label="Eyesight" value={value.eyesightNote ?? ""} onChangeText={(t) => set("eyesightNote", t)} placeholder="Contacts, spares in pack" />
-          <View>
-            <FieldLabel label="Backcountry experience" />
-            <ChipPicker options={EXPERIENCE_OPTIONS} selected={value.experienceLevel} onSelect={(v) => set("experienceLevel", v)} size="sm" />
-          </View>
-          <TextField label="Avalanche training" value={value.avalancheTraining ?? ""} onChangeText={(t) => set("avalancheTraining", t)} placeholder="AIARE 1 (2024), Rec 2…" />
-          <View>
-            <FieldLabel label="Could you survive a night out with what you carry?" />
-            <YesNoSwitch value={value.overnightCapable ?? false} onChange={(v) => set("overnightCapable", v)} />
-          </View>
-          <View>
-            <FieldLabel label="Do you often go out alone?" />
-            <YesNoSwitch value={value.goesOutAlone ?? false} onChange={(v) => set("goesOutAlone", v)} />
-          </View>
-        </>
-      ) : null}
+    <View style={{ gap: 12 }}>
+      <TextField label="Full name" required value={value.fullName ?? ""} onChangeText={(t) => set("fullName", t)} error={errors["subject.fullName"]} autoCapitalize="words" textContentType="name" />
+      <Row>
+        <TextField label="Cell number" required value={value.phone ?? ""} onChangeText={(t) => set("phone", t)} error={errors["subject.phone"]} keyboardType="phone-pad" textContentType="telephoneNumber" />
+        <TextField label="Carrier" value={value.cellCarrier ?? ""} onChangeText={(t) => set("cellCarrier", t)} placeholder="GCI, Verizon…" />
+      </Row>
+    </View>
+  );
+}
+
+// What a searcher would use to recognise you.
+export function DescriptionEditor({ value, onChange, errors = {} }: SubjectProps) {
+  const set = useSet(value, onChange);
+  return (
+    <View style={{ gap: 12 }}>
+      <Row>
+        <TextField label="Date of birth" value={value.dateOfBirth ?? ""} onChangeText={(t) => set("dateOfBirth", t)} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" error={errors["subject.dateOfBirth"]} />
+        <TextField label="Sex" value={value.sex ?? ""} onChangeText={(t) => set("sex", t)} />
+      </Row>
+      <Row>
+        <TextField label="Height" value={value.height ?? ""} onChangeText={(t) => set("height", t)} placeholder={"5'10\""} />
+        <TextField label="Weight" value={value.weight ?? ""} onChangeText={(t) => set("weight", t)} placeholder="170 lb" />
+        <TextField label="Build" value={value.build ?? ""} onChangeText={(t) => set("build", t)} placeholder="Medium" />
+      </Row>
+      <Row>
+        <TextField label="Hair" value={value.hair ?? ""} onChangeText={(t) => set("hair", t)} placeholder="Brown, short" />
+        <TextField label="Eyes" value={value.eyes ?? ""} onChangeText={(t) => set("eyes", t)} placeholder="Blue" />
+      </Row>
+      <TextField label="Distinguishing marks" value={value.distinguishingMarks ?? ""} onChangeText={(t) => set("distinguishingMarks", t)} placeholder="Tattoos, scars, glasses, beard…" />
+      <TextField label="Home address" value={value.homeAddress ?? ""} onChangeText={(t) => set("homeAddress", t)} textContentType="fullStreetAddress" />
+    </View>
+  );
+}
+
+// Kept in the device keychain; only leaves the phone inside a trip you send.
+export function MedicalEditor({ value, onChange }: SubjectProps) {
+  const set = useSet(value, onChange);
+  return (
+    <View style={{ gap: 12 }}>
+      <TextField label="Medical conditions" value={value.medicalConditions ?? ""} onChangeText={(t) => set("medicalConditions", t)} multiline rows={2} placeholder="Asthma, diabetes, heart condition… or 'none'" />
+      <TextField label="Medications" hint="What happens if a dose is missed?" value={value.medications ?? ""} onChangeText={(t) => set("medications", t)} multiline rows={2} placeholder="Name, dose, how often" />
+      <Row>
+        <TextField label="Allergies" value={value.allergies ?? ""} onChangeText={(t) => set("allergies", t)} placeholder="Penicillin, bees…" />
+        <TextField label="Eyesight" value={value.eyesightNote ?? ""} onChangeText={(t) => set("eyesightNote", t)} placeholder="Contacts; spares in pack" />
+      </Row>
+    </View>
+  );
+}
+
+export function ExperienceEditor({ value, onChange }: SubjectProps) {
+  const set = useSet(value, onChange);
+  return (
+    <View style={{ gap: 12 }}>
+      <View>
+        <FieldLabel label="Backcountry experience" />
+        <ChipPicker options={EXPERIENCE_OPTIONS} selected={value.experienceLevel} onSelect={(v) => set("experienceLevel", v)} size="sm" />
+      </View>
+      <TextField label="Avalanche training" value={value.avalancheTraining ?? ""} onChangeText={(t) => set("avalancheTraining", t)} placeholder="AIARE 1 (2024), Rec 2, Pro 1…" />
+      <View>
+        <FieldLabel label="Do you often go out alone?" />
+        <YesNoSwitch value={value.goesOutAlone ?? false} onChange={(v) => set("goesOutAlone", v)} />
+      </View>
     </View>
   );
 }
@@ -346,7 +345,7 @@ export function ContactsEditor({
 
 // ─────────────────────────── bits ──────────────────────────────────────────
 
-function Row({ children }: { children: React.ReactNode }) {
+export function Row({ children }: { children: React.ReactNode }) {
   return (
     <View style={{ flexDirection: "row", gap: 10 }}>
       {Array.isArray(children)

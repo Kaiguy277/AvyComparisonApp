@@ -12,9 +12,10 @@ Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
 
 ## Secrets (Supabase → Edge Function secrets)
 - `RESEND_API_KEY` — Resend account kai.myers.a@gmail.com, key "TripPlanner".
-- `TRIP_PLAN_EMAIL_FROM` — currently `Avy Comparison <trips@akrfp.com>` (akrfp.com is the
-  only verified domain on that Resend account). Switch to
-  `Avy Comparison <trips@trips.kaiconsulting.ai>` once the DNS below verifies.
+- `TRIP_PLAN_EMAIL_FROM` — `Avy Comparison <trips@trips.kaiconsulting.ai>` (verified
+  2026-09-10). The Resend account is shared with AK RFP Hub (akrfp.com, keys RFP_app/
+  RFP@/STT); this app only uses its own key "TripPlanner" and its own subdomain. Never
+  send from akrfp.com again.
 - `TRIP_NUDGE_CHANNELS` — optional, default `email`. Add `sms` when Twilio lands.
 - `TRIP_PLAN_PAGE_BASE` — optional override for the share-link base.
 

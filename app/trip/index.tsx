@@ -76,7 +76,7 @@ export default function TripHubScreen() {
     <ZoneScreenContainer>
       <Stack.Screen options={{ headerShown: false }} />
       <ZoneScreenHeader
-        eyebrow="YOUR PEOPLE"
+        eyebrow={live ? "YOUR PEOPLE KNOW" : "PLAN FOR THE WORST · HOPE FOR THE BEST"}
         title={live ? plan!.areaName : "Let your people know"}
         rightAction={
           <Pressable onPress={() => router.push("/trip/profile" as never)} hitSlop={10}>
@@ -168,7 +168,7 @@ export default function TripHubScreen() {
             ) : null}
 
             <Button variant={recent ? "outline" : "primary"} size="lg" onPress={() => router.push("/trip/new" as never)}>
-              NEW TRIP
+              I&apos;M HEADING OUT
             </Button>
 
             <Text className="text-ink-400" style={{ fontSize: 12, lineHeight: 17, marginTop: 4 }}>

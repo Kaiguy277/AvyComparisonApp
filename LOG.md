@@ -21,6 +21,36 @@ Format per entry:
 
 ---
 
+## 2026-09-10 (evening) — Build #22 feedback → IA rethink, bottom action bar, declutter
+- **Kai's notes on #22:** forms cluttered; per-trip questions (survive a night out) were
+  on the profile and profile things (car, plate, medical) felt buried; pill too small
+  for its label; rethink where the "let people know" entry lives and what to call it;
+  keep messing with Resend from touching AK RFP Hub.
+- **Information architecture now:** *Profile = set up once, doesn't change per trip*:
+  1 how to reach you · 2 your people · 3 vehicles · 4 what you own · 5 medical ·
+  6 what you look like · 7 experience · 8 usual partners. Numbered, one open at a
+  time, progress bar, "Done → next". *Heading out = confirm today*: WHERE · WHEN ·
+  TODAY (who's going as tappable partner chips, which vehicle as cards, what's in the
+  pack as the grid prefilled from "what you own", wearing today, **could you survive a
+  night out** moved here as `draft.overnightCapable`) · WHO TO TELL (prefilled).
+  Composer no longer shows profile fields unless name/phone are missing.
+- **Home entry point moved:** the top card is gone. New `components/trip/HeadingOutBar`
+  = bottom bar with two pills, **HEADING OUT** (frost) + **REPORT OBS** (sienna). When a
+  trip is live the left pill becomes **I'M BACK** (red when overdue) and a thin status
+  strip above the bar links to the hub. Pills auto-shrink text to fit; both fit at 390pt.
+  Home ScrollView bottom padding raised to clear the bar.
+- **Naming:** hub eyebrow "PLAN FOR THE WORST · HOPE FOR THE BEST", title "Let your
+  people know", primary button "I'M HEADING OUT", composer eyebrow "HEADING OUT".
+- **Declutter:** TextField height 52→48, section fields grouped into rows (DOB/sex,
+  height/weight/build, hair/eyes, allergies/eyesight), hints trimmed, composer's top
+  banner removed. `docs/screens/` refreshed (home, profile, profile-description,
+  composer-today, composer-today-2).
+- **Resend / AK RFP Hub:** audited — akrfp.com verified + untouched (DNS at name.com),
+  RFP keys untouched, digests delivered today. `trips.kaiconsulting.ai` verified →
+  sender flipped to `trips@trips.kaiconsulting.ai` (test send OK). No further use of
+  the akrfp.com domain by this app.
+- Gates: tsc, eslint 0 warnings, Vitest 110/110. Shipping as build #23.
+
 ## 2026-09-10 — Device feedback on build #21 → rebrand, tap-to-own gear, solid FAB
 - **Kai's notes from build #21:** (1) add-observation bubble still reads transparent;
   (2) don't brand it "trip planning" — it's about alerting your people; (3) profile
@@ -53,7 +83,12 @@ Format per entry:
   the observation happen?" → added label/hint/required props.
 - Gates: tsc, eslint (0 warnings), Vitest 110/110. **Shipped as TestFlight build #22**
   (abd807a, build 6fa48962, submission 3fba47e7, auto-submit).
-- Resend: `trips.kaiconsulting.ai` DKIM still pending at 08:14Z (MX/SPF verified; the
+- **Sender flipped (later, 2026-09-10 evening):** Resend verified `trips.kaiconsulting.ai`;
+  `TRIP_PLAN_EMAIL_FROM` now `trips@trips.kaiconsulting.ai`, test send OK. AK RFP Hub
+  audit on the shared Resend account: akrfp.com still verified, its keys untouched,
+  its DNS (name.com) untouched, digests delivering today. The only crossover was one
+  nudge sent from trips@akrfp.com earlier — none from now on.
+- (superseded) Resend: `trips.kaiconsulting.ai` DKIM still pending at 08:14Z (MX/SPF verified; the
   record is byte-exact and public). Sender NOT flipped — Resend 403s sends from an
   unverified domain, so flipping would break nudges. Re-check later; then the one-liner
   in `docs/TRIP_PLAN_OPS.md`.

@@ -39,7 +39,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Collapsible } from "@/components/ui/Collapsible";
 import { Text } from "@/components/ui/Text";
-import { TripPlanHomeCard } from "@/components/trip/TripPlanHomeCard";
+import { HeadingOutBar } from "@/components/trip/HeadingOutBar";
 import { FavoritesReorder } from "@/components/avalanche/FavoritesReorder";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
 import { ZoneMapPicker } from "@/components/avalanche/ZoneMapPicker";
@@ -104,7 +104,6 @@ const months = [
 ];
 
 export default function Index() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   // Top-level collapse state. Picker is collapsed by default — favorites
@@ -665,7 +664,7 @@ export default function Index() {
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingTop: insets.top + 8,
-          paddingBottom: insets.bottom + 64,
+          paddingBottom: insets.bottom + 150,
         }}
         refreshControl={
           <RefreshControl
@@ -757,9 +756,6 @@ export default function Index() {
             back to the form so they can retry. */}
         <ObservationDraftsBanner />
 
-        {/* Trip plan — "tell someone where you're going". Live plan shows
-            status + I'M BACK; otherwise an invite. */}
-        <TripPlanHomeCard />
 
         {/* HEADER — wordmark + date pager on the top row, status meta
             (cached/live/offline + fetched time) on a small line below.
@@ -1805,82 +1801,8 @@ export default function Index() {
         </View>
       </ScrollView>
 
-      {/* Floating "REPORT" button. Wrapped in an absolute-fill overlay
-          with pointerEvents="box-none" so the FAB always renders above
-          siblings (TopoBackground, ScrollView, etc.) and never gets
-          clipped by overflow on any iOS device. The overlay itself
-          ignores touches except where the Pressable lives. */}
-      <View
-        pointerEvents="box-none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          justifyContent: "flex-end",
-          alignItems: "flex-end",
-          paddingRight: 16,
-          paddingBottom: insets.bottom + 24,
-          zIndex: 1000,
-          elevation: 1000,
-        }}
-      >
-        {/* Opaque pill on a plain View (static style — no pressed-state
-            function, no same-color glow). Device feedback across builds
-            #20/#21 was that the button read as translucent: the wide
-            sienna-on-sienna shadow blurred its edge into the warm page.
-            Now: solid fill, 1px darker rim for a crisp edge, tight
-            neutral shadow, and press feedback via opacity only. */}
-        <View
-          style={{
-            borderRadius: 30,
-            backgroundColor: palette.aspen[500],
-            borderWidth: 1,
-            borderColor: palette.aspen[600],
-            shadowColor: "#000000",
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.28,
-            shadowRadius: 5,
-            elevation: 8,
-          }}
-        >
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-                () => {},
-              );
-              router.push("/observation/new" as never);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Report a new observation"
-            style={({ pressed }) => ({
-              height: 60,
-              minWidth: 168,
-              paddingHorizontal: 24,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              borderRadius: 30,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <Ionicons name="add" size={26} color="#FFFFFF" />
-            <Text
-              variant="mono"
-              weight="bold"
-              style={{
-                fontSize: 14,
-                letterSpacing: 1.6,
-                color: "#FFFFFF",
-              }}
-            >
-              REPORT OBS
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+      {/* Bottom action bar: HEADING OUT (your people) + REPORT OBS. */}
+      <HeadingOutBar />
 
       <Modal
         visible={mapModalOpen}

@@ -263,7 +263,7 @@ ${s.photoUrl ? `<img class="photo" src="${esc(s.photoUrl)}" alt="photo">` : ""}
 <dl>${row("Medical conditions", s.medicalConditions)}${row("Medications", s.medications)}${row("Allergies", s.allergies)}${row("Eyesight", s.eyesightNote)}</dl>
 
 <h2>7. Experience</h2>
-<dl>${row("Level", s.experienceLevel)}${row("Avalanche training", s.avalancheTraining)}${row("Can survive a night out", s.overnightCapable)}${row("Goes out alone", s.goesOutAlone)}</dl>
+<dl>${row("Level", s.experienceLevel)}${row("Avalanche training", s.avalancheTraining)}${row("Can survive a night out", d.overnightCapable ?? s.overnightCapable)}${row("Goes out alone", s.goesOutAlone)}</dl>
 
 <h2>8. People who know about this trip</h2>
 <p>${others}</p>${d.othersWhoKnow ? `<p>${esc(d.othersWhoKnow)}</p>` : ""}${d.notes ? `<p><b>Notes:</b> ${esc(d.notes)}</p>` : ""}

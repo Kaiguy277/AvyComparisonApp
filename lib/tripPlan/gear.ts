@@ -27,7 +27,7 @@ export const GEAR_ITEMS: readonly GearItem[] = [
   { key: "first_aid", label: "First aid", icon: "medical-bag" },
   { key: "headlamp", label: "Headlamp", icon: "flashlight" },
   { key: "stove", label: "Stove / fire", icon: "fire", detail: "fireAndStove", detailLabel: "What?", detailPlaceholder: "Jetboil, lighter" },
-  { key: "overnight", label: "Overnight kit", icon: "tent", detail: "overnightGear", detailLabel: "What's in it?", detailPlaceholder: "Bivy, puffy, extra food" },
+  { key: "overnight", label: "Overnight", icon: "tent", detail: "overnightGear", detailLabel: "What's in it?", detailPlaceholder: "Bivy, puffy, extra food" },
   { key: "map", label: "Map / GPS", icon: "map-marker-path", detail: "navigation", detailLabel: "What are you navigating with?", detailPlaceholder: "Gaia on phone, paper map" },
   { key: "helmet", label: "Helmet", icon: "racing-helmet" },
   { key: "repair", label: "Repair kit", icon: "tools" },
