@@ -19,6 +19,9 @@ interface Props {
   visible: boolean;
   step: SubmitStep | null;
   centerLabel?: string;
+  // Builds and shares a PDF copy of what was just submitted.
+  onSaveCopy?: () => void;
+  savingCopy?: boolean;
   onCancel: () => void;
   onRetry: () => void;
   onSubmitAnother: () => void;
@@ -30,6 +33,8 @@ export function SubmitProgress({
   visible,
   step,
   centerLabel,
+  onSaveCopy,
+  savingCopy,
   onCancel,
   onRetry,
   onSubmitAnother,
@@ -74,6 +79,8 @@ export function SubmitProgress({
               centerLabel={centerLabel}
               onSubmitAnother={onSubmitAnother}
               onBackToHome={onBackToHome}
+              onSaveCopy={onSaveCopy}
+              savingCopy={savingCopy}
             />
           ) : step?.kind === "error" ? (
             <ErrorBody
@@ -176,10 +183,14 @@ function SuccessBody({
   centerLabel,
   onSubmitAnother,
   onBackToHome,
+  onSaveCopy,
+  savingCopy,
 }: {
   centerLabel?: string;
   onSubmitAnother: () => void;
   onBackToHome: () => void;
+  onSaveCopy?: () => void;
+  savingCopy?: boolean;
 }) {
   return (
     <View style={{ alignItems: "center", gap: 14 }}>
@@ -211,10 +222,36 @@ function SuccessBody({
         reports to keep the rest of the community informed.
       </Text>
 
+      {onSaveCopy ? (
+        <Touchable
+          onPress={onSaveCopy}
+          disabled={savingCopy}
+          style={({ pressed }) => ({
+            marginTop: 4,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            paddingHorizontal: 18,
+            paddingVertical: 12,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: palette.frost[400],
+            backgroundColor: pressed ? palette.frost[400] + "22" : "transparent",
+            opacity: savingCopy ? 0.6 : 1,
+          })}
+        >
+          <Ionicons name="document-text-outline" size={16} color={palette.frost[400]} />
+          <Text variant="mono" weight="bold" allowFontScaling={false} style={{ fontSize: 12, letterSpacing: 1.2, color: palette.frost[400] }}>
+            {savingCopy ? "MAKING PDF…" : "SAVE A COPY (PDF)"}
+          </Text>
+        </Touchable>
+      ) : null}
+
       <Touchable
         onPress={onBackToHome}
         style={({ pressed }) => ({
-          marginTop: 8,
+          marginTop: 4,
           paddingHorizontal: 18,
           paddingVertical: 12,
           borderRadius: 999,

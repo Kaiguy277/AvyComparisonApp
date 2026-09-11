@@ -41,7 +41,7 @@ import {
 const LIMITS = {
   maxContacts: 5,
   maxWorryOffsetMs: 48 * 3_600_000,
-  maxPacketBytes: 131_072,
+  maxPacketBytes: 393_216,
   createPerMin: 10,
   contactPer5Min: 30,
 };

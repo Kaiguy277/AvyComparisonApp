@@ -21,6 +21,41 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (later) — Kai's bug sweep through profile + observation
+**Profile**
+- **Space key did nothing in gear detail fields** (stove/fire, overnight) — profile.tsx
+  ran `gearProfileSchema.parse()` on *every keystroke*, and `optionalText` trims, so a
+  trailing space was deleted as fast as it was typed (interior spaces too, since every
+  space is trailing while you type it). Radio only seemed fine by luck of typing order.
+  Fixed by dropping the per-keystroke parse; `saveProfile` still parses once on save.
+  Added `normalizeGear()` to fill schema defaults without trimming.
+- Usual colors are **no longer behind progressive disclosure** — shown in §4 directly;
+  the fold now only holds skis/sled + tent color.
+- **Photo "too large" on a normal selfie.** Old cap was 28 KB of base64 with a single
+  480px/0.45 pass, which typically yields 40–80 KB — so it rejected almost everything.
+  Now steps 400/0.5 → 320/0.45 → 256/0.4 → 200/0.35 until it fits, cap raised to 120 KB,
+  packet cap 128 KB → 384 KB (client + edge).
+- Date of birth is a **wheel picker** (`components/trip/DateOnlyField.tsx`), defaulting
+  to 1990 so nobody spins through 30 years. "Sex" → **"Gender"**. **Home address moved**
+  from "what you look like" to "how to reach you". **Usual partners can be added from
+  the phone's contacts.**
+- **DONE button at the bottom of the profile**, and the composer now re-reads the
+  profile with `useFocusEffect` — filling only gaps, never overwriting a choice already
+  made for this trip — so edits show up immediately instead of after a restart.
+
+**Observation**
+- **Take a photo** alongside choose-from-library (both entry points).
+- **Pick on a map**: new `components/observation/MapPointPicker.tsx`, Leaflet in a
+  WebView like ZoneMapPicker, tap to drop and drag to fine-tune. No new native dep.
+- **Elevation is no longer required.** Blank = "I don't know"; schema regex `\d*`,
+  payload sends `null` instead of `NaN`. A GPS fix now reports altitude
+  (`LocationField.onAltitudeFt`), offered as a one-tap `USE GPS · N FT` chip with a
+  note that it comes from the fix, not the crown. +3 tests (113 total).
+- **PDF copy of what you submitted** — `lib/observation/receipt.ts` (expo-print) builds
+  it from the same merged form the flow posted; "SAVE A COPY (PDF)" on the success
+  screen shares it.
+- Gates: tsc, eslint 0 warnings, Vitest 113/113.
+
 ## 2026-09-11 — ROOT CAUSE of every UI complaint: NativeWind drops function styles
 - **The bug behind all of it.** This project runs NativeWind v4.2.3 with
   `jsxImportSource: "nativewind"`, so every JSX element goes through NativeWind's

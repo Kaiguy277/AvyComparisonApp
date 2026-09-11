@@ -136,9 +136,12 @@ export const avalancheEntryFormSchema = z.object({
   bed_sfc: bedSurfaceValueSchema.optional(),
   aspect: aspectValueSchema,
   d_size: dSizeValueSchema,
+  // Blank means "I don't know" — a guessed number is worse than no number,
+  // and forecasters would rather have the rest of the record than nothing.
   elevation: z
     .string()
-    .regex(/^\d+$/, "Elevation must be a whole number (feet)."),
+    .regex(/^\d*$/, "Elevation must be a whole number of feet, or left blank.")
+    .default(""),
   number: z
     .string()
     .regex(/^\d+$/, "Number of avalanches must be a whole number.")
@@ -247,7 +250,7 @@ const avalancheWirePayloadSchema = z.object({
   bed_sfc: z.string().optional(),
   aspect: z.string(),
   d_size: z.string(),
-  elevation: z.number(),
+  elevation: z.number().nullable(),
   number: z.number(),
   comments: z.string().optional(),
   media: z.array(mediaItemSchema).default([]),
@@ -327,7 +330,7 @@ export function toSubmitPayload(args: {
       bed_sfc: a.bed_sfc,
       aspect: a.aspect,
       d_size: a.d_size,
-      elevation: Number(a.elevation),
+      elevation: a.elevation ? Number(a.elevation) : null,
       number: Number(a.number),
       comments: a.comments || undefined,
       media: avalancheMedia[i] ?? [],

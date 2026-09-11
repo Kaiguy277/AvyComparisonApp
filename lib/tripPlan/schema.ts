@@ -24,9 +24,10 @@ export const TRIP_LIMITS = {
   defaultWorryOffsetHours: 3,
   defaultTripHours: 8,
   maxTextChars: 2000,
-  maxPacketBytes: 131_072,
-  // Profile photo, base64 data URI. Kept well under the packet cap.
-  maxPhotoChars: 28_000,
+  maxPacketBytes: 393_216,
+  // Profile photo, base64 data URI. A 400px JPEG is typically 25–50 KB of
+  // base64, so this leaves room for one photo plus a full packet.
+  maxPhotoChars: 120_000,
   maxPartyMembers: 12,
 } as const;
 

@@ -12,7 +12,7 @@ import {
   Share,
   View,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
@@ -162,6 +162,37 @@ export default function TripNewScreen() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.templateId, params.zoneId]);
+
+  // Coming back from the profile screen, pull in anything new. Only fills
+  // gaps — a choice already made for this trip is never overwritten.
+  useFocusEffect(
+    useCallback(() => {
+      if (!ready) return;
+      let cancelled = false;
+      loadProfile().then((p) => {
+        if (cancelled) return;
+        setProfile(p);
+        setDraft((d) => {
+          const defaultVehicle =
+            p.vehicles.find((v) => v.id === p.defaultVehicleId) ?? p.vehicles[0] ?? null;
+          return {
+            ...d,
+            subject: { ...p.subject, ...d.subject },
+            gear: { ...p.gear, ...d.gear },
+            clothingToday:
+              Object.values(d.clothingToday ?? {}).some(Boolean)
+                ? d.clothingToday
+                : { ...(p.gear.usualColors ?? {}) },
+            vehicle: d.vehicle ?? defaultVehicle,
+            contacts: (d.contacts ?? []).length > 0 ? d.contacts : p.contacts.slice(0, TRIP_LIMITS.maxContacts),
+          };
+        });
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [ready]),
+  );
 
   // Persist the draft while composing (not for template runs — those
   // are meant to be fire-and-forget).

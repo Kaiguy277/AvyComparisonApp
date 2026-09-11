@@ -7,6 +7,7 @@ import * as Location from "expo-location";
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { FieldError, FieldLabel, TextField } from "./formPrimitives";
+import { MapPointPicker } from "./MapPointPicker";
 import type { LocationPoint } from "@/lib/observation/schema";
 
 // Two-mode location field: tap "Use current location" for a one-shot
@@ -21,6 +22,9 @@ import type { LocationPoint } from "@/lib/observation/schema";
 interface Props {
   value: LocationPoint;
   onChange: (next: LocationPoint) => void;
+  // A GPS fix carries an altitude; the avalanche entries use it to
+  // pre-fill elevation rather than making the user guess.
+  onAltitudeFt?: (ft: number | null) => void;
   error?: string;
   // Label overrides — the default copy is observation-specific; the
   // trip composer reuses the field for the trailhead pin.
@@ -32,12 +36,14 @@ interface Props {
 export function LocationField({
   value,
   onChange,
+  onAltitudeFt,
   error,
   label = "Location",
   hint = "Where did the observation happen?",
   required = true,
 }: Props) {
   const [busy, setBusy] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
 
   // Raw text is the source of truth for the manual fields — a controlled
@@ -88,6 +94,11 @@ export function LocationField({
         lat: round5(pos.coords.latitude),
         lng: round5(pos.coords.longitude),
       });
+      onAltitudeFt?.(
+        typeof pos.coords.altitude === "number" && Number.isFinite(pos.coords.altitude)
+          ? Math.round(pos.coords.altitude * 3.28084)
+          : null,
+      );
     } catch {
       setPermError("Couldn't read GPS. Type the coordinates manually below.");
     } finally {
@@ -98,6 +109,42 @@ export function LocationField({
   return (
     <View>
       <FieldLabel label={label} required={required} hint={hint} />
+
+      <Touchable
+        onPress={() => setMapOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Pick the location on a map"
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          minHeight: 46,
+          borderRadius: 10,
+          borderWidth: 0.5,
+          borderColor: palette.ink[500] + "88",
+          backgroundColor: pressed ? palette.ink[900] : "transparent",
+          marginBottom: 10,
+        })}
+      >
+        <Ionicons name="map-outline" size={16} color={palette.ink[300]} />
+        <Text variant="mono" weight="medium" allowFontScaling={false} style={{ fontSize: 11, letterSpacing: 1.2, color: palette.ink[200] }}>
+          PICK ON A MAP
+        </Text>
+      </Touchable>
+
+      <MapPointPicker
+        visible={mapOpen}
+        initial={hasFix ? { lat: value.lat, lng: value.lng } : null}
+        onCancel={() => setMapOpen(false)}
+        onPick={(p) => {
+          setMapOpen(false);
+          onChange({ lat: round5(p.lat), lng: round5(p.lng) });
+          // A map pin carries no altitude — clear any stale GPS elevation
+          // so nothing silently attaches the wrong number to it.
+          onAltitudeFt?.(null);
+        }}
+      />
 
       {/* GPS button + current value display */}
       <Touchable

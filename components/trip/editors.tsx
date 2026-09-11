@@ -18,6 +18,7 @@ import {
 } from "@/components/observation/formPrimitives";
 import { GearGrid } from "@/components/trip/GearGrid";
 import { PhotoField } from "@/components/trip/PhotoField";
+import { DateOnlyField } from "@/components/trip/DateOnlyField";
 import {
   EXPERIENCE_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
@@ -53,6 +54,9 @@ export function ContactInfoEditor({ value, onChange, errors = {} }: SubjectProps
         <TextField label="Cell number" required value={value.phone ?? ""} onChangeText={(t) => set("phone", t)} error={errors["subject.phone"]} keyboardType="phone-pad" textContentType="telephoneNumber" />
         <TextField label="Carrier" value={value.cellCarrier ?? ""} onChangeText={(t) => set("cellCarrier", t)} placeholder="GCI, Verizon…" />
       </Row>
+      {/* Address lives here, not under "what you look like": it's how
+          someone reaches you, and it's what a trooper asks for first. */}
+      <TextField label="Home address" value={value.homeAddress ?? ""} onChangeText={(t) => set("homeAddress", t)} textContentType="fullStreetAddress" />
     </View>
   );
 }
@@ -63,10 +67,13 @@ export function DescriptionEditor({ value, onChange, errors = {} }: SubjectProps
   return (
     <View style={{ gap: 14 }}>
       <PhotoField value={value.photoDataUri} onChange={(d) => set("photoDataUri", d)} />
-      <Row>
-        <TextField label="Date of birth" value={value.dateOfBirth ?? ""} onChangeText={(t) => set("dateOfBirth", t)} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" error={errors["subject.dateOfBirth"]} />
-        <TextField label="Sex" value={value.sex ?? ""} onChangeText={(t) => set("sex", t)} />
-      </Row>
+      <DateOnlyField
+        label="Date of birth"
+        value={value.dateOfBirth}
+        onChange={(d) => set("dateOfBirth", d)}
+        error={errors["subject.dateOfBirth"]}
+      />
+      <TextField label="Gender" value={value.sex ?? ""} onChangeText={(t) => set("sex", t)} placeholder="However you'd describe it" />
       <Row>
         <TextField label="Height" value={value.height ?? ""} onChangeText={(t) => set("height", t)} placeholder={"5'10\""} />
         <TextField label="Weight" value={value.weight ?? ""} onChangeText={(t) => set("weight", t)} placeholder="170 lb" />
@@ -77,7 +84,6 @@ export function DescriptionEditor({ value, onChange, errors = {} }: SubjectProps
         <TextField label="Eyes" value={value.eyes ?? ""} onChangeText={(t) => set("eyes", t)} placeholder="Blue" />
       </Row>
       <TextField label="Distinguishing marks" value={value.distinguishingMarks ?? ""} onChangeText={(t) => set("distinguishingMarks", t)} placeholder="Tattoos, scars, glasses, beard…" />
-      <TextField label="Home address" value={value.homeAddress ?? ""} onChangeText={(t) => set("homeAddress", t)} textContentType="fullStreetAddress" />
     </View>
   );
 }
@@ -225,10 +231,6 @@ export function KitDetailsEditor({
   const set = <K extends keyof GearProfile>(k: K, v: GearProfile[K]) => onChange({ ...value, [k]: v });
   return (
     <View style={{ gap: 14 }}>
-      <View>
-        <FieldLabel label="Colors you usually wear" hint="Prefills each trip; you can change it on the day." />
-        <ClothingEditor value={value.usualColors ?? {}} onChange={(c) => set("usualColors", c)} />
-      </View>
       <Row>
         <TextField label="Ski / sled color" value={value.skiOrSledColor ?? ""} onChangeText={(t) => set("skiOrSledColor", t)} placeholder="Orange" />
         <TextField label="Tent color" value={value.tentColor ?? ""} onChangeText={(t) => set("tentColor", t)} placeholder="Yellow" />
@@ -249,6 +251,22 @@ export function PartyEditor({
 }) {
   const update = (i: number, patch: Partial<PartyMember>) =>
     onChange(value.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+
+  const addPartnerFromContacts = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== "granted") {
+        onChange([...value, { name: "" }]);
+        return;
+      }
+      const picked = await Contacts.presentContactPickerAsync();
+      if (!picked) return;
+      const name = [picked.firstName, picked.lastName].filter(Boolean).join(" ") || picked.name || "";
+      onChange([...value, { name, phone: picked.phoneNumbers?.[0]?.number ?? undefined }]);
+    } catch {
+      onChange([...value, { name: "" }]);
+    }
+  };
   return (
     <View style={{ gap: 12 }}>
       {value.map((m, i) => (
@@ -267,7 +285,10 @@ export function PartyEditor({
           <TextField label="Their vehicle (if separate)" value={m.vehicleNote ?? ""} onChangeText={(t) => update(i, { vehicleNote: t })} />
         </View>
       ))}
-      <AddButton label={value.length === 0 ? "Add a partner" : "Add another"} onPress={() => onChange([...value, { name: "" }])} />
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <AddButton label="From contacts" icon="people-outline" onPress={addPartnerFromContacts} />
+        <AddButton label={value.length === 0 ? "Type it in" : "Add another"} icon="create-outline" onPress={() => onChange([...value, { name: "" }])} />
+      </View>
       {value.length === 0 ? (
         <Text className="text-ink-400" style={{ fontSize: 12, lineHeight: 17 }}>
           Going solo? Leave this empty. SAR wants every name in the party.

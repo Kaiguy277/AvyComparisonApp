@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { DateField } from "./DateField";
-import { TextField } from "./formPrimitives";
+import { Chip, TextField } from "./formPrimitives";
 import { PhotoPicker } from "./PhotoPicker";
 import { SelectField } from "./SelectField";
 import {
@@ -30,6 +30,8 @@ interface Props {
   // Field-level errors keyed by `avalanches.<index>.<field>`. The screen
   // builds this map from the zod result.
   errors?: Record<string, string>;
+  // Feet, from the observation's GPS fix. Offered as a one-tap fill.
+  suggestedElevationFt?: number | null;
 }
 
 export function AvalancheEntryCard({
@@ -39,6 +41,7 @@ export function AvalancheEntryCard({
   onChange,
   onRemove,
   errors,
+  suggestedElevationFt,
 }: Props) {
   const update = <K extends keyof AvalancheEntryForm>(
     key: K,
@@ -202,17 +205,38 @@ export function AvalancheEntryCard({
         clearable
       />
 
-      {/* Elevation */}
-      <TextField
-        label="Elevation (feet)"
-        required
-        hint="Crown elevation. Whole feet."
-        value={value.elevation}
-        onChangeText={(t) => update("elevation", t.replace(/\D/g, ""))}
-        keyboardType="number-pad"
-        placeholder="3500"
-        error={err("elevation")}
-      />
+      {/* Elevation — optional. A guess is worse than a blank. */}
+      <View style={{ gap: 8 }}>
+        <TextField
+          label="Elevation (feet)"
+          hint="Crown elevation. Leave blank if you don't know."
+          value={value.elevation}
+          onChangeText={(t) => update("elevation", t.replace(/\D/g, ""))}
+          keyboardType="number-pad"
+          placeholder="Not sure? Leave it blank"
+          error={err("elevation")}
+        />
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {typeof suggestedElevationFt === "number" ? (
+            <Chip
+              label={`USE GPS · ${suggestedElevationFt.toLocaleString()} FT`}
+              selected={value.elevation === String(suggestedElevationFt)}
+              onPress={() => update("elevation", String(suggestedElevationFt))}
+              size="sm"
+            />
+          ) : null}
+          {value.elevation ? (
+            <Chip label="I DON'T KNOW" selected={false} onPress={() => update("elevation", "")} size="sm" />
+          ) : null}
+        </View>
+        {typeof suggestedElevationFt === "number" ? (
+          <Text className="text-ink-400" style={{ fontSize: 11, lineHeight: 15 }}>
+            GPS elevation comes from where you took the location fix, not
+            necessarily from the crown. If the fix isn&apos;t in the right
+            place, this won&apos;t be either — edit it or leave it blank.
+          </Text>
+        ) : null}
+      </View>
 
       {/* Free text */}
       <TextField

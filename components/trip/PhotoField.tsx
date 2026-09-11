@@ -15,8 +15,16 @@ import { palette } from "@/constants/design";
 import { FieldLabel } from "@/components/observation/formPrimitives";
 import { TRIP_LIMITS } from "@/lib/tripPlan/schema";
 
-const LONG_EDGE = 480;
-const QUALITY = 0.45;
+// Tried in order until one fits the cap. A close-up selfie off a modern
+// phone is ~3000px; the first pass alone takes it under 50 KB of base64.
+// The earlier single 480px/0.45 pass produced ~40–80 KB, which blew the
+// old 28 KB cap and rejected perfectly good photos.
+const STEPS: { edge: number; quality: number }[] = [
+  { edge: 400, quality: 0.5 },
+  { edge: 320, quality: 0.45 },
+  { edge: 256, quality: 0.4 },
+  { edge: 200, quality: 0.35 },
+];
 
 export function PhotoField({
   value,
@@ -27,19 +35,28 @@ export function PhotoField({
 }) {
   const [busy, setBusy] = useState(false);
 
-  const shrink = async (uri: string, width: number, height: number) => {
+  const shrink = async (uri: string, width: number, height: number, edge: number, quality: number) => {
     const portrait = height >= width;
     const longSide = portrait ? height : width;
     const ctx = ImageManipulator.manipulate(uri);
-    if (longSide > LONG_EDGE) {
+    if (longSide > edge) {
       ctx.resize({
-        width: portrait ? undefined : LONG_EDGE,
-        height: portrait ? LONG_EDGE : undefined,
+        width: portrait ? undefined : edge,
+        height: portrait ? edge : undefined,
       });
     }
     const rendered = await ctx.renderAsync();
-    const out = await rendered.saveAsync({ format: SaveFormat.JPEG, base64: true, compress: QUALITY });
+    const out = await rendered.saveAsync({ format: SaveFormat.JPEG, base64: true, compress: quality });
     return out.base64 ? `data:image/jpeg;base64,${out.base64}` : undefined;
+  };
+
+  const fit = async (uri: string, width: number, height: number) => {
+    let last: string | undefined;
+    for (const step of STEPS) {
+      last = await shrink(uri, width, height, step.edge, step.quality);
+      if (last && last.length <= TRIP_LIMITS.maxPhotoChars) return last;
+    }
+    return undefined;
   };
 
   const pick = async (fromCamera: boolean) => {
@@ -60,15 +77,11 @@ export function PhotoField({
         : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
       if (result.canceled || !result.assets[0]) return;
       const a = result.assets[0];
-      const dataUri = await shrink(a.uri, a.width, a.height);
+      const dataUri = await fit(a.uri, a.width, a.height);
       if (!dataUri) {
-        Alert.alert("Couldn't use that photo", "Try a different one.");
-        return;
-      }
-      if (dataUri.length > TRIP_LIMITS.maxPhotoChars) {
         Alert.alert(
-          "That photo is too large",
-          "Pick one with a simpler background, or crop it tighter to your face.",
+          "Couldn't use that photo",
+          "Even shrunk right down it wouldn't fit. Try a different photo.",
         );
         return;
       }

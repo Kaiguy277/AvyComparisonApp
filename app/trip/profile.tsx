@@ -13,8 +13,10 @@ import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { ZoneScreenContainer, ZoneScreenHeader } from "@/components/avalanche/ZoneScreenChrome";
 import { CollapsibleSection } from "@/components/observation/CollapsibleSection";
+import { FieldLabel } from "@/components/observation/formPrimitives";
 import {
   AddButton,
+  ClothingEditor,
   ContactInfoEditor,
   ContactsEditor,
   DescriptionEditor,
@@ -28,11 +30,28 @@ import { GearGrid } from "@/components/trip/GearGrid";
 import { VehicleCard } from "@/components/trip/VehicleCards";
 import { gearSummary } from "@/lib/tripPlan/gear";
 import { newId } from "@/lib/tripPlan/ids";
-import { gearProfileSchema } from "@/lib/tripPlan/schema";
 import { emptyProfile, loadProfile, saveProfile, type TripProfile } from "@/lib/tripPlan/store";
+import type { GearProfile } from "@/lib/tripPlan/schema";
 
 type Section = "contact" | "people" | "vehicles" | "gear" | "medical" | "description" | "experience" | "partners";
 const ORDER: Section[] = ["contact", "people", "vehicles", "gear", "medical", "description", "experience", "partners"];
+
+
+// The editors work in the schema's *input* shape (every key optional) while
+// the stored profile uses the output shape (defaults applied). Fill the
+// required keys on write. Deliberately NOT `schema.parse()`: that also trims
+// strings, which ate a space the moment you typed one.
+function normalizeGear(g: GearProfile): TripProfile["gear"] {
+  return {
+    ...g,
+    inventory: g.inventory ?? [],
+    beacon: g.beacon ?? true,
+    shovel: g.shovel ?? true,
+    probe: g.probe ?? true,
+    airbag: g.airbag ?? false,
+    usualColors: g.usualColors ?? {},
+  };
+}
 
 export default function TripProfileScreen() {
   const router = useRouter();
@@ -233,14 +252,26 @@ export default function TripProfileScreen() {
             <Text className="text-ink-300" style={{ fontSize: 12, lineHeight: 17 }}>
               Tap what you own. On each trip you&apos;ll confirm what&apos;s actually in the pack.
             </Text>
-            <GearGrid value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: gearProfileSchema.parse(g) }))} />
+            <GearGrid value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: normalizeGear(g) }))} />
+
+            <View style={{ gap: 8 }}>
+              <FieldLabel
+                label="Colors you usually wear"
+                hint="Prefills every trip; change it on the day if you wear something else."
+              />
+              <ClothingEditor
+                value={profile.gear.usualColors ?? {}}
+                onChange={(c) => update((p) => ({ ...p, gear: { ...p.gear, usualColors: c } }))}
+              />
+            </View>
+
             <Touchable onPress={() => setMoreGear((m) => !m)} hitSlop={8}>
               <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>
-                {moreGear ? "HIDE KIT DETAILS" : "ADD COLORS, SKIS / SLED, TENT →"}
+                {moreGear ? "HIDE" : "SKIS / SLED + TENT COLOR →"}
               </Text>
             </Touchable>
             {moreGear ? (
-              <KitDetailsEditor value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: gearProfileSchema.parse(g) }))} />
+              <KitDetailsEditor value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: normalizeGear(g) }))} />
             ) : null}
           </CollapsibleSection>
 
@@ -292,6 +323,9 @@ export default function TripProfileScreen() {
             <PartyEditor value={profile.party} onChange={(m) => update((p) => ({ ...p, party: m }))} />
           </CollapsibleSection>
 
+          {/* Always a way out of this screen. In the intro it continues to
+              the trip; afterwards it just goes back — and the composer
+              re-reads the profile on focus, so edits land immediately. */}
           {isIntro ? (
             <Touchable
               onPress={() => router.replace("/trip/new" as never)}
@@ -314,7 +348,23 @@ export default function TripProfileScreen() {
                 {!done.contact || !done.people ? "FINISH 1 AND 2 TO CONTINUE" : "CONTINUE — PLAN A TRIP"}
               </Text>
             </Touchable>
-          ) : null}
+          ) : (
+            <Touchable
+              onPress={() => router.back()}
+              style={({ pressed }) => ({
+                marginTop: 6,
+                height: 56,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? palette.frost[600] : palette.frost[500],
+              })}
+            >
+              <Text variant="mono" weight="bold" allowFontScaling={false} style={{ fontSize: 13, letterSpacing: 1.4, color: "#FFFFFF" }}>
+                DONE
+              </Text>
+            </Touchable>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </ZoneScreenContainer>

@@ -53,6 +53,7 @@ import {
   type SubmitStep,
 } from "@/lib/observation/submitFlow";
 import { observationApiConfig } from "@/lib/api/observationSubmit";
+import { buildReceiptPdf, shareReceiptPdf } from "@/lib/observation/receipt";
 import {
   summarizeAbout,
   summarizeActivity,
@@ -252,6 +253,9 @@ export default function ObservationNewScreen() {
   }, [profileLoaded, profile]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Feet, from the location fix. Offered to each avalanche entry.
+  const [gpsElevationFt, setGpsElevationFt] = useState<number | null>(null);
+  const [savingCopy, setSavingCopy] = useState(false);
 
   // Section state — every section starts open and stays open until
   // the user explicitly collapses it. Multiple can be open at once.
@@ -413,6 +417,25 @@ export default function ObservationNewScreen() {
     setErrors({});
     void runSubmit();
   }, [form, sectionNotes, runSubmit, scrollToSection]);
+
+  // A record of what you sent. Built from the same merged form object the
+  // submit flow posted, so it reflects the submission, not a re-query.
+  const saveCopy = useCallback(async () => {
+    setSavingCopy(true);
+    try {
+      const merged = mergeSectionNotes(form, sectionNotes);
+      const uri = await buildReceiptPdf(merged, form.center_id || initialCenter || "");
+      if (!uri) {
+        Alert.alert("Couldn't make the PDF", "Your observation was still submitted.");
+        return;
+      }
+      await shareReceiptPdf(uri);
+    } catch {
+      Alert.alert("Couldn't share the PDF", "Your observation was still submitted.");
+    } finally {
+      setSavingCopy(false);
+    }
+  }, [form, sectionNotes, initialCenter]);
 
   const onCancelSubmission = useCallback(() => {
     abortRef.current?.abort();
@@ -607,6 +630,7 @@ export default function ObservationNewScreen() {
           >
             <LocationField
               value={form.location_point}
+              onAltitudeFt={setGpsElevationFt}
               onChange={(p) =>
                 setForm((prev) => {
                   // Auto-fill the forecast center from the location when
@@ -827,6 +851,7 @@ export default function ObservationNewScreen() {
                       list[i] = next;
                       update("avalanches", list);
                     }}
+                    suggestedElevationFt={gpsElevationFt}
                     onRemove={() =>
                       update(
                         "avalanches",
@@ -1007,6 +1032,8 @@ export default function ObservationNewScreen() {
       </KeyboardAvoidingView>
 
       <SubmitProgress
+        onSaveCopy={saveCopy}
+        savingCopy={savingCopy}
         visible={progressVisible}
         step={submitStep}
         centerLabel={form.center_id || initialCenter}

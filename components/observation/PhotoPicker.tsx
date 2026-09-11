@@ -40,6 +40,27 @@ export function PhotoPicker({
 
   const remaining = Math.max(0, maxCount - value.length);
 
+  const ingest = useCallback(
+    (assets: ImagePicker.ImagePickerAsset[]) => {
+      const next: LocalImageWithCaption[] = assets.map((a) => ({
+        image: {
+          uri: a.uri,
+          width: a.width,
+          height: a.height,
+          exif: a.exif
+            ? {
+                DateTimeOriginal: a.exif.DateTimeOriginal as string | undefined,
+                Orientation: a.exif.Orientation as number | undefined,
+              }
+            : undefined,
+        },
+        caption: "",
+      }));
+      onChange([...value, ...next].slice(0, maxCount));
+    },
+    [onChange, value, maxCount],
+  );
+
   const pickImages = useCallback(async () => {
     if (remaining === 0) return;
     setBusy(true);
@@ -60,34 +81,33 @@ export function PhotoPicker({
         quality: 1,
       });
       if (result.canceled) return;
-      const next: LocalImageWithCaption[] = result.assets.map((a) => ({
-        image: {
-          uri: a.uri,
-          width: a.width,
-          height: a.height,
-          // expo-image-picker returns EXIF as a record; we only use
-          // DateTimeOriginal + Orientation downstream.
-          exif: a.exif
-            ? {
-                DateTimeOriginal:
-                  typeof a.exif.DateTimeOriginal === "string"
-                    ? a.exif.DateTimeOriginal
-                    : undefined,
-                Orientation:
-                  typeof a.exif.Orientation === "string" ||
-                  typeof a.exif.Orientation === "number"
-                    ? a.exif.Orientation
-                    : undefined,
-              }
-            : null,
-        },
-        caption: "",
-      }));
-      onChange([...value, ...next].slice(0, maxCount));
+      ingest(result.assets);
     } finally {
       setBusy(false);
     }
-  }, [onChange, remaining, value, maxCount]);
+  }, [remaining, ingest]);
+
+  // Most observations are written at the trailhead right after the tour,
+  // so shooting straight from the form matters as much as the library.
+  const takePhoto = useCallback(async () => {
+    if (remaining === 0) return;
+    setBusy(true);
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (perm.status !== "granted") {
+        Alert.alert(
+          "Camera permission needed",
+          "Open Settings → Avy Comparison and allow Camera access to take photos for your observation.",
+        );
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ exif: true, quality: 1 });
+      if (result.canceled) return;
+      ingest(result.assets);
+    } finally {
+      setBusy(false);
+    }
+  }, [remaining, ingest]);
 
   const remove = (idx: number) => {
     onChange(value.filter((_, i) => i !== idx));
@@ -105,7 +125,10 @@ export function PhotoPicker({
       />
 
       {value.length === 0 ? (
-        <AddPhotoButton onPress={pickImages} busy={busy} large />
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <AddPhotoButton onPress={pickImages} busy={busy} large label="Choose photos" icon="image-outline" />
+          <AddPhotoButton onPress={takePhoto} busy={busy} large label="Take a photo" icon="camera-outline" />
+        </View>
       ) : (
         <View style={{ gap: 12 }}>
           {value.map((item, idx) => (
@@ -161,7 +184,10 @@ export function PhotoPicker({
             </View>
           ))}
           {remaining > 0 ? (
-            <AddPhotoButton onPress={pickImages} busy={busy} large={false} />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <AddPhotoButton onPress={pickImages} busy={busy} large={false} label="Choose" icon="image-outline" />
+              <AddPhotoButton onPress={takePhoto} busy={busy} large={false} label="Camera" icon="camera-outline" />
+            </View>
           ) : null}
         </View>
       )}
@@ -173,17 +199,22 @@ function AddPhotoButton({
   onPress,
   busy,
   large,
+  label,
+  icon,
 }: {
   onPress: () => void;
   busy: boolean;
   large: boolean;
+  label?: string;
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
 }) {
   return (
     <Touchable
       onPress={onPress}
       disabled={busy}
       style={({ pressed }) => ({
-        paddingVertical: large ? 28 : 14,
+        flex: label ? 1 : undefined,
+        paddingVertical: large ? 22 : 14,
         paddingHorizontal: 14,
         borderRadius: 10,
         borderWidth: 1,
@@ -196,7 +227,7 @@ function AddPhotoButton({
       })}
     >
       <Ionicons
-        name={busy ? "hourglass-outline" : "image-outline"}
+        name={busy ? "hourglass-outline" : (icon ?? "image-outline")}
         size={large ? 22 : 16}
         color={palette.ink[300]}
       />
@@ -209,7 +240,7 @@ function AddPhotoButton({
           color: palette.ink[300],
         }}
       >
-        {busy ? "OPENING…" : "ADD PHOTOS"}
+        {busy ? "OPENING…" : (label ?? "ADD PHOTOS").toUpperCase()}
       </Text>
     </Touchable>
   );
