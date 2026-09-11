@@ -21,6 +21,30 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (evening) — Real-looking SAR links, NWAC outreach drafted
+- **Share links no longer read as garbage.** Activated the project's free **vanity
+  subdomain**: `tfvxhsgwrwvendrnbrgf.supabase.co` → **`avycomparison.supabase.co`**
+  (`supabase vanity-subdomains activate --experimental`). `TRIP_PLAN_PAGE_BASE` repointed,
+  verified end to end: a new plan's link is
+  `https://avycomparison.supabase.co/functions/v1/trip-plan-page?t=…` and opens with no
+  auth headers. The old host still resolves, so links already sent keep working.
+  (Custom domains like `sar.kaiconsulting.ai` need the Pro plan + a $10/mo add-on, or a
+  Cloudflare Worker proxy which would mean moving kaiconsulting.ai's NS off Porkbun —
+  not done, decision left to Kai.)
+- **Caught a stale backend.** The live `trip-plan-page` was several commits behind the
+  repo — still titled "trip plan", no gear-inventory row, no photo support — because
+  app builds had been going out without redeploying edge functions. Redeployed all
+  three; verified the page now renders the current copy and all nine sections. Added a
+  loud note to `docs/TRIP_PLAN_OPS.md`: **edge code does not ship with the app build.**
+- **NWAC email drafted** in Kai's Gmail (to developer@nwac.us, unsent): who at NAC grants
+  production observation access, whether centers opt in individually, what they'd want
+  to review, terms of use for presenting forecast data. Kai reviews and sends.
+- **New backlog item (Kai, for after launch):** contact every avalanche center to
+  introduce the app *and* ask which weather stations they consider most representative
+  for each forecast zone — station choice is currently our guess, and local knowledge
+  beats it. Research + drafts to start once the app is publicly available. See
+  `docs/CENTER_OUTREACH.md`.
+
 ## 2026-09-11 (later) — Kai's bug sweep through profile + observation
 **Profile**
 - **Space key did nothing in gear detail fields** (stove/fire, overnight) — profile.tsx

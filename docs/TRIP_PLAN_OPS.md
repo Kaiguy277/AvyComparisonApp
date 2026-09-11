@@ -19,7 +19,11 @@ Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
   RFP@/STT); this app only uses its own key "TripPlanner" and its own subdomain. Never
   send from akrfp.com again.
 - `TRIP_NUDGE_CHANNELS` — optional, default `email`. Add `sms` when Twilio lands.
-- `TRIP_PLAN_PAGE_BASE` — optional override for the share-link base.
+- `TRIP_PLAN_PAGE_BASE` — `https://avycomparison.supabase.co/functions/v1/trip-plan-page`.
+  The project has a **vanity subdomain** (`avycomparison.supabase.co`, free, activated
+  2026-09-11) so the link a contact receives reads as this app rather than a random
+  project ref. The old `tfvxhsgwrwvendrnbrgf.supabase.co` host still resolves, so links
+  already sent keep working.
 
 ## DNS for the sending subdomains (Porkbun, kaiconsulting.ai)
 kaiconsulting.ai DNS is at **Porkbun** (login saved in Kai's Firefox; 2FA code goes to
@@ -48,6 +52,10 @@ supabase functions deploy trip-plans --use-api
 supabase functions deploy trip-plan-sweeper --use-api
 supabase functions deploy trip-plan-page --no-verify-jwt --use-api
 ```
+**Deploy after every change to `supabase/functions/**` — edge code does not ship with
+the app build.** On 2026-09-11 the live page was several commits stale (still titled
+"trip plan", no gear inventory row, no photo) because app builds had gone out without a
+function deploy. If the page looks older than the repo, this is why.
 
 ## Smoke (curl)
 See LOG 2026-09-09 for the sequence. Delete smoke plans afterwards:

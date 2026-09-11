@@ -1,6 +1,9 @@
 # Getting production NAC observation-API access
 
-Status (2026-09-09): NOT yet requested. App submits to `staging-api.avalanche.org`.
+Status (2026-09-11): **email drafted in Kai's Gmail, awaiting his send.** App still
+submits to `staging-api.avalanche.org`. Draft is addressed to developer@nwac.us and
+asks who at NAC grants production access, whether centers opt in individually, what
+they'd want to review, and the terms of use for presenting forecast data.
 
 ## What we already have
 - Client speaks the NAC observation API: `POST /v2/public/media` per photo, then
