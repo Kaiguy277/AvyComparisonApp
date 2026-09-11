@@ -21,6 +21,36 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (late night) — **BLOCKER: Supabase won't serve HTML. The packet page doesn't render.**
+- Found while trying to screenshot a sample packet: the page loads as **raw HTML source**
+  in a browser. `curl -D -` shows why — the response comes back
+  `content-type: text/plain` with `content-security-policy: default-src 'none'; sandbox`,
+  even though the function sets `text/html`.
+- **Cause (confirmed):** Supabase deliberately rewrites `text/html` → `text/plain` for GET
+  responses on `*.supabase.co` function domains, as anti-phishing. Serving HTML requires
+  **Pro plan + the Custom Domain add-on**, or hosting the page somewhere else. Refs:
+  supabase/discussions #31238, #35627, #37443.
+- **Impact is worse than the screenshot.** Two things are broken in production right now:
+  1. **Every SAR packet link.** A contact who opens one sees markup, not a page. This is
+     the whole deliverable of the "let your people know" feature.
+  2. **The App Store privacy + support URLs**, which are submission blockers. A reviewer
+     opening them sees source. That's a likely rejection.
+- **My verification was wrong, and that's the lesson.** I "verified end to end" by curling
+  the body and grepping for `<title>` and section headings — which passes happily on a
+  text/plain response. I never opened the URL in a browser or checked a response header.
+  Checking the *bytes* is not checking the *behaviour*.
+- Options (need Kai's call, all involve either money or a new account):
+  a. **Supabase Pro $25/mo + Custom Domain add-on $10/mo.** One CLI command + DNS; also
+     delivers the branded link Kai wanted. Most expensive, least moving parts.
+  b. **Deno Deploy (free).** The page function is already Deno; redeploy it there, talk to
+     Postgres with the service role. `*.deno.dev` renders HTML. Needs a Deno Deploy login.
+  c. **Cloudflare Worker (free) on `whumpf.app`** (unregistered, ~$15/yr). Worker proxies
+     to the Supabase function and re-serves as `text/html`. Needs the domain + a CF account.
+  d. **GitHub Pages** for the *static* legal pages only — free, uses the existing
+     `Kaiguy277` account, and `gh` is already authenticated here. Does not solve the
+     packet page, which is dynamic.
+- Test plan created for the screenshot has been deleted.
+
 ## 2026-09-11 (late night) — Avalanche center contact addresses researched
 - Subagent cross-checked all 28 centers against both the center's own site and the
   official `api.avalanche.org/v2/public/avalanche-center/<id>` record. **26 verified
