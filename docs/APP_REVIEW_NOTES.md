@@ -49,3 +49,16 @@ explanation heads that off.
 - Fallback if you'd rather not carry the risk at all: remove the location-wake
   path entirely (Background App Refresh + silent push still cover the common,
   not-force-quit case) — you lose only the force-quit-survival refresh.
+
+
+---
+
+## Observation submission — reviewer note
+
+> Tapping "Send observation" does not file the report directly. Whumpf is waiting on
+> production API access from the National Avalanche Center, so the app says so plainly
+> and offers to send the completed observation to the avalanche center by email
+> instead, with a PDF copy and the user's photos attached. Nothing is submitted to a
+> live forecasting system until that access is granted. A reviewer can complete the
+> form and tap the button to see the explanation; choosing "Save a PDF" exercises the
+> whole flow without sending anything.

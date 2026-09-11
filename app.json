@@ -73,7 +73,8 @@
         {
           "contactsPermission": "Allow $(PRODUCT_NAME) to pick the people you want to share your trip plan with. Contacts are only used to fill in a name, phone, and email you choose."
         }
-      ]
+      ],
+      "expo-mail-composer"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -54,6 +54,7 @@ import {
 } from "@/lib/observation/submitFlow";
 import { observationApiConfig } from "@/lib/api/observationSubmit";
 import { buildReceiptPdf, shareReceiptPdf } from "@/lib/observation/receipt";
+import { centerEmail, emailObservation } from "@/lib/observation/emailFallback";
 import {
   summarizeAbout,
   summarizeActivity,
@@ -381,6 +382,56 @@ export default function ObservationNewScreen() {
     else if (result.draftId) draftIdRef.current = result.draftId;
   }, [form, sectionNotes]);
 
+  // A record of what you sent. Built from the same merged form object the
+  // submit flow posted, so it reflects the submission, not a re-query.
+  const saveCopy = useCallback(async () => {
+    setSavingCopy(true);
+    try {
+      const merged = mergeSectionNotes(form, sectionNotes);
+      const uri = await buildReceiptPdf(merged, form.center_id || initialCenter || "");
+      if (!uri) {
+        Alert.alert("Couldn't make the PDF", "Your observation was still submitted.");
+        return;
+      }
+      await shareReceiptPdf(uri);
+    } catch {
+      Alert.alert("Couldn't share the PDF", "Your observation was still submitted.");
+    } finally {
+      setSavingCopy(false);
+    }
+  }, [form, sectionNotes, initialCenter]);
+
+  // Interim submission route: same content as the API payload, sent to the
+  // center as an email with the PDF and photos attached.
+  const emailInstead = useCallback(async () => {
+    setSavingCopy(true);
+    try {
+      const merged = mergeSectionNotes(form, sectionNotes);
+      const center = form.center_id || initialCenter || "";
+      const pdfUri = await buildReceiptPdf(merged, center);
+      const result = await emailObservation({ form: merged, centerId: center, pdfUri });
+      if (result.status === "unavailable") {
+        Alert.alert(
+          "No email account set up",
+          "Add an account in the Mail app, or use Save a PDF and send it however you like.",
+        );
+        return;
+      }
+      if (result.status === "sent" || result.status === "saved") {
+        Alert.alert(
+          result.status === "sent" ? "On its way" : "Saved as a draft",
+          "Thank you — forecasters read these. When direct submission is switched on, this " +
+            "will file straight to the center instead.",
+          [{ text: "Done", onPress: () => router.back() }],
+        );
+      }
+    } catch {
+      Alert.alert("Couldn't open your email", "Try Save a PDF instead.");
+    } finally {
+      setSavingCopy(false);
+    }
+  }, [form, sectionNotes, initialCenter, router]);
+
   const onSubmit = useCallback(() => {
     // Validate the MERGED form — the same object runSubmit sends. Section
     // notes get folded into observation_summary, so validating the raw
@@ -415,27 +466,29 @@ export default function ObservationNewScreen() {
       return;
     }
     setErrors({});
-    void runSubmit();
-  }, [form, sectionNotes, runSubmit, scrollToSection]);
 
-  // A record of what you sent. Built from the same merged form object the
-  // submit flow posted, so it reflects the submission, not a re-query.
-  const saveCopy = useCallback(async () => {
-    setSavingCopy(true);
-    try {
-      const merged = mergeSectionNotes(form, sectionNotes);
-      const uri = await buildReceiptPdf(merged, form.center_id || initialCenter || "");
-      if (!uri) {
-        Alert.alert("Couldn't make the PDF", "Your observation was still submitted.");
-        return;
-      }
-      await shareReceiptPdf(uri);
-    } catch {
-      Alert.alert("Couldn't share the PDF", "Your observation was still submitted.");
-    } finally {
-      setSavingCopy(false);
+    // Direct submission still points at NAC's staging host, so a "sent"
+    // observation would never reach a forecaster. Say so plainly and offer
+    // the email route instead of quietly posting into a test system.
+    if (observationApiConfig.isStaging) {
+      const center = form.center_id || initialCenter || "your avalanche center";
+      const to = centerEmail(form.center_id || initialCenter);
+      Alert.alert(
+        "Not connected to " + center + " yet",
+        "Whumpf is waiting on production access from the National Avalanche Center, so it " +
+          "can't file this for you directly.\n\nYour observation isn't lost. It can go to the " +
+          "center by email right now, formatted, with a PDF and your photos attached" +
+          (to ? "." : " — you'll just need to pick the address."),
+        [
+          { text: "Not now", style: "cancel" },
+          { text: "Save a PDF", onPress: () => void saveCopy() },
+          { text: "Send by email", onPress: () => void emailInstead() },
+        ],
+      );
+      return;
     }
-  }, [form, sectionNotes, initialCenter]);
+    void runSubmit();
+  }, [form, sectionNotes, runSubmit, scrollToSection, initialCenter, saveCopy, emailInstead]);
 
   const onCancelSubmission = useCallback(() => {
     abortRef.current?.abort();
@@ -991,7 +1044,7 @@ export default function ObservationNewScreen() {
                 color: palette.ink[950],
               }}
             >
-              {inFlight ? "SENDING…" : "SUBMIT OBSERVATION"}
+              {inFlight ? "SENDING…" : observationApiConfig.isStaging ? "SEND OBSERVATION" : "SUBMIT OBSERVATION"}
             </Text>
           </Touchable>
 
@@ -1004,12 +1057,9 @@ export default function ObservationNewScreen() {
               marginTop: 14,
             }}
           >
-            Sent to {form.center_id || initialCenter || "the relevant center"} via
-            avalanche.org. Email kept private; photos use the credit setting
-            you choose above.
             {observationApiConfig.isStaging
-              ? "\nTEST MODE — this build submits to NAC's staging system, not the live center."
-              : ""}
+              ? `Direct filing to ${form.center_id || initialCenter || "your center"} isn't switched on yet — we're waiting on production access from the National Avalanche Center. You can send this to them by email instead, with a PDF attached.`
+              : `Sent to ${form.center_id || initialCenter || "the relevant center"} via avalanche.org. Email kept private; photos use the credit setting you choose above.`}
           </Text>
 
           <Touchable
