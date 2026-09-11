@@ -4,14 +4,18 @@ Inventory taken 2026-09-09 in App Store Connect (app 6765956364). Builds 19 and 
 (v1.0.0) are "Ready to Submit" on TestFlight; build 20 is the candidate. Everything
 below is unset unless marked ✅. Draft values are proposals — edit, then paste.
 
+> **Status 2026-09-11:** the two hosted-page blockers are cleared. What's left all
+> lives inside App Store Connect and needs Kai signed in, plus device screenshots.
+
 ## A. Blockers (ASC will not accept the submission without these)
 
-- [ ] **Privacy policy URL** (App Privacy → Edit). Need a hosted page. Proposal: a
-      static page on the AvalancheComparison web app domain, or a GitHub Pages doc in
-      this repo. Must cover: forecast data caching, push tokens, background location
-      (trigger only, never read), observation submissions to NAC (name, email, optional
-      phone, photos, coordinates → sent to avalanche.org, not stored by us), no
-      analytics/ads, no account. Add a section for Trip Plan before that ships.
+- [x] **Privacy policy URL** — DONE, live and reviewer-reachable:
+      `https://avycomparison.supabase.co/functions/v1/legal/privacy`
+      (served by the `legal` edge function, deployed `--no-verify-jwt`; source in
+      `supabase/functions/legal/index.ts`). Covers on-device storage, what goes to NAC
+      on an observation, trip plans + 7-day deletion, the push token, the three uses of
+      location incl. "background is a trigger, coordinates never read", service
+      providers, children, deletion requests, and the safety disclaimer.
 - [ ] **App Privacy questionnaire** (Get Started → Publish). Based on the code today:
       - Contact Info · Name, Email, Phone — collected, **not linked** to identity by us
         (sent to NAC when the user submits an observation), used for App Functionality.
@@ -55,8 +59,12 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
       > your own decisions in the field.
 - [ ] **Keywords** (100 chars): `avalanche,forecast,backcountry,ski,snowmachine,
       snow,danger,CNFAIC,NWAC,SNOTEL,weather,touring`
-- [ ] **Support URL** — needs a real page (same host as the privacy policy; a
-      mailto is not accepted).
+- [x] **Support URL** — DONE:
+      `https://avycomparison.supabase.co/functions/v1/legal/support`
+      (what the app does, why EXPIRED appears, why background location is asked for,
+      Low Power Mode and background refresh, what submitting an observation does, how
+      trip plans work, deletion, bug-report guidance, data sources + no-affiliation
+      note).
 - [ ] **Copyright** — `2026 Kai Myers` (or K.AI Consulting).
 - [ ] **Build** — Add Build → 20.
 - [ ] **App Review Information**: uncheck **Sign-in required** (there is no login);

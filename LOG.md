@@ -21,6 +21,28 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (night) — App Store prep: privacy + support pages live
+- **Kai's call: submit to the App Store *before* sending the NWAC email** — so the first
+  thing they see is a real, installable app rather than a pitch.
+- **NWAC draft rewritten** to Kai's notes: dropped "built around the avalanche.org
+  platform" (read as derivative) and the Alaska framing (it's national — 92 zones, 28
+  centers). Now leads with "I'm not trying to compete; if this is useful, I'd rather see
+  it in Avy", then the actual motivation — from Anchorage it's ~1h north to Hatcher Pass,
+  ~1h south to Turnagain, a few hours east to Valdez, three centers for one Saturday —
+  then five concrete differences (cross-center side-by-side, offline-first background
+  refresh, weather stations + SNOTEL + NWS on the zone, cached day pager, trip plan/SAR
+  packet), then the four questions. Keeps the credit for their published schemas.
+- **Privacy policy + support pages written and deployed** as a `legal` edge function
+  (`--no-verify-jwt`), the last two blockers I could clear without Kai's ASC login:
+  - `https://avycomparison.supabase.co/functions/v1/legal/privacy`
+  - `https://avycomparison.supabase.co/functions/v1/legal/support`
+  Content is derived from what the code actually does, not boilerplate: no accounts/ads/
+  analytics, on-device vs. transmitted split, observations → NAC, trip plans + 7-day
+  purge, push token, the three uses of location with the background-trigger carve-out,
+  named service providers, deletion path, safety disclaimer.
+- Remaining App Store work is all inside App Store Connect (needs Kai signed in) plus
+  device screenshots — see `docs/APP_STORE_CHECKLIST.md`.
+
 ## 2026-09-11 (evening) — Real-looking SAR links, NWAC outreach drafted
 - **Share links no longer read as garbage.** Activated the project's free **vanity
   subdomain**: `tfvxhsgwrwvendrnbrgf.supabase.co` → **`avycomparison.supabase.co`**
