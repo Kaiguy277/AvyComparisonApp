@@ -21,6 +21,38 @@ Format per entry:
 
 ---
 
+## 2026-09-11 — ROOT CAUSE of every UI complaint: NativeWind drops function styles
+- **The bug behind all of it.** This project runs NativeWind v4.2.3 with
+  `jsxImportSource: "nativewind"`, so every JSX element goes through NativeWind's
+  interop. That interop **does not apply a *function* `style` on `Pressable` on
+  native** — but does on web. Any control whose layout lived in
+  `style={({ pressed }) => ({...})}` fell back to defaults on device: no padding, no
+  border, no background, no `flexDirection: "row"`, children stacked at the top-left.
+  Every complaint in this run was one symptom: "add-obs bubble is transparent"
+  (background dropped), "icons blend together" (tile borders dropped), "text doesn't
+  fit in the pills" (centering + padding dropped), and the stacked profile section
+  headers / plain-text chips in the 4:50 PM screenshot.
+- **Why it hid:** it renders *correctly* in the Expo web preview, so every screenshot I
+  took to verify a fix looked right. The codebase already held the safe pattern —
+  `ZoneTile` and the MANAGE ZONES header keep layout on a plain child View and use the
+  function style only for `opacity`, which is why those two never broke.
+- **Fix:** new `components/ui/Touchable.tsx` resolves the style function itself from
+  local pressed state and hands `Pressable` a plain object. Codemodded **28 files**
+  (every `style={({ pressed })` call site) from `Pressable` → `Touchable`; stale imports
+  cleaned. Components that style via `className` (Button, Collapsible, Checkbox) were
+  never affected and are untouched.
+- **Dynamic Type.** Kai's phone is on a larger text setting, which is why his labels
+  were oversized versus my screenshots. `components/ui/Text.tsx` now defaults to
+  `maxFontSizeMultiplier={1.25}` (overridable), and fixed-height chrome (field labels,
+  chips, gear tiles, section eyebrows, bar pills) sets `allowFontScaling={false}`.
+- **Kai's ask — a box per field, coloured by state.** New `FieldCard` in
+  `formPrimitives`: empty = sepia rim on the recessed surface; filled = frost rim +
+  tint + a corner check; focused = brighter frost; error = aspen. `TextField`,
+  `SelectField` and the trip `DateTimeField` render through it, so profile,
+  heading-out and observation all get the same separated, self-labelling boxes.
+- Gates: tsc, eslint 0 warnings, Vitest 110/110. **Shipped as TestFlight build #27**
+  (79bf132, build 7dbef0d7, submission e2254e2e).
+
 ## 2026-09-10 (night) — Build #24 device notes: pills, gear borders, profile-first flow
 - **Push was broken in prod (found in Kai's screenshot, not by us):**
   `PUSH · SUPABASE-UPSERT-ERROR · permission denied for table device_tokens`, failing
