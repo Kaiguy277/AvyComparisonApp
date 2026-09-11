@@ -56,6 +56,16 @@ Format per entry:
   {home, profile-intro, gear-grid, composer-pinned-profile}.png.
 - Shipped as build #25 (711bc8a), superseded the same night by **TestFlight build #26**
   (b4a621a, build cd2cfc72, submission 132d0472) with the pill and push fixes above.
+- **"26 never landed" — it did, just late.** Build finished 15:10 AKDT, auto-submit
+  `132d0472` FINISHED, and Apple's "1.0.0 (26) is ready to test" email arrived 15:32
+  AKDT; Kai's 14:59 screenshot predates it and was build #25 (hence the translucent
+  band). Diagnosis path worth reusing: `eas build:view <id>` shows build state but not
+  submission state, and the Expo/ASC web UIs need a login — the fastest read is the
+  EAS GraphQL API with the session secret from `~/.expo/state.json`
+  (`submissions{byId(submissionId:){status error logFiles}}`), then Kai's Gmail for
+  Apple's TestFlight mail. Note: I re-ran `eas submit` before checking, which created
+  a second, **ERRORED** submission (`01b86ec2`) because build 26 was already uploaded.
+  Harmless, but check submission status before resubmitting.
 - **Lesson recorded:** Expo web is reliable for information architecture, not for
   measured layout — percentage widths and `adjustsFontSizeToFit` both rendered
   correctly on web and wrongly on device. Check those on a phone screenshot.
