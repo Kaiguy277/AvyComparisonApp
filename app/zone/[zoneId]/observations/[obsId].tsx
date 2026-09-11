@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Linking, ScrollView, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -258,7 +259,7 @@ function MediaGallery({
         contentContainerStyle={{ gap: 8 }}
       >
         {obs.media.map((m, i) => (
-          <Pressable
+          <Touchable
             key={`${m.id ?? ""}-${i}`}
             onPress={() => onOpenPhoto(i)}
           >
@@ -273,7 +274,7 @@ function MediaGallery({
                 backgroundColor: palette.ink[700],
               }}
             />
-          </Pressable>
+          </Touchable>
         ))}
       </ScrollView>
     </Section>
@@ -497,7 +498,7 @@ function AdvancedSection({ obs }: { obs: ObservationSummary }) {
 function ViewExternalLink({ obs }: { obs: ObservationSummary }) {
   const url = viewerUrlForObservation(obs.centerId, obs.id);
   return (
-    <Pressable
+    <Touchable
       onPress={() => Linking.openURL(url)}
       style={({ pressed }) => ({
         marginTop: 4,
@@ -520,7 +521,7 @@ function ViewExternalLink({ obs }: { obs: ObservationSummary }) {
         VIEW ON {(obs.centerId ?? "AVALANCHE.ORG").toUpperCase()}
       </Text>
       <Ionicons name="open-outline" size={14} color={palette.ink[300]} />
-    </Pressable>
+    </Touchable>
   );
 }
 

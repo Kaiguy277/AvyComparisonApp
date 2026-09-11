@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
+import { Touchable } from "@/components/ui/Touchable";
 import {
   Modal,
-  Pressable,
   StatusBar,
   StyleSheet,
   View,
@@ -125,7 +125,7 @@ export function PhotoLightbox({
               paddingHorizontal: 16,
             }}
           >
-            <Pressable
+            <Touchable
               onPress={onClose}
               hitSlop={16}
               style={({ pressed }) => ({
@@ -138,7 +138,7 @@ export function PhotoLightbox({
               })}
             >
               <Ionicons name="close" size={22} color="#fff" />
-            </Pressable>
+            </Touchable>
             <Text
               variant="mono"
               weight="bold"
@@ -169,7 +169,7 @@ export function PhotoLightbox({
                 gap: 12,
               }}
             >
-              <Pressable
+              <Touchable
                 onPress={() => advance(-1)}
                 disabled={index === 0}
                 hitSlop={12}
@@ -179,7 +179,7 @@ export function PhotoLightbox({
                 })}
               >
                 <Ionicons name="chevron-back" size={24} color="#fff" />
-              </Pressable>
+              </Touchable>
 
               <View style={{ flex: 1 }}>
                 {current.caption ? (
@@ -199,7 +199,7 @@ export function PhotoLightbox({
                 )}
               </View>
 
-              <Pressable
+              <Touchable
                 onPress={() => advance(1)}
                 disabled={index >= media.length - 1}
                 hitSlop={12}
@@ -210,7 +210,7 @@ export function PhotoLightbox({
                 })}
               >
                 <Ionicons name="chevron-forward" size={24} color="#fff" />
-              </Pressable>
+              </Touchable>
             </View>
           </View>
         </View>

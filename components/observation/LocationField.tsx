@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { ActivityIndicator, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 
@@ -99,7 +100,7 @@ export function LocationField({
       <FieldLabel label={label} required={required} hint={hint} />
 
       {/* GPS button + current value display */}
-      <Pressable
+      <Touchable
         onPress={useCurrentLocation}
         disabled={busy}
         style={({ pressed }) => ({
@@ -156,7 +157,7 @@ export function LocationField({
             </Text>
           ) : null}
         </View>
-      </Pressable>
+      </Touchable>
 
       {permError ? <FieldError message={permError} /> : null}
 

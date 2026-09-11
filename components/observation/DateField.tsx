@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Modal, Platform, Pressable, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Modal, Platform, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -73,7 +74,7 @@ export function DateField({
   return (
     <View>
       <FieldLabel label={label} hint={hint} required={required} />
-      <Pressable
+      <Touchable
         onPress={openPicker}
         accessibilityRole="button"
         accessibilityLabel={`${label}, currently ${formatLong(value)}`}
@@ -109,7 +110,7 @@ export function DateField({
           </Text>
         </View>
         <Ionicons name="chevron-down" size={18} color={palette.ink[300]} />
-      </Pressable>
+      </Touchable>
       <FieldError message={error} />
 
       {Platform.OS === "android" && open ? (
@@ -130,7 +131,7 @@ export function DateField({
           animationType="slide"
           onRequestClose={() => setOpen(false)}
         >
-          <Pressable
+          <Touchable
             onPress={() => setOpen(false)}
             style={{
               flex: 1,
@@ -138,7 +139,7 @@ export function DateField({
               justifyContent: "flex-end",
             }}
           >
-            <Pressable
+            <Touchable
               onPress={() => {}}
               style={{
                 backgroundColor: palette.ink[800],
@@ -179,9 +180,9 @@ export function DateField({
                 >
                   {label}
                 </Text>
-                <Pressable onPress={() => setOpen(false)} hitSlop={10}>
+                <Touchable onPress={() => setOpen(false)} hitSlop={10}>
                   <Ionicons name="close" size={22} color={palette.ink[300]} />
-                </Pressable>
+                </Touchable>
               </View>
               <DateTimePicker
                 value={draft}
@@ -206,7 +207,7 @@ export function DateField({
                   gap: 12,
                 }}
               >
-                <Pressable
+                <Touchable
                   onPress={() => {
                     onChange(draft);
                     setOpen(false);
@@ -231,10 +232,10 @@ export function DateField({
                   >
                     DONE
                   </Text>
-                </Pressable>
+                </Touchable>
               </View>
-            </Pressable>
-          </Pressable>
+            </Touchable>
+          </Touchable>
         </Modal>
       ) : null}
     </View>

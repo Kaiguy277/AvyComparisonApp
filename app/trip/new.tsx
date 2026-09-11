@@ -3,11 +3,11 @@
 // trailhead case is: check the times, check the contacts, SEND.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Touchable } from "@/components/ui/Touchable";
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   Share,
   View,
@@ -330,7 +330,7 @@ export default function TripNewScreen() {
       {/* Pinned profile bar — the one-time setup stays one tap away from
           every trip, so adding a vehicle or a medical note never means
           hunting through menus. */}
-      <Pressable
+      <Touchable
         onPress={() => router.push("/trip/profile" as never)}
         accessibilityRole="button"
         accessibilityLabel="Open your profile"
@@ -357,7 +357,7 @@ export default function TripNewScreen() {
         <Text variant="mono" weight="medium" style={{ fontSize: 10, letterSpacing: 1.2, color: palette.frost[400] }}>
           EDIT
         </Text>
-      </Pressable>
+      </Touchable>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
           {/* WHERE */}
@@ -473,13 +473,13 @@ export default function TripNewScreen() {
                   {profile.party.map((m) => {
                     const on = (draft.party ?? []).some((x) => x.name === m.name);
                     return (
-                      <Pressable
+                      <Touchable
                         key={m.name}
                         onPress={() => set("party", on ? (draft.party ?? []).filter((x) => x.name !== m.name) : [...(draft.party ?? []), m])}
                         style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: on ? 1 : 0.5, borderColor: on ? palette.frost[400] : palette.ink[500] + "66", backgroundColor: on ? palette.frost[400] + "26" : "transparent" }}
                       >
                         <Text variant="mono" weight={on ? "bold" : "medium"} style={{ fontSize: 12, letterSpacing: 1, color: on ? palette.frost[400] : palette.ink[200] }}>{m.name.toUpperCase()}</Text>
-                      </Pressable>
+                      </Touchable>
                     );
                   })}
                 </View>
@@ -499,9 +499,9 @@ export default function TripNewScreen() {
                     selected={draft.vehicle?.type === "dropped_off"}
                     onPress={() => { set("vehicle", { id: newId(), label: "", type: "dropped_off" }); setEditVehicle(false); }}
                   />
-                  <Pressable onPress={() => { if (!draft.vehicle || profile.vehicles.some((v) => v.id === draft.vehicle?.id)) set("vehicle", { id: newId(), label: "", type: "truck" }); setEditVehicle(true); }} hitSlop={8}>
+                  <Touchable onPress={() => { if (!draft.vehicle || profile.vehicles.some((v) => v.id === draft.vehicle?.id)) set("vehicle", { id: newId(), label: "", type: "truck" }); setEditVehicle(true); }} hitSlop={8}>
                     <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>DIFFERENT VEHICLE TODAY →</Text>
-                  </Pressable>
+                  </Touchable>
                 </View>
               ) : null}
               {profile.vehicles.length === 0 || editVehicle ? (
@@ -568,7 +568,7 @@ export default function TripNewScreen() {
             </Text>
           </View>
 
-          <Pressable
+          <Touchable
             onPress={send}
             disabled={sending}
             style={({ pressed }) => ({
@@ -583,10 +583,10 @@ export default function TripNewScreen() {
             <Text variant="mono" weight="bold" style={{ fontSize: 15, letterSpacing: 1.8, color: palette.ink[950] }}>
               {sending ? "SENDING…" : "SEND TO MY PEOPLE"}
             </Text>
-          </Pressable>
-          <Pressable onPress={() => router.back()} hitSlop={8} style={{ alignSelf: "center", marginTop: 16, padding: 12 }}>
+          </Touchable>
+          <Touchable onPress={() => router.back()} hitSlop={8} style={{ alignSelf: "center", marginTop: 16, padding: 12 }}>
             <Text variant="mono" style={{ fontSize: 12, letterSpacing: 1.2, color: palette.ink[400] }}>CANCEL</Text>
-          </Pressable>
+          </Touchable>
         </ScrollView>
       </KeyboardAvoidingView>
     </ZoneScreenContainer>

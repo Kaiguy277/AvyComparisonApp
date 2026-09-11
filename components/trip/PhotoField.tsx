@@ -3,7 +3,8 @@
 // the packet JSON (no bucket, no upload, dies with the plan at purge).
 
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { ActivityIndicator, Alert, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -113,11 +114,11 @@ export function PhotoField({
             <SmallButton icon="camera-outline" label="Camera" onPress={() => pick(true)} disabled={busy} />
           </View>
           {value ? (
-            <Pressable onPress={() => onChange(undefined)} hitSlop={8}>
+            <Touchable onPress={() => onChange(undefined)} hitSlop={8}>
               <Text variant="mono" style={{ fontSize: 10, letterSpacing: 1.2, color: palette.ink[400] }}>
                 REMOVE
               </Text>
-            </Pressable>
+            </Touchable>
           ) : null}
         </View>
       </View>
@@ -137,7 +138,7 @@ function SmallButton({
   disabled?: boolean;
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       disabled={disabled}
       hitSlop={6}
@@ -159,6 +160,6 @@ function SmallButton({
       <Text variant="mono" weight="medium" style={{ fontSize: 11, letterSpacing: 1, color: palette.ink[200] }}>
         {label.toUpperCase()}
       </Text>
-    </Pressable>
+    </Touchable>
   );
 }

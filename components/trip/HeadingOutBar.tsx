@@ -5,7 +5,8 @@
 // Replaces the single REPORT FAB and the top-of-page card: the two
 // actions people take from the truck belong together, at thumb height.
 
-import { Alert, Pressable, View } from "react-native";
+import { Alert, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -71,7 +72,7 @@ export function HeadingOutBar() {
       }}
     >
       {loaded && plan ? (
-        <Pressable
+        <Touchable
           onPress={goHub}
           style={{
             alignSelf: "stretch",
@@ -106,7 +107,7 @@ export function HeadingOutBar() {
             {pendingActions > 0 ? " · syncing…" : ""}
           </Text>
           <Ionicons name="chevron-forward" size={14} color={palette.ink[400]} />
-        </Pressable>
+        </Touchable>
       ) : null}
 
       <View pointerEvents="box-none" style={{ flexDirection: "row", gap: 12 }}>
@@ -176,33 +177,48 @@ function Pill({
         opacity: disabled ? 0.6 : 1,
       }}
     >
-      <Pressable
+      <Touchable
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         style={({ pressed }) => ({
-          height: 56,
-          flexDirection: "row",
+          height: 58,
           alignItems: "center",
           justifyContent: "center",
-          gap: 8,
           paddingHorizontal: 12,
           borderRadius: 28,
           overflow: "hidden",
           backgroundColor: pressed ? "#00000022" : "transparent",
         })}
       >
-        <Ionicons name={icon} size={20} color={fg} />
-        <Text
-          variant="mono"
-          weight="bold"
-          numberOfLines={1}
-          style={{ fontSize: 12, letterSpacing: 0.8, color: fg, flexShrink: 1 }}
-        >
-          {label}
-        </Text>
-      </Pressable>
+        {/* Icon + label sit in their own centred row instead of being
+            direct children of the Pressable: on device the label kept
+            rendering below the pill's bottom edge. Two causes, both pinned
+            here — the mono face's default line box is taller than its point
+            size, so `lineHeight` is explicit; and Text scales with the
+            system Dynamic Type setting by default, which overflows a
+            fixed-height button, so scaling is off for this chrome. */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+          <Ionicons name={icon} size={18} color={fg} />
+          <Text
+            variant="mono"
+            weight="bold"
+            numberOfLines={1}
+            allowFontScaling={false}
+            style={{
+              fontSize: 12,
+              lineHeight: 14,
+              letterSpacing: 0.6,
+              color: fg,
+              textAlign: "center",
+              includeFontPadding: false,
+            }}
+          >
+            {label}
+          </Text>
+        </View>
+      </Touchable>
     </View>
   );
 }

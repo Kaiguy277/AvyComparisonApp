@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Modal, Platform, Pressable, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Modal, Platform, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -8,7 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
-import { FieldError, FieldLabel } from "@/components/observation/formPrimitives";
+import { FieldCard, FieldError, FieldLabel } from "@/components/observation/formPrimitives";
 
 // Date + time picker for trip times (future-allowed). iOS: spinner in a
 // bottom sheet, committed on Done. Android: date dialog then time dialog.
@@ -73,36 +74,22 @@ export function DateTimeField({ label, required, hint, value, onChange, minDate,
 
   return (
     <View>
-      <FieldLabel label={label} hint={hint} required={required} />
-      <Pressable
-        onPress={openPicker}
-        accessibilityRole="button"
-        style={({ pressed }) => ({
-          minHeight: 52,
-          paddingHorizontal: 14,
-          paddingVertical: 14,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          borderRadius: 10,
-          borderWidth: error ? 1 : 0.5,
-          borderColor: error ? palette.aspen[400] : pressed ? palette.frost[400] : palette.ink[500] + "66",
-          backgroundColor: palette.ink[900],
-        })}
-      >
-        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Ionicons name="time-outline" size={18} color={palette.ink[300]} />
-          <Text style={{ fontSize: 16, lineHeight: 22, color: palette.ink[100], flex: 1 }}>
-            {formatDateTime(value)}
-          </Text>
-        </View>
-        <Ionicons name="chevron-down" size={18} color={palette.ink[300]} />
-      </Pressable>
+      <Touchable onPress={openPicker} accessibilityRole="button" accessibilityLabel={label}>
+        <FieldCard filled error={!!error}>
+          <FieldLabel label={label} hint={hint} required={required} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 26 }}>
+            <Ionicons name="time-outline" size={18} color={palette.ink[300]} />
+            <Text style={{ fontSize: 16, lineHeight: 22, color: palette.ink[100], flex: 1 }}>
+              {formatDateTime(value)}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={palette.ink[300]} />
+          </View>
+        </FieldCard>
+      </Touchable>
       {quick && quick.length > 0 ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           {quick.map((q) => (
-            <Pressable
+            <Touchable
               key={q.label}
               onPress={() => onChange(q.apply(value))}
               hitSlop={6}
@@ -118,7 +105,7 @@ export function DateTimeField({ label, required, hint, value, onChange, minDate,
               <Text variant="mono" weight="medium" style={{ fontSize: 12, letterSpacing: 1, color: palette.ink[200] }}>
                 {q.label}
               </Text>
-            </Pressable>
+            </Touchable>
           ))}
         </View>
       ) : null}
@@ -136,11 +123,11 @@ export function DateTimeField({ label, required, hint, value, onChange, minDate,
 
       {Platform.OS === "ios" ? (
         <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-          <Pressable
+          <Touchable
             onPress={() => setOpen(false)}
             style={{ flex: 1, backgroundColor: "rgba(15,13,11,0.55)", justifyContent: "flex-end" }}
           >
-            <Pressable
+            <Touchable
               onPress={() => undefined}
               style={{
                 backgroundColor: palette.ink[800],
@@ -160,13 +147,13 @@ export function DateTimeField({ label, required, hint, value, onChange, minDate,
                   borderColor: palette.ink[500] + "55",
                 }}
               >
-                <Pressable onPress={() => setOpen(false)} hitSlop={10}>
+                <Touchable onPress={() => setOpen(false)} hitSlop={10}>
                   <Text style={{ fontSize: 15, color: palette.ink[300] }}>Cancel</Text>
-                </Pressable>
+                </Touchable>
                 <Text variant="mono" weight="medium" style={{ fontSize: 11, letterSpacing: 1.4, color: palette.ink[400] }}>
                   {label.toUpperCase()}
                 </Text>
-                <Pressable
+                <Touchable
                   onPress={() => {
                     onChange(draft);
                     setOpen(false);
@@ -174,7 +161,7 @@ export function DateTimeField({ label, required, hint, value, onChange, minDate,
                   hitSlop={10}
                 >
                   <Text weight="semibold" style={{ fontSize: 15, color: palette.frost[400] }}>Done</Text>
-                </Pressable>
+                </Touchable>
               </View>
               <DateTimePicker
                 value={draft}
@@ -186,8 +173,8 @@ export function DateTimeField({ label, required, hint, value, onChange, minDate,
                 textColor={palette.ink[100]}
                 style={{ alignSelf: "center" }}
               />
-            </Pressable>
-          </Pressable>
+            </Touchable>
+          </Touchable>
         </Modal>
       ) : null}
     </View>

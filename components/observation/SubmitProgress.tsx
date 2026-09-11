@@ -1,4 +1,5 @@
-import { ActivityIndicator, Modal, Pressable, View } from "react-native";
+import { ActivityIndicator, Modal, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
@@ -127,7 +128,7 @@ function BusyBody({
         </Text>
       ) : null}
       {showCancel ? (
-        <Pressable
+        <Touchable
           onPress={onCancel}
           hitSlop={8}
           style={{ paddingVertical: 8, paddingHorizontal: 12 }}
@@ -142,7 +143,7 @@ function BusyBody({
           >
             CANCEL
           </Text>
-        </Pressable>
+        </Touchable>
       ) : (
         <Text
           className="text-ink-400"
@@ -210,7 +211,7 @@ function SuccessBody({
         reports to keep the rest of the community informed.
       </Text>
 
-      <Pressable
+      <Touchable
         onPress={onBackToHome}
         style={({ pressed }) => ({
           marginTop: 8,
@@ -233,8 +234,8 @@ function SuccessBody({
         >
           DONE
         </Text>
-      </Pressable>
-      <Pressable
+      </Touchable>
+      <Touchable
         onPress={onSubmitAnother}
         hitSlop={8}
         style={{ paddingVertical: 6 }}
@@ -250,7 +251,7 @@ function SuccessBody({
         >
           SUBMIT ANOTHER
         </Text>
-      </Pressable>
+      </Touchable>
     </View>
   );
 }
@@ -299,7 +300,7 @@ function ErrorBody({
       </Text>
 
       {!offline ? (
-        <Pressable
+        <Touchable
           onPress={onRetry}
           style={({ pressed }) => ({
             marginTop: 8,
@@ -322,9 +323,9 @@ function ErrorBody({
           >
             TRY AGAIN
           </Text>
-        </Pressable>
+        </Touchable>
       ) : null}
-      <Pressable
+      <Touchable
         onPress={onDismiss}
         hitSlop={8}
         style={{ paddingVertical: 6 }}
@@ -340,7 +341,7 @@ function ErrorBody({
         >
           {offline ? "OK" : "DISMISS"}
         </Text>
-      </Pressable>
+      </Touchable>
     </View>
   );
 }

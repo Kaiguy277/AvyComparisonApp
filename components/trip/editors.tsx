@@ -2,7 +2,8 @@
 // controlled block: `value` in, `onChange(next)` out. No validation here —
 // the screens run the zod schema and pass errors down.
 
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
 import { Ionicons } from "@expo/vector-icons";
 import * as Contacts from "expo-contacts";
 
@@ -256,9 +257,9 @@ export function PartyEditor({
             <Text variant="mono" weight="medium" style={{ fontSize: 10, letterSpacing: 1.4, color: palette.ink[400] }}>
               PARTNER {i + 1}
             </Text>
-            <Pressable onPress={() => onChange(value.filter((_, j) => j !== i))} hitSlop={10}>
+            <Touchable onPress={() => onChange(value.filter((_, j) => j !== i))} hitSlop={10}>
               <Ionicons name="close-circle-outline" size={20} color={palette.ink[400]} />
-            </Pressable>
+            </Touchable>
           </View>
           <TextField label="Name" required value={m.name} onChangeText={(t) => update(i, { name: t })} autoCapitalize="words" />
           <TextField label="Phone" value={m.phone ?? ""} onChangeText={(t) => update(i, { phone: t })} keyboardType="phone-pad" />
@@ -344,13 +345,13 @@ export function ContactsEditor({
             </Text>
             <View style={{ flexDirection: "row", gap: 14 }}>
               {onSaveContact && !saved.some((s) => s.id === c.id) && c.displayName && c.email ? (
-                <Pressable onPress={() => onSaveContact(c)} hitSlop={10}>
+                <Touchable onPress={() => onSaveContact(c)} hitSlop={10}>
                   <Text variant="mono" style={{ fontSize: 10, letterSpacing: 1.2, color: palette.frost[400] }}>SAVE</Text>
-                </Pressable>
+                </Touchable>
               ) : null}
-              <Pressable onPress={() => remove(i)} hitSlop={10}>
+              <Touchable onPress={() => remove(i)} hitSlop={10}>
                 <Ionicons name="close-circle-outline" size={20} color={palette.ink[400]} />
-              </Pressable>
+              </Touchable>
             </View>
           </View>
           <TextField label="Name" required value={c.displayName} onChangeText={(t) => update(i, { displayName: t })} autoCapitalize="words" error={errors[`contacts.${i}.displayName`]} />
@@ -397,7 +398,7 @@ export function AddButton({
   icon?: React.ComponentProps<typeof Ionicons>["name"];
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       hitSlop={6}
       style={({ pressed }) => ({
@@ -418,6 +419,6 @@ export function AddButton({
       <Text variant="mono" weight="medium" style={{ fontSize: 12, letterSpacing: 1.1, color: palette.ink[200] }}>
         {label.toUpperCase()}
       </Text>
-    </Pressable>
+    </Touchable>
   );
 }

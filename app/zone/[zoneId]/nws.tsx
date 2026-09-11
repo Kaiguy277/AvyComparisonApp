@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Linking, Pressable, ScrollView, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Linking, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 
@@ -112,7 +113,7 @@ function NwsForecastView({ nws }: { nws: NwsForecast }) {
       )}
 
       {nws.forecastPageUrl ? (
-        <Pressable
+        <Touchable
           onPress={() => Linking.openURL(nws.forecastPageUrl)}
           style={({ pressed }) => ({
             marginTop: 8,
@@ -139,7 +140,7 @@ function NwsForecastView({ nws }: { nws: NwsForecast }) {
             OPEN AT WEATHER.GOV
           </Text>
           <Ionicons name="open-outline" size={14} color={palette.ink[300]} />
-        </Pressable>
+        </Touchable>
       ) : null}
     </View>
   );

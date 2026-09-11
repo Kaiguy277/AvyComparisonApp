@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Touchable } from "@/components/ui/Touchable";
 import {
   Alert,
   findNodeHandle,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   View,
 } from "react-native";
@@ -836,7 +836,7 @@ export default function ObservationNewScreen() {
                     errors={errors}
                   />
                 ))}
-                <Pressable
+                <Touchable
                   onPress={() =>
                     update("avalanches", [
                       ...form.avalanches,
@@ -870,7 +870,7 @@ export default function ObservationNewScreen() {
                   >
                     ADD AVALANCHE
                   </Text>
-                </Pressable>
+                </Touchable>
                 {errors.avalanches ? (
                   <Text
                     style={{
@@ -939,7 +939,7 @@ export default function ObservationNewScreen() {
           </CollapsibleSection>
 
           {/* SUBMIT */}
-          <Pressable
+          <Touchable
             onPress={onSubmit}
             disabled={inFlight}
             style={({ pressed }) => ({
@@ -968,7 +968,7 @@ export default function ObservationNewScreen() {
             >
               {inFlight ? "SENDING…" : "SUBMIT OBSERVATION"}
             </Text>
-          </Pressable>
+          </Touchable>
 
           <Text
             className="text-ink-400"
@@ -987,7 +987,7 @@ export default function ObservationNewScreen() {
               : ""}
           </Text>
 
-          <Pressable
+          <Touchable
             onPress={() => router.back()}
             hitSlop={8}
             style={{ alignSelf: "center", marginTop: 18, padding: 12 }}
@@ -1002,7 +1002,7 @@ export default function ObservationNewScreen() {
             >
               CANCEL
             </Text>
-          </Pressable>
+          </Touchable>
         </ScrollView>
       </KeyboardAvoidingView>
 

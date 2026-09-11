@@ -1,9 +1,9 @@
 import { useState } from "react";
+import { Touchable } from "@/components/ui/Touchable";
 import {
   Linking,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   View,
 } from "react-native";
@@ -162,7 +162,7 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
             }
           />
 
-          <Pressable
+          <Touchable
             onPress={onComplete}
             style={({ pressed }) => ({
               marginTop: 24,
@@ -182,7 +182,7 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
             >
               CONTINUE
             </Text>
-          </Pressable>
+          </Touchable>
         </ScrollView>
       </View>
     </Modal>
@@ -304,12 +304,12 @@ function PermissionRow({
   if (!onPress) return body_view;
 
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       disabled={!interactive}
       style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
     >
       {body_view}
-    </Pressable>
+    </Touchable>
   );
 }

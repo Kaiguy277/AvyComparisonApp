@@ -1,4 +1,5 @@
-import { Linking, Pressable, ScrollView, View } from "react-native";
+import { Linking, ScrollView, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 
@@ -84,7 +85,7 @@ export default function ZoneFullForecastScreen() {
               </Text>
             ) : null}
             {zone?.forecastUrl ? (
-              <Pressable
+              <Touchable
                 onPress={() => Linking.openURL(zone.forecastUrl!)}
                 style={({ pressed }) => ({
                   flexDirection: "row",
@@ -115,7 +116,7 @@ export default function ZoneFullForecastScreen() {
                   size={14}
                   color={palette.ink[300]}
                 />
-              </Pressable>
+              </Touchable>
             ) : null}
           </>
         )}

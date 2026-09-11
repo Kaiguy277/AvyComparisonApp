@@ -39,6 +39,11 @@ export function Text({
     <RNText
       className={`text-ink-100 ${className}`}
       style={[{ fontFamily: fontFor(variant, weight) }, style]}
+      // Respect the reader's Dynamic Type setting, but cap it: this app is
+      // dense and several controls are fixed-height, so an uncapped
+      // multiplier pushes labels out of their boxes. Callers can override,
+      // and chrome that must not move sets allowFontScaling={false}.
+      maxFontSizeMultiplier={1.25}
       {...props}
     />
   );

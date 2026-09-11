@@ -1,4 +1,5 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
 import * as Haptics from "expo-haptics";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -89,7 +90,7 @@ export function StationsOnlyTile({
         opacity: 0.92,
       }}
     >
-      <Pressable
+      <Touchable
         onPress={onPress}
         style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
       >
@@ -244,7 +245,7 @@ export function StationsOnlyTile({
             </Text>
           ) : null}
         </View>
-      </Pressable>
+      </Touchable>
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import { forwardRef, useState } from "react";
+import { Touchable } from "@/components/ui/Touchable";
 import {
   Modal,
-  Pressable,
   TextInput,
   type TextInputProps,
   View,
@@ -94,6 +94,7 @@ export function FieldLabel({
         <Text
           variant="mono"
           weight="medium"
+          allowFontScaling={false}
           style={{
             fontSize: 10,
             letterSpacing: 1.3,
@@ -131,7 +132,7 @@ export function HelpButton({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Pressable
+      <Touchable
         onPress={() => setOpen(true)}
         hitSlop={8}
         accessibilityRole="button"
@@ -160,14 +161,14 @@ export function HelpButton({
         >
           ?
         </Text>
-      </Pressable>
+      </Touchable>
       <Modal
         visible={open}
         transparent
         animationType="fade"
         onRequestClose={() => setOpen(false)}
       >
-        <Pressable
+        <Touchable
           onPress={() => setOpen(false)}
           style={{
             flex: 1,
@@ -177,7 +178,7 @@ export function HelpButton({
             padding: 24,
           }}
         >
-          <Pressable
+          <Touchable
             onPress={() => {}}
             style={{
               width: "100%",
@@ -204,9 +205,9 @@ export function HelpButton({
               >
                 {title}
               </Text>
-              <Pressable onPress={() => setOpen(false)} hitSlop={8}>
+              <Touchable onPress={() => setOpen(false)} hitSlop={8}>
                 <Ionicons name="close" size={20} color={palette.ink[300]} />
-              </Pressable>
+              </Touchable>
             </View>
             <Text
               className="text-ink-200"
@@ -214,8 +215,8 @@ export function HelpButton({
             >
               {body}
             </Text>
-          </Pressable>
-        </Pressable>
+          </Touchable>
+        </Touchable>
       </Modal>
     </>
   );
@@ -234,6 +235,58 @@ export function FieldError({ message }: { message?: string }) {
     >
       {message}
     </Text>
+  );
+}
+
+
+// ─────────────────────────── FieldCard ──────────────────────────────────
+
+// Every field sits in its own box so it's obvious where one tappable thing
+// ends and the next begins, and the box changes colour once it holds a
+// value. Empty = quiet sepia rim on the recessed surface; filled = frost
+// rim with a tint and a check; focused = brighter frost rim; error = aspen.
+export function FieldCard({
+  filled,
+  focused,
+  error,
+  children,
+}: {
+  filled?: boolean;
+  focused?: boolean;
+  error?: boolean;
+  children: React.ReactNode;
+}) {
+  const borderColor = error
+    ? palette.aspen[400]
+    : focused
+      ? palette.frost[400]
+      : filled
+        ? palette.frost[400] + "99"
+        : palette.ink[500] + "88";
+  return (
+    <View
+      style={{
+        borderRadius: 12,
+        borderWidth: focused || error ? 1.5 : 1,
+        borderColor,
+        backgroundColor: error
+          ? palette.aspen[400] + "0D"
+          : filled
+            ? palette.frost[400] + "0F"
+            : palette.ink[900],
+        paddingHorizontal: 12,
+        paddingTop: 10,
+        paddingBottom: 10,
+        gap: 6,
+      }}
+    >
+      {filled && !error ? (
+        <View style={{ position: "absolute", top: 8, right: 10 }}>
+          <Ionicons name="checkmark-circle" size={14} color={palette.frost[400]} />
+        </View>
+      ) : null}
+      {children}
+    </View>
   );
 }
 
@@ -260,40 +313,35 @@ export function TextField({
   ...props
 }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
+  const filled = String(props.value ?? "").trim().length > 0;
   return (
     <View>
-      <FieldLabel label={label} required={required} hint={hint} />
-      <TextInput
-        {...props}
-        multiline={multiline}
-        onFocus={(e) => {
-          setFocused(true);
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          props.onBlur?.(e);
-        }}
-        placeholderTextColor={palette.ink[400] + "AA"}
-        style={{
-          fontFamily: "InstrumentSans_400Regular",
-          fontSize: 16,
-          lineHeight: 22,
-          color: palette.ink[100],
-          backgroundColor: palette.ink[900],
-          borderWidth: focused ? 1 : 0.5,
-          borderColor: error
-            ? palette.aspen[400]
-            : focused
-              ? palette.frost[400]
-              : palette.ink[500] + "66",
-          borderRadius: 10,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          minHeight: multiline ? Math.max(88, rows * 22 + 24) : 48,
-          textAlignVertical: multiline ? "top" : "center",
-        }}
-      />
+      <FieldCard filled={filled} focused={focused} error={!!error}>
+        <FieldLabel label={label} required={required} hint={hint} />
+        <TextInput
+          {...props}
+          multiline={multiline}
+          onFocus={(e) => {
+            setFocused(true);
+            props.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            props.onBlur?.(e);
+          }}
+          placeholderTextColor={palette.ink[400] + "AA"}
+          maxFontSizeMultiplier={1.2}
+          style={{
+            fontFamily: "InstrumentSans_400Regular",
+            fontSize: 16,
+            lineHeight: 22,
+            color: palette.ink[100],
+            padding: 0,
+            minHeight: multiline ? Math.max(66, rows * 22) : 26,
+            textAlignVertical: multiline ? "top" : "center",
+          }}
+        />
+      </FieldCard>
       <FieldError message={error} />
     </View>
   );
@@ -380,7 +428,7 @@ export function Chip({
   // smaller variant for dense pickers (aspect, D-size); even that
   // exceeds Apple's HIG minimum.
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       hitSlop={6}
       style={({ pressed }) => ({
@@ -402,6 +450,7 @@ export function Chip({
       <Text
         variant="mono"
         weight={selected ? "bold" : "medium"}
+        allowFontScaling={false}
         style={{
           fontSize: size === "sm" ? 12 : 13,
           letterSpacing: 1.1,
@@ -411,7 +460,7 @@ export function Chip({
       >
         {label}
       </Text>
-    </Pressable>
+    </Touchable>
   );
 }
 
@@ -445,7 +494,7 @@ export function YesNoSwitch({
       ].map(({ v, label }) => {
         const active = value === v;
         return (
-          <Pressable
+          <Touchable
             key={String(v)}
             onPress={() => onChange(v)}
             hitSlop={6}
@@ -468,7 +517,7 @@ export function YesNoSwitch({
             >
               {label.toUpperCase()}
             </Text>
-          </Pressable>
+          </Touchable>
         );
       })}
     </View>

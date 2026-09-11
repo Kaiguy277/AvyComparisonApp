@@ -1,5 +1,6 @@
 import { forwardRef, type ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
@@ -76,7 +77,7 @@ export const CollapsibleSection = forwardRef<View, Props>(
           opacity: disabled ? 0.45 : 1,
         }}
       >
-        <Pressable
+        <Touchable
           onPress={disabled ? undefined : onToggle}
           accessibilityRole="button"
           accessibilityState={{ expanded: open, disabled }}
@@ -118,6 +119,7 @@ export const CollapsibleSection = forwardRef<View, Props>(
             <Text
               variant="mono"
               weight="medium"
+              allowFontScaling={false}
               style={{
                 fontSize: 10,
                 letterSpacing: 1.4,
@@ -153,7 +155,7 @@ export const CollapsibleSection = forwardRef<View, Props>(
             size={20}
             color={palette.ink[300]}
           />
-        </Pressable>
+        </Touchable>
 
         {open ? (
           <View style={{ padding: 16, paddingTop: 4, gap: 16 }}>
@@ -170,7 +172,7 @@ export const CollapsibleSection = forwardRef<View, Props>(
               />
             ) : null}
             {onDone ? (
-              <Pressable
+              <Touchable
                 onPress={onDone}
                 style={({ pressed }) => ({
                   marginTop: 4,
@@ -201,7 +203,7 @@ export const CollapsibleSection = forwardRef<View, Props>(
                   size={16}
                   color={palette.ink[950]}
                 />
-              </Pressable>
+              </Touchable>
             ) : null}
           </View>
         ) : null}

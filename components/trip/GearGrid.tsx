@@ -2,7 +2,8 @@
 // (sat device, radio…) reveal a one-line field beneath the grid.
 
 import { useState } from "react";
-import { Pressable, View, type LayoutChangeEvent } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { View, type LayoutChangeEvent } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
@@ -40,7 +41,7 @@ export function GearGrid({
         {GEAR_ITEMS.map((item) => {
           const on = hasItem(value, item.key);
           return (
-            <Pressable
+            <Touchable
               key={item.key}
               onPress={() => onChange(toggleItem(value, item.key))}
               accessibilityRole="checkbox"
@@ -74,6 +75,7 @@ export function GearGrid({
               <Text
                 variant="mono"
                 weight={on ? "bold" : "medium"}
+                allowFontScaling={false}
                 style={{
                   fontSize: 9,
                   letterSpacing: 0.4,
@@ -85,7 +87,7 @@ export function GearGrid({
               >
                 {item.label.toUpperCase()}
               </Text>
-            </Pressable>
+            </Touchable>
           );
         })}
       </View>

@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Alert, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -131,7 +132,7 @@ export function PhotoPicker({
                     backgroundColor: palette.ink[700],
                   }}
                 />
-                <Pressable
+                <Touchable
                   onPress={() => remove(idx)}
                   hitSlop={6}
                   accessibilityRole="button"
@@ -149,7 +150,7 @@ export function PhotoPicker({
                   }}
                 >
                   <Ionicons name="close" size={14} color="#FFF" />
-                </Pressable>
+                </Touchable>
               </View>
               <View style={{ flex: 1 }}>
                 <CaptionInput
@@ -178,7 +179,7 @@ function AddPhotoButton({
   large: boolean;
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       disabled={busy}
       style={({ pressed }) => ({
@@ -210,7 +211,7 @@ function AddPhotoButton({
       >
         {busy ? "OPENING…" : "ADD PHOTOS"}
       </Text>
-    </Pressable>
+    </Touchable>
   );
 }
 

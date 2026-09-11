@@ -1,4 +1,5 @@
-import { Modal, Pressable, View } from "react-native";
+import { Modal, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
@@ -25,7 +26,7 @@ export function LocationPrompt({ visible, onEnable, onDismiss, busy }: Props) {
       statusBarTranslucent
       onRequestClose={onDismiss}
     >
-      <Pressable
+      <Touchable
         onPress={onDismiss}
         style={{
           flex: 1,
@@ -35,7 +36,7 @@ export function LocationPrompt({ visible, onEnable, onDismiss, busy }: Props) {
         }}
       >
         {/* Swallow taps on the card so the backdrop press doesn't close it. */}
-        <Pressable
+        <Touchable
           onPress={() => {}}
           style={{
             backgroundColor: palette.ink[900],
@@ -96,7 +97,7 @@ export function LocationPrompt({ visible, onEnable, onDismiss, busy }: Props) {
           </Text>
 
           {/* Enable */}
-          <Pressable
+          <Touchable
             onPress={onEnable}
             disabled={busy}
             style={({ pressed }) => ({
@@ -115,10 +116,10 @@ export function LocationPrompt({ visible, onEnable, onDismiss, busy }: Props) {
             >
               {busy ? "REQUESTING…" : "ENABLE LOCATION"}
             </Text>
-          </Pressable>
+          </Touchable>
 
           {/* Not now */}
-          <Pressable
+          <Touchable
             onPress={onDismiss}
             disabled={busy}
             style={({ pressed }) => ({
@@ -135,9 +136,9 @@ export function LocationPrompt({ visible, onEnable, onDismiss, busy }: Props) {
             >
               NOT NOW
             </Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
+          </Touchable>
+        </Touchable>
+      </Touchable>
     </Modal>
   );
 }

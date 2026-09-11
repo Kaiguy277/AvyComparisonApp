@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Modal, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
-import { FieldError, FieldLabel } from "./formPrimitives";
+import { FieldCard, FieldError, FieldLabel } from "./formPrimitives";
 
 // iOS-style tap-to-open select. Renders as a single-tap field that
 // pops a bottom sheet with the option list. Tap = single-select with
@@ -55,46 +56,37 @@ export function SelectField<V extends string>({
   const selected = options.find((o) => o.value === value);
   return (
     <View>
-      <FieldLabel label={label} hint={hint} required={required} help={help} />
-      <Pressable
+      <Touchable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`${label}, currently ${selected?.label ?? "not set"}`}
-        style={({ pressed }) => ({
-          minHeight: 52,
-          paddingHorizontal: 14,
-          paddingVertical: 14,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          borderRadius: 10,
-          borderWidth: error ? 1 : 0.5,
-          borderColor: error
-            ? palette.aspen[400]
-            : pressed
-              ? palette.frost[400]
-              : palette.ink[500] + "66",
-          backgroundColor: palette.ink[900],
-        })}
       >
-        <Text
-          style={{
-            fontSize: 16,
-            lineHeight: 22,
-            color: selected ? palette.ink[100] : palette.ink[400] + "DD",
-            flex: 1,
-          }}
-          numberOfLines={1}
-        >
-          {selected?.label ?? placeholder}
-        </Text>
-        <Ionicons
-          name="chevron-down"
-          size={18}
-          color={palette.ink[300]}
-        />
-      </Pressable>
+        <FieldCard filled={!!selected} error={!!error}>
+          <FieldLabel label={label} hint={hint} required={required} help={help} />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              minHeight: 26,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                lineHeight: 22,
+                color: selected ? palette.ink[100] : palette.ink[400] + "DD",
+                flex: 1,
+              }}
+              numberOfLines={1}
+            >
+              {selected?.label ?? placeholder}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={palette.ink[300]} />
+          </View>
+        </FieldCard>
+      </Touchable>
       <FieldError message={error} />
 
       <PickerSheet
@@ -175,7 +167,7 @@ export function MultiSelectField<V extends string>({
   return (
     <View>
       <FieldLabel label={label} hint={hint} required={required} />
-      <Pressable
+      <Touchable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`${label}, ${selected.length} selected`}
@@ -209,7 +201,7 @@ export function MultiSelectField<V extends string>({
           {display}
         </Text>
         <Ionicons name="chevron-down" size={18} color={palette.ink[300]} />
-      </Pressable>
+      </Touchable>
       <FieldError message={error} />
 
       <PickerSheet
@@ -259,7 +251,7 @@ function PickerSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <Pressable
+      <Touchable
         onPress={onClose}
         style={{
           flex: 1,
@@ -267,7 +259,7 @@ function PickerSheet({
           justifyContent: "flex-end",
         }}
       >
-        <Pressable
+        <Touchable
           onPress={() => {
             /* swallow taps so the backdrop only closes from outside the sheet */
           }}
@@ -313,9 +305,9 @@ function PickerSheet({
             >
               {title}
             </Text>
-            <Pressable onPress={onClose} hitSlop={10}>
+            <Touchable onPress={onClose} hitSlop={10}>
               <Ionicons name="close" size={22} color={palette.ink[300]} />
-            </Pressable>
+            </Touchable>
           </View>
           <ScrollView
             contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 4 }}
@@ -346,7 +338,7 @@ function PickerSheet({
               >
                 {footerLabel?.toUpperCase()}
               </Text>
-              <Pressable
+              <Touchable
                 onPress={onDone}
                 style={({ pressed }) => ({
                   paddingHorizontal: 22,
@@ -368,11 +360,11 @@ function PickerSheet({
                 >
                   DONE
                 </Text>
-              </Pressable>
+              </Touchable>
             </View>
           ) : null}
-        </Pressable>
-      </Pressable>
+        </Touchable>
+      </Touchable>
     </Modal>
   );
 }
@@ -391,7 +383,7 @@ function PickerRow({
   multi?: boolean;
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       style={({ pressed }) => ({
         minHeight: 56,
@@ -439,6 +431,6 @@ function PickerRow({
           </Text>
         ) : null}
       </View>
-    </Pressable>
+    </Touchable>
   );
 }

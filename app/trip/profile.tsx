@@ -4,7 +4,8 @@
 // survive a night out) live in the composer instead.
 
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
@@ -190,14 +191,14 @@ export default function TripProfileScreen() {
                     onPress={() => setEditingVehicle(editingVehicle === v.id ? null : v.id)}
                     trailing={
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                        <Pressable onPress={() => update((p) => ({ ...p, defaultVehicleId: v.id }))} hitSlop={8}>
+                        <Touchable onPress={() => update((p) => ({ ...p, defaultVehicleId: v.id }))} hitSlop={8}>
                           <Text variant="mono" style={{ fontSize: 10, letterSpacing: 1.2, color: profile.defaultVehicleId === v.id ? palette.frost[500] : palette.ink[400] }}>
                             {profile.defaultVehicleId === v.id ? "USUAL" : "SET USUAL"}
                           </Text>
-                        </Pressable>
-                        <Pressable onPress={() => update((p) => ({ ...p, vehicles: p.vehicles.filter((_, j) => j !== i) }))} hitSlop={10}>
+                        </Touchable>
+                        <Touchable onPress={() => update((p) => ({ ...p, vehicles: p.vehicles.filter((_, j) => j !== i) }))} hitSlop={10}>
                           <Ionicons name="close-circle-outline" size={20} color={palette.ink[400]} />
-                        </Pressable>
+                        </Touchable>
                       </View>
                     }
                   />
@@ -233,11 +234,11 @@ export default function TripProfileScreen() {
               Tap what you own. On each trip you&apos;ll confirm what&apos;s actually in the pack.
             </Text>
             <GearGrid value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: gearProfileSchema.parse(g) }))} />
-            <Pressable onPress={() => setMoreGear((m) => !m)} hitSlop={8}>
+            <Touchable onPress={() => setMoreGear((m) => !m)} hitSlop={8}>
               <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.frost[400] }}>
                 {moreGear ? "HIDE KIT DETAILS" : "ADD COLORS, SKIS / SLED, TENT →"}
               </Text>
-            </Pressable>
+            </Touchable>
             {moreGear ? (
               <KitDetailsEditor value={profile.gear} onChange={(g) => update((p) => ({ ...p, gear: gearProfileSchema.parse(g) }))} />
             ) : null}
@@ -292,7 +293,7 @@ export default function TripProfileScreen() {
           </CollapsibleSection>
 
           {isIntro ? (
-            <Pressable
+            <Touchable
               onPress={() => router.replace("/trip/new" as never)}
               disabled={!done.contact || !done.people}
               style={({ pressed }) => ({
@@ -312,7 +313,7 @@ export default function TripProfileScreen() {
               <Text variant="mono" weight="bold" style={{ fontSize: 13, letterSpacing: 1.4, color: "#FFFFFF" }}>
                 {!done.contact || !done.people ? "FINISH 1 AND 2 TO CONTINUE" : "CONTINUE — PLAN A TRIP"}
               </Text>
-            </Pressable>
+            </Touchable>
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>

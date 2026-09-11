@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Touchable } from "@/components/ui/Touchable";
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +9,6 @@ import {
   Linking,
   Modal,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   View,
@@ -778,7 +778,7 @@ export default function Index() {
               gap: 10,
             }}
           >
-            <Pressable
+            <Touchable
               onLongPress={async () => {
                 const next = await toggleDebugMode();
                 Haptics.notificationAsync(
@@ -804,7 +804,7 @@ export default function Index() {
               >
                 AVY · COMPARISON
               </Text>
-            </Pressable>
+            </Touchable>
             <View style={{ flex: 1 }} />
             <View
               style={{
@@ -813,7 +813,7 @@ export default function Index() {
                 gap: 6,
               }}
             >
-              <Pressable
+              <Touchable
                 onPress={() => stepDate(-1)}
                 hitSlop={10}
                 disabled={!canStepBack}
@@ -828,7 +828,7 @@ export default function Index() {
                   size={14}
                   color={palette.ink[200]}
                 />
-              </Pressable>
+              </Touchable>
               <Text
                 variant="mono"
                 weight="medium"
@@ -839,7 +839,7 @@ export default function Index() {
                   ? `${today.weekday.slice(0, 3)} · ${today.month.slice(0, 3)} ${today.day}`
                   : viewedDateLabel(viewedDate)}
               </Text>
-              <Pressable
+              <Touchable
                 onPress={() => stepDate(1)}
                 hitSlop={10}
                 disabled={!canStepForward}
@@ -854,7 +854,7 @@ export default function Index() {
                   size={14}
                   color={palette.ink[200]}
                 />
-              </Pressable>
+              </Touchable>
             </View>
           </View>
 
@@ -929,7 +929,7 @@ export default function Index() {
               overflow: "hidden",
             }}
           >
-            <Pressable
+            <Touchable
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
                 setPickerOpen((v) => !v);
@@ -987,7 +987,7 @@ export default function Index() {
                   color={palette.ink[300]}
                 />
               </View>
-            </Pressable>
+            </Touchable>
             {!pickerOpen ? null : (
             <View
               style={{
@@ -1115,7 +1115,7 @@ export default function Index() {
                 BROWSE & ADD ZONES
               </Text>
               <View style={{ flexDirection: "row", gap: 10 }}>
-                <Pressable
+                <Touchable
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {});
                     setCompareOpen((v) => !v);
@@ -1156,8 +1156,8 @@ export default function Index() {
                   >
                     Compare zones from any center
                   </Text>
-                </Pressable>
-                <Pressable
+                </Touchable>
+                <Touchable
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {});
                     mapBaselineIdsRef.current = displayedZoneIds;
@@ -1193,7 +1193,7 @@ export default function Index() {
                   >
                     Find by location
                   </Text>
-                </Pressable>
+                </Touchable>
               </View>
 
               {/* COMPARE — collapsed by default. The hierarchical selector +
@@ -1562,7 +1562,7 @@ export default function Index() {
                 The archive only fills going forward — nothing was cached
                 before the cron started running for these zones.
               </Text>
-              <Pressable
+              <Touchable
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
                   setViewedDate(todayStr);
@@ -1589,7 +1589,7 @@ export default function Index() {
                 >
                   BACK TO TODAY
                 </Text>
-              </Pressable>
+              </Touchable>
             </View>
           ) : (
             <View
@@ -1735,7 +1735,7 @@ export default function Index() {
                 doesn't get lost in the shadow + nested-View layout the way
                 a single outer Pressable sometimes does on iOS. Both fire
                 the same kaiconsulting.ai open. */}
-            <Pressable
+            <Touchable
               onPress={() => Linking.openURL("https://kaiconsulting.ai")}
               hitSlop={8}
               style={({ pressed }) => ({
@@ -1753,8 +1753,8 @@ export default function Index() {
                 }}
                 resizeMode="contain"
               />
-            </Pressable>
-            <Pressable
+            </Touchable>
+            <Touchable
               onPress={() => Linking.openURL("https://kaiconsulting.ai")}
               hitSlop={8}
               style={({ pressed }) => ({
@@ -1782,7 +1782,7 @@ export default function Index() {
                 color={palette.frost[400]}
                 style={{ transform: [{ rotate: "-45deg" }] }}
               />
-            </Pressable>
+            </Touchable>
 
             <Text
               variant="mono"
@@ -1849,7 +1849,7 @@ export default function Index() {
                 justifyContent: "space-between",
               }}
             >
-              <Pressable
+              <Touchable
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
                   updateDisplayedZones(mapBaselineIdsRef.current);
@@ -1877,9 +1877,9 @@ export default function Index() {
                 >
                   CANCEL
                 </Text>
-              </Pressable>
+              </Touchable>
 
-              <Pressable
+              <Touchable
                 onPress={() => {
                   if (displayedZoneIds.length === 0) return;
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
@@ -1918,7 +1918,7 @@ export default function Index() {
                     ? "PICK A ZONE"
                     : `VIEW ${displayedZoneIds.length} ZONE${displayedZoneIds.length === 1 ? "" : "S"}`}
                 </Text>
-              </Pressable>
+              </Touchable>
             </View>
           </View>
 
@@ -1978,7 +1978,7 @@ function PushDiagnosticLine() {
   return (
     <View style={{ marginTop: 6, gap: 4 }}>
       {showPush ? (
-        <Pressable
+        <Touchable
           onPress={onTap}
           style={{
             flexDirection: "row",
@@ -2022,7 +2022,7 @@ function PushDiagnosticLine() {
           >
             · TAP TO RETRY
           </Text>
-        </Pressable>
+        </Touchable>
       ) : null}
       {showBgWake ? (
         <View
@@ -2102,7 +2102,7 @@ function ObservationDraftsBanner() {
   )[0];
 
   return (
-    <Pressable
+    <Touchable
       onPress={() =>
         router.push(
           `/observation/new?draftId=${encodeURIComponent(nextDraft.id)}` as never,
@@ -2153,7 +2153,7 @@ function ObservationDraftsBanner() {
         size={14}
         color={palette.aspen[400]}
       />
-    </Pressable>
+    </Touchable>
   );
 }
 
@@ -2218,7 +2218,7 @@ function LocationWakeBanner() {
         gap: 10,
       }}
     >
-      <Pressable
+      <Touchable
         onPress={onEnable}
         disabled={busy}
         style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
@@ -2240,11 +2240,11 @@ function LocationWakeBanner() {
             after you close the app or drop out of service.
           </Text>
         </View>
-      </Pressable>
+      </Touchable>
       {/* Dismiss (snooze) */}
-      <Pressable onPress={onDismiss} disabled={busy} hitSlop={8}>
+      <Touchable onPress={onDismiss} disabled={busy} hitSlop={8}>
         <Ionicons name="close" size={16} color={palette.ink[400]} />
-      </Pressable>
+      </Touchable>
     </View>
   );
 }
@@ -2259,7 +2259,7 @@ function SourceLink({
   url: string;
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={() => Linking.openURL(url)}
       className="flex-row items-center justify-between"
       hitSlop={6}
@@ -2282,7 +2282,7 @@ function SourceLink({
           style={{ transform: [{ rotate: "-45deg" }] }}
         />
       </View>
-    </Pressable>
+    </Touchable>
   );
 }
 

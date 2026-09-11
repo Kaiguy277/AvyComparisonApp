@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { ScrollView, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -87,7 +88,7 @@ export default function ZoneObservationsScreen() {
         eyebrow="OBSERVATIONS"
         title={displayName}
         rightAction={
-          <Pressable
+          <Touchable
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
               router.push({
@@ -124,7 +125,7 @@ export default function ZoneObservationsScreen() {
             >
               REPORT
             </Text>
-          </Pressable>
+          </Touchable>
         }
       />
 
@@ -231,7 +232,7 @@ function ToggleHalf({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       hitSlop={4}
       style={{
@@ -256,7 +257,7 @@ function ToggleHalf({
       >
         {label}
       </Text>
-    </Pressable>
+    </Touchable>
   );
 }
 
@@ -300,7 +301,7 @@ function EmptyState({
         Nothing has been reported inside this zone since mid-March, but{" "}
         {centerName} has neighbor obs you can browse.
       </Text>
-      <Pressable
+      <Touchable
         onPress={onSwitchToAll}
         style={({ pressed }) => ({
           marginTop: 16,
@@ -323,7 +324,7 @@ function EmptyState({
           SHOW ALL CENTER OBS
         </Text>
         <Ionicons name="chevron-forward" size={14} color="#4FB3C9" />
-      </Pressable>
+      </Touchable>
     </View>
   );
 }
@@ -342,7 +343,7 @@ function ObservationCard({
   const byline = formatByline(obs);
 
   return (
-    <Pressable
+    <Touchable
       onPress={onOpen}
       style={({ pressed }) => ({
         backgroundColor: pressed ? palette.ink[700] : palette.ink[800],
@@ -438,7 +439,7 @@ function ObservationCard({
             contentContainerStyle={{ gap: 6, paddingTop: 4 }}
           >
             {obs.media.slice(0, 6).map((m, i) => (
-              <Pressable
+              <Touchable
                 key={`${m.id ?? ""}-${i}`}
                 onPress={() => onOpenPhoto(i)}
                 hitSlop={4}
@@ -454,7 +455,7 @@ function ObservationCard({
                     backgroundColor: palette.ink[700],
                   }}
                 />
-              </Pressable>
+              </Touchable>
             ))}
           </ScrollView>
         ) : null}
@@ -480,7 +481,7 @@ function ObservationCard({
           <Ionicons name="chevron-forward" size={14} color={palette.ink[400]} />
         </View>
       </View>
-    </Pressable>
+    </Touchable>
   );
 }
 

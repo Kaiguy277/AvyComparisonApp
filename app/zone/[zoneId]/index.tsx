@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Dimensions, Linking, Pressable, ScrollView, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Dimensions, Linking, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -143,7 +144,7 @@ export default function ZoneDetailScreen() {
           borderColor: palette.ink[700],
         }}
       >
-        <Pressable
+        <Touchable
           onPress={() => {
             Haptics.selectionAsync().catch(() => {});
             router.back();
@@ -151,7 +152,7 @@ export default function ZoneDetailScreen() {
           hitSlop={12}
         >
           <Ionicons name="chevron-back" size={24} color={palette.ink[100]} />
-        </Pressable>
+        </Touchable>
         <View style={{ flex: 1 }}>
           <Text
             variant="display"
@@ -458,7 +459,7 @@ export default function ZoneDetailScreen() {
                 near the top of the page. */}
 
             {zone.forecastUrl ? (
-              <Pressable
+              <Touchable
                 onPress={() => Linking.openURL(zone.forecastUrl)}
                 style={({ pressed }) => ({
                   marginTop: 24,
@@ -490,7 +491,7 @@ export default function ZoneDetailScreen() {
                   size={14}
                   color={palette.ink[300]}
                 />
-              </Pressable>
+              </Touchable>
             ) : null}
           </>
         )}
@@ -635,7 +636,7 @@ function SubTile({
         opacity: disabled ? 0.45 : 1,
       }}
     >
-      <Pressable
+      <Touchable
         onPress={disabled ? undefined : onPress}
         disabled={disabled}
         style={({ pressed }) => ({
@@ -703,7 +704,7 @@ function SubTile({
             ) : null}
           </View>
         </View>
-      </Pressable>
+      </Touchable>
     </View>
   );
 }

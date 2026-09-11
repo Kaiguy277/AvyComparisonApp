@@ -1,7 +1,8 @@
 // Saved vehicles as tappable cards. In the composer a tap selects
 // ("that's the one I'm taking"); in the profile a tap expands the editor.
 
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { Text } from "@/components/ui/Text";
@@ -37,7 +38,7 @@ export function VehicleCard({
   trailing?: React.ReactNode;
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
@@ -69,6 +70,6 @@ export function VehicleCard({
         </Text>
       </View>
       {trailing ?? (selected ? <MaterialCommunityIcons name="check-circle" size={22} color={palette.frost[500]} /> : null)}
-    </Pressable>
+    </Touchable>
   );
 }

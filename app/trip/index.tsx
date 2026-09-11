@@ -2,7 +2,8 @@
 // fast path: repeat last trip, saved trips, favorite zones, new plan.
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Share, View } from "react-native";
+import { Touchable } from "@/components/ui/Touchable";
+import { Alert, ScrollView, Share, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -79,9 +80,9 @@ export default function TripHubScreen() {
         eyebrow={live ? "YOUR PEOPLE KNOW" : "PLAN FOR THE WORST · HOPE FOR THE BEST"}
         title={live ? plan!.areaName : "Let your people know"}
         rightAction={
-          <Pressable onPress={() => router.push("/trip/profile" as never)} hitSlop={10}>
+          <Touchable onPress={() => router.push("/trip/profile" as never)} hitSlop={10}>
             <Ionicons name="person-circle-outline" size={26} color={palette.ink[200]} />
-          </Pressable>
+          </Touchable>
         }
       />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 14 }}>
@@ -146,7 +147,7 @@ export default function TripHubScreen() {
                 <Eyebrow>YOUR FAVORITE ZONES</Eyebrow>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                   {favZones.map((z) => (
-                    <Pressable
+                    <Touchable
                       key={z.id}
                       onPress={() => router.push(`/trip/new?zoneId=${encodeURIComponent(z.id)}` as never)}
                       style={({ pressed }) => ({
@@ -161,7 +162,7 @@ export default function TripHubScreen() {
                       <Text variant="mono" weight="medium" style={{ fontSize: 12, letterSpacing: 1, color: palette.ink[200] }}>
                         {z.name.toUpperCase()}
                       </Text>
-                    </Pressable>
+                    </Touchable>
                   ))}
                 </View>
               </View>
@@ -253,11 +254,11 @@ function PlanCard({
               </Text>
             </View>
             {!closed && c.shareUrl ? (
-              <Pressable onPress={() => onShare(c.id)} hitSlop={8} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, borderWidth: 0.5, borderColor: palette.ink[500] }}>
+              <Touchable onPress={() => onShare(c.id)} hitSlop={8} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, borderWidth: 0.5, borderColor: palette.ink[500] }}>
                 <Text variant="mono" weight="medium" style={{ fontSize: 11, letterSpacing: 1.1, color: palette.ink[200] }}>
                   {c.sharedAt ? "RESEND" : "SEND"}
                 </Text>
-              </Pressable>
+              </Touchable>
             ) : null}
           </View>
         ))}
@@ -276,7 +277,7 @@ function PlanCard({
 
       {!closed ? (
         <>
-          <Pressable
+          <Touchable
             onPress={onCheckIn}
             disabled={!!plan.checkInQueuedAt}
             style={({ pressed }) => ({
@@ -290,10 +291,10 @@ function PlanCard({
             <Text variant="mono" weight="bold" style={{ fontSize: 15, letterSpacing: 1.8, color: palette.ink[950] }}>
               {plan.checkInQueuedAt ? "CHECK-IN QUEUED — WILL SEND ON SIGNAL" : "I'M BACK"}
             </Text>
-          </Pressable>
-          <Pressable onPress={onCancel} hitSlop={8} style={{ alignSelf: "center", padding: 8 }}>
+          </Touchable>
+          <Touchable onPress={onCancel} hitSlop={8} style={{ alignSelf: "center", padding: 8 }}>
             <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.ink[400] }}>CANCEL TRIP</Text>
-          </Pressable>
+          </Touchable>
         </>
       ) : (
         <Button variant="outline" onPress={onDismiss}>DISMISS</Button>
@@ -352,7 +353,7 @@ function QuickRow({ icon, eyebrow, title, subtitle, onPress, primary }: {
   primary?: boolean;
 }) {
   return (
-    <Pressable
+    <Touchable
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
         onPress();
@@ -376,6 +377,6 @@ function QuickRow({ icon, eyebrow, title, subtitle, onPress, primary }: {
         <Text className="text-ink-400" style={{ fontSize: 12, marginTop: 1 }}>{subtitle}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={palette.ink[400]} />
-    </Pressable>
+    </Touchable>
   );
 }
