@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Collapsible } from "@/components/ui/Collapsible";
 import { Text } from "@/components/ui/Text";
+import { DEMO_MODE } from "@/lib/forecast/demoData";
 import { HeadingOutBar } from "@/components/trip/HeadingOutBar";
 import { FavoritesReorder } from "@/components/avalanche/FavoritesReorder";
 import { HierarchicalZoneSelector } from "@/components/avalanche/HierarchicalZoneSelector";
@@ -909,10 +910,12 @@ export default function Index() {
             </View>
           ) : null}
 
+          {/* Hidden in store-screenshot mode: these lines are developer
+              diagnostics and (on web) report a platform the store never sees. */}
           {/* Push diagnostic — shown only when registration didn't
               succeed. Tap to retry. Helps debug TestFlight builds
               where there's no console access. */}
-          <PushDiagnosticLine />
+          {DEMO_MODE ? null : <PushDiagnosticLine />}
         </View>
 
         {/* MANAGE ZONES — tile-style pane matching the zone tiles +

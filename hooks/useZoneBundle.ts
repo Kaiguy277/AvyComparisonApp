@@ -7,6 +7,7 @@ import {
 } from "@/lib/offlineCache";
 import { getZoneSession } from "@/lib/zoneSession";
 import { todayKey } from "@/lib/dates";
+import { DEMO_MODE, demoZoneBundle } from "@/lib/forecast/demoData";
 import type {
   AvalancheZone,
   WeatherObservation,
@@ -63,6 +64,20 @@ export function useZoneBundle(
 
   const effectiveDate = date ?? todayKey();
   const isToday = effectiveDate === todayKey();
+
+  // Store-screenshot mode; never set in a production build (see demoData.ts).
+  if (DEMO_MODE) {
+    const demo = demoZoneBundle(zoneId);
+    return {
+      loaded: true,
+      snap: null,
+      forecast: demo.forecast,
+      stations: demo.stations,
+      weather: undefined,
+      cachedAt: demo.cachedAt,
+      isToday,
+    };
+  }
 
   // Today → newest stored bundle (undefined date); archive → exact date.
   const bundle = snap

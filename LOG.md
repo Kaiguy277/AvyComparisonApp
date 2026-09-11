@@ -21,6 +21,23 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (late night) — Store screenshots from sample data
+- **Problem:** it's September. Every real zone reads EXPIRED with May dates, which shows
+  the app at its least useful and tells a store browser nothing.
+- **`lib/forecast/demoData.ts`, gated on `EXPO_PUBLIC_DEMO=1`** (absent from `.env` and
+  `eas.json`, so a production build cannot enable it). Four hand-written mid-winter
+  Alaska zones — plausible values, not a copy of any real forecast — wired in at two
+  seams: `loadForecastBundle` (home) and `useZoneBundle` (zone detail, which reads the
+  snapshot and would otherwise still show stale real data). Demo mode also hides the
+  dev diagnostic lines.
+- **Capture method worth keeping** (App Store wants 1290×2796 and the browser runs at
+  DPR 1): set the viewport to 1290×2796, override `window.innerWidth/innerHeight` to
+  430×932 so RN Web lays out phone-sized, then `transform: scale(3)` on `#root` with
+  `transform-origin: 0 0`. Text renders as true 3× vectors rather than an upscaled
+  blur. Inject CSS to hide scrollbars. **Gotcha:** don't leave `documentElement.zoom`
+  set from an earlier attempt — it compounds with the transform (9× the first time).
+- Five shots in `docs/store-screenshots/`, all verified 1290×2796.
+
 ## 2026-09-11 (late night) — Subtitle, and an honest answer to the staging problem
 - **Subtitle** (30-char cap, measured not guessed): `Avalanche forecasts, obs, plan` —
   exactly 30. Keeps "Avalanche" because the name Whumpf tells a stranger nothing about

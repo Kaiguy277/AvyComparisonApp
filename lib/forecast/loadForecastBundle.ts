@@ -26,6 +26,7 @@ import type {
 } from "@/lib/api/avalanche";
 import { loadSnapshot } from "@/lib/offlineCache";
 import { AVAILABLE_ZONES, ZONE_TO_CENTER } from "@/lib/zones";
+import { DEMO_MODE, demoBundle } from "./demoData";
 
 export interface WeatherForecastBundle {
   centerWeather: Record<string, NacWeatherProduct>;
@@ -75,6 +76,9 @@ export async function loadForecastBundle(
 ): Promise<ForecastBundle> {
   const { zoneIds, date, isToday, isOnline } = args;
   if (zoneIds.length === 0) return emptyBundle("cached");
+
+  // Store-screenshot mode. Never set in a production build; see demoData.ts.
+  if (DEMO_MODE) return demoBundle(zoneIds);
 
   // Offline: the snapshot is the only source. Newest-per-zone for today,
   // exact date for an archive day (mirrors useZoneBundle's safety rule).

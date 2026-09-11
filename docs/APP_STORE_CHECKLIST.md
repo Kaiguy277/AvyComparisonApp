@@ -39,10 +39,13 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
       `docs/NAC_PRODUCTION_ACCESS.md`.
 - [ ] **Pricing** — Add Pricing → Free. **Availability** — United States only for 1.0
       (NAC data is US-only; avoids DSA/EU trader verification).
-- [ ] **Screenshots** — 0 of 10. Need 6.9" (iPhone 16 Pro Max class) set at minimum;
-      ASC reuses them for smaller sizes. Suggested 5: home zone tiles, zone forecast
-      with danger rose, problems detail, weather stations, observation form. Capture on
-      device from build 20 (Settings → screenshot), no simulator here.
+- [x] **Screenshots** — 5 generated at 1290×2796 (6.9"), in `docs/store-screenshots/`:
+      home comparison, zone forecast, weather stations, "Let your people know" hub,
+      observation form. Produced from the real UI with sample mid-winter data
+      (`EXPO_PUBLIC_DEMO=1`, see `lib/forecast/demoData.ts`) because every real zone
+      reads EXPIRED outside the season. Method: Expo web at a 430×932 layout scaled 3×
+      for true-resolution text — see LOG 2026-09-11. Review before upload; swap for
+      device captures mid-winter if preferred.
 - [ ] **Description** (4,000 max). Draft:
       > Compare avalanche forecasts side by side. Avy Comparison pulls the daily
       > forecast for every zone you care about — danger ratings by elevation,
