@@ -16,6 +16,40 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-11 — One bug, five complaints, and the danger of a convincing preview
+
+Every UI note Kai has given me in the last two days was the same defect. NativeWind's
+JSX interop silently ignores a function `style` on `Pressable` on native. If a control
+put its layout in `style={({ pressed }) => ({ flexDirection: "row", padding, border,
+backgroundColor })}`, all of that vanished on the phone and the Pressable rendered as a
+bare box with its children stacked top-left. "The bubble is transparent." "The icons
+blend together." "The text doesn't fit in the pills." Each time I treated it as a
+styling opinion and adjusted the styling — of code that was never running.
+
+What let it survive four rounds of fixes is that it renders perfectly on Expo web, and
+web is what I was screenshotting to check my work. I even wrote an entry two sessions
+ago saying web is unreliable for measured layout and that I'd verify on device
+screenshots. I then kept using web as proof anyway, because it was fast and it agreed
+with me. A verification tool that shares the bug it is meant to catch is worse than no
+tool, because it manufactures confidence.
+
+The tell was sitting in the repo the whole time. `ZoneTile` and the MANAGE ZONES header
+never broke, and both follow a different shape: layout on a plain child View, function
+style used only for `opacity`. Two components written earlier had already routed around
+the bug, probably by accident. When part of a codebase consistently avoids an ergonomic
+pattern, that is evidence, not style.
+
+The fix is a `Touchable` that resolves the function itself and hands Pressable a plain
+object, applied across 28 files, so the ergonomic pattern is safe everywhere instead of
+every future call site having to remember a workaround.
+
+Two smaller things fell out. Kai's phone is on a larger Dynamic Type setting, which is
+why his labels looked bigger than mine — Text now caps the multiplier and fixed-height
+chrome opts out. And his "put everything in its own little box with a colour change when
+filled" became `FieldCard`, which finally gives the forms real separators. That one is
+worth more than it sounds: with every field boxed and self-labelling, you can see at a
+glance what is done, which is the entire point of a profile you fill in once.
+
 ## 2026-09-10 (night) — What the simulator can't tell you
 
 Three of tonight's four fixes were things web rendering showed as *fine*. The gear
