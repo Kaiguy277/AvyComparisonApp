@@ -20,12 +20,69 @@ import {
 } from "./constants";
 import type { ObservationForm } from "./schema";
 
-// Public observation addresses we have actually verified. Deliberately sparse:
-// a wrong address sends someone's field observation into a void, which is worse
-// than asking them to pick the right one. More get added as the center-outreach
-// effort (docs/CENTER_OUTREACH.md) confirms them.
+// Contact addresses for the avalanche centers, each one read off the center's
+// own site or its official avalanche.org record (researched 2026-09-11; see
+// docs/CENTER_OUTREACH.md for provenance and the full source list).
+//
+// Two things to know before adding to this list:
+//
+//   1. These are contact/forecaster inboxes, NOT observation intake endpoints.
+//      Essentially every center takes observations through a web form. Email is
+//      a fallback that puts the report in front of a human who can route it —
+//      which is why the message says "public observation" up front. When direct
+//      API submission is switched on, this path retires.
+//   2. Never infer an address from a domain. Two traps caught during research:
+//      the NAC record lists `chris@avalanche.org` for SOAIX and EWYAIX, which is
+//      avalanche.org staff rather than either center; and SOAIX's listed site
+//      `oregonsnow.org` belongs to the Oregon State Snowmobile Association, not
+//      an avalanche centre.
+//
+// Deliberately absent: BTAC (publishes a form and a phone number only — its NAC
+// record shows the director's personal Gmail, which is not ours to hand out) and
+// SOAIX (no center address exists). Those open the composer with no recipient.
 const VERIFIED_CENTER_EMAIL: Record<string, string> = {
+  // Alaska. VAC, CAC and HAC all sit under the Alaska Avalanche Information
+  // Center umbrella and share one inbox; EARAC has its own alias.
+  CNFAIC: "staff@chugachavalanche.org",
   HPAC: "info@hpavalanche.org",
+  VAC: "info@alaskasnow.org",
+  CAC: "info@alaskasnow.org",
+  HAC: "info@alaskasnow.org",
+  EARAC: "EARAC@alaskasnow.org",
+  CAAC: "contact@coastalakavalanche.org",
+
+  // Pacific Northwest
+  NWAC: "forecasters@nwac.us",
+  COAA: "info@coavalanche.org",
+  WAC: "info@wallowaavalanchecenter.org",
+
+  // California
+  SAC: "forecasters@sierraavalanchecenter.org",
+  ESAC: "office@esavalanche.org",
+  BAC: "bridgeportavalanche@gmail.com",
+  // Person-specific, will rot when staff change.
+  MSAC: "nicklaus.meyers@usda.gov",
+
+  // Idaho
+  SNFAC: "info@sawtoothavalanche.com",
+  PAC: "info@payetteavalanche.org",
+  IPAC: "info@idahopanhandleavalanche.org",
+
+  // Montana
+  GNFAC: "forecast@mtavalanche.com",
+  FAC: "fac.admin@flatheadavalanche.org",
+  WCMAC: "info@missoulaavalanche.org",
+
+  // Wyoming / Utah / Colorado
+  EWYAIX: "ccavalancheteam@carboncountywy.gov",
+  UAC: "info@utahavalanchecenter.org",
+  CAIC: "caic@state.co.us",
+
+  // Southwest / Northeast
+  // Person-specific, will rot when staff change.
+  TAC: "andy@taosavalanchecenter.org",
+  KPAC: "info@kachinapeaks.org",
+  MWAC: "snow@mountwashingtonavalanchecenter.org",
 };
 
 export function centerEmail(centerId: string | undefined): string | null {

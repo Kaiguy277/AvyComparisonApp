@@ -21,6 +21,27 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (late night) — Avalanche center contact addresses researched
+- Subagent cross-checked all 28 centers against both the center's own site and the
+  official `api.avalanche.org/v2/public/avalanche-center/<id>` record. **26 verified
+  addresses** now in `lib/observation/emailFallback.ts`, replacing the single HPAC entry,
+  so the observation email fallback prefills a recipient for nearly every center.
+- **Two traps it caught, both of which a naive lookup would have shipped:** the NAC
+  record lists `chris@avalanche.org` for SOAIX *and* EWYAIX — that's avalanche.org staff,
+  not either center; and SOAIX's listed site `oregonsnow.org` is the Oregon State
+  Snowmobile Association, not an avalanche center at all.
+- **Two deliberately absent.** BTAC publishes only a form + phone (its NAC record exposes
+  the director's personal Gmail — not ours to hand out); SOAIX has no center address.
+  Both fall through to "compose with no recipient".
+- **Caveat recorded in code and in `docs/CENTER_OUTREACH.md`:** these are contact/
+  forecaster inboxes, *not* observation intake endpoints — essentially every center takes
+  obs through a web form. The email route puts the report in front of a human who can
+  route it, which is why the body leads with "public observation". Added an outreach
+  question: would you rather receive these by email, or should users use your form (and
+  what's its URL)?
+- Also flagged: MSAC/TAC/BAC addresses are person-specific and will rot; five centers'
+  own sites disagree with their NAC record (own site won).
+
 ## 2026-09-11 (late night) — Store screenshots from sample data
 - **Problem:** it's September. Every real zone reads EXPIRED with May dates, which shows
   the app at its least useful and tells a store browser nothing.

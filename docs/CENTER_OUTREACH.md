@@ -25,6 +25,32 @@ App Store, so the first thing a center hears is "here's a thing you can look at"
 - It opens the relationship before we ever need anything bigger (observation feeds,
   data questions, corrections).
 
+## Contact addresses (researched 2026-09-11)
+
+26 of 28 centers have a verified contact address, now in
+`lib/observation/emailFallback.ts` with per-region comments. Each was read off the
+center's own site or its official avalanche.org record. Notes that matter:
+
+- **These are contact/forecaster inboxes, not observation intake.** Essentially every
+  center takes observations through a web form. Our email path puts the report in front
+  of a human who can route it; that's a fallback, not a designed endpoint. **Ask each
+  center in the outreach email whether they'd rather receive these by email or have
+  users go to their form** — and collect the form URLs while we're at it.
+- **Two traps.** The NAC record lists `chris@avalanche.org` for both SOAIX and EWYAIX —
+  that's avalanche.org staff, not either center. And SOAIX's listed site
+  `oregonsnow.org` is the Oregon State Snowmobile Association, not an avalanche center.
+  Neither is in the app.
+- **Two centers have no usable address.** BTAC publishes a form and a phone number only
+  (its NAC record shows the director's personal Gmail — not ours to hand out), and SOAIX
+  has none. Both open the mail composer with no recipient. Getting a real address for
+  these is a concrete outreach goal.
+- **Three are person-specific and will rot** when staff change: MSAC, TAC, BAC. Ask for
+  a role address.
+- **Where a center's own site disagreed with its NAC record**, the site won (CAAC, FAC,
+  PAC, KPAC, ESAC). Worth confirming which they prefer.
+- **Four Alaska centers share one inbox** (VAC, CAC, HAC → `info@alaskasnow.org`, the
+  Alaska Avalanche Information Center umbrella). EARAC has its own alias.
+
 ## Before writing anything
 
 - Inventory what we currently show per zone: station IDs, and how they were chosen
