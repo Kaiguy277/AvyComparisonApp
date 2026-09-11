@@ -54,7 +54,11 @@ Format per entry:
 - **PDF copy of what you submitted** — `lib/observation/receipt.ts` (expo-print) builds
   it from the same merged form the flow posted; "SAVE A COPY (PDF)" on the success
   screen shares it.
-- Gates: tsc, eslint 0 warnings, Vitest 113/113.
+- Gates: tsc, eslint 0 warnings, Vitest 113/113. **Shipped as TestFlight build #28**
+  (3ec5a52, build 96686eda, submission 0724f562).
+- **Still open from Kai's list:** elevation does not auto-populate without a GPS fix
+  (a map pin carries no altitude — would need a terrain-elevation lookup service);
+  worth deciding whether to add one.
 
 ## 2026-09-11 — ROOT CAUSE of every UI complaint: NativeWind drops function styles
 - **The bug behind all of it.** This project runs NativeWind v4.2.3 with

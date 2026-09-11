@@ -16,6 +16,37 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-11 (later) — The space-key bug is the whole lesson again
+
+Kai typed a space into a gear field and it vanished. The cause: the profile screen
+called `gearProfileSchema.parse()` on every keystroke, and the schema's text transform
+trims. While you are typing, every space is a trailing space, so it was deleted the
+instant it appeared — and interior spaces were impossible too, because they are
+trailing until the next character lands. I had added that parse purely to satisfy a
+TypeScript error about optional keys. A type error nudged me into corrupting user input
+on every keystroke, which is a good argument for fixing types at the type level
+(`normalizeGear` fills defaults, no trimming) rather than reaching for a validator as a
+cast.
+
+The photo rejection was arithmetic I never did. I picked a 28 KB cap for base64 and a
+480px/0.45 compression pass without checking what that pass actually produces — roughly
+40 to 80 KB. So the cap rejected essentially every real photo, including a tight
+selfie, and the error message told the user to crop closer, which could never help.
+Now it steps the quality down until it fits, which is what it should have done from the
+start: try, measure, adjust, rather than guess a threshold and blame the input.
+
+The elevation change is the one I like most. It was a required whole number, so anyone
+who did not know the crown elevation had to invent one — and an invented number in an
+avalanche record is worse than a blank, because a forecaster cannot tell it apart from
+a measured one. Now blank means "I don't know", a GPS fix offers its altitude as a
+one-tap chip, and the note says plainly that it comes from where you took the fix and
+not from the crown. Honest uncertainty beats false precision, especially in safety data.
+
+Still unsolved: a map pin carries no altitude, so picking the location on the map gives
+no elevation suggestion. Filling that needs a terrain-elevation lookup, which means a
+network call and another dependency. Worth asking Kai whether that is wanted before
+adding it.
+
 ## 2026-09-11 — One bug, five complaints, and the danger of a convincing preview
 
 Every UI note Kai has given me in the last two days was the same defect. NativeWind's
