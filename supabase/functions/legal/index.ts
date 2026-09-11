@@ -37,9 +37,9 @@ footer{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);color:v
 function page(title: string, body: string): string {
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} · Avy Comparison</title><style>${CSS}</style></head>
+<title>${title} · Whumpf</title><style>${CSS}</style></head>
 <body><main>${body}
-<footer>Avy Comparison · Built by Kai Myers, K.AI Consulting LLC, Anchorage, Alaska ·
+<footer>Whumpf · Built by Kai Myers, K.AI Consulting LLC, Anchorage, Alaska ·
 <a href="mailto:${CONTACT}">${CONTACT}</a><br>
 <a href="/functions/v1/legal/privacy">Privacy</a> · <a href="/functions/v1/legal/support">Support</a></footer>
 </main></body></html>`;
@@ -49,7 +49,7 @@ const privacy = page(
   "Privacy Policy",
   `<h1>Privacy Policy</h1>
 <p class="updated">Last updated ${UPDATED}</p>
-<p class="lead">Avy Comparison shows avalanche and weather forecasts for the backcountry.
+<p class="lead">Whumpf shows avalanche and weather forecasts for the backcountry.
 There are no accounts, no advertising, no analytics, and no tracking. Most of what the app
 knows about you never leaves your phone.</p>
 
@@ -161,7 +161,8 @@ const support = page(
 you'll get a real reply.</p>
 
 <h2>What the app does</h2>
-<p>Avy Comparison puts avalanche forecasts for several zones side by side, so you can compare
+<p><em>Whumpf</em> is the sound a collapsing weak layer makes underfoot — one of the
+clearest signs the snowpack is unstable. The app puts avalanche forecasts for several zones side by side, so you can compare
 destinations instead of reading one forecast at a time. It covers 92 forecast zones across 28
 avalanche centers. Each zone also carries nearby weather station and SNOTEL observations and
 the National Weather Service point forecast, and your favorite zones are cached for use out of

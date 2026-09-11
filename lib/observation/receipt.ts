@@ -111,7 +111,7 @@ export function receiptHtml(form: ObservationForm, submittedAt: Date, centerId: 
   ${form.images.length ? `<h2>Photos</h2><table>${row("Attached", `${form.images.length}`)}</table>` : ""}
 
   <div class="note">
-    Your copy of an observation submitted through Avy Comparison to the National
+    Your copy of an observation submitted through Whumpf to the National
     Avalanche Center. Photos are listed by count only; the images themselves went
     with the submission.
   </div>

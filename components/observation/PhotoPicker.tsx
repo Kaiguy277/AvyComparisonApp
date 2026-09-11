@@ -69,7 +69,7 @@ export function PhotoPicker({
       if (perm.status !== "granted") {
         Alert.alert(
           "Photos permission needed",
-          "Open Settings → Avy Comparison and allow Photos access to attach images to your observation.",
+          "Open Settings → Whumpf and allow Photos access to attach images to your observation.",
         );
         return;
       }
@@ -97,7 +97,7 @@ export function PhotoPicker({
       if (perm.status !== "granted") {
         Alert.alert(
           "Camera permission needed",
-          "Open Settings → Avy Comparison and allow Camera access to take photos for your observation.",
+          "Open Settings → Whumpf and allow Camera access to take photos for your observation.",
         );
         return;
       }

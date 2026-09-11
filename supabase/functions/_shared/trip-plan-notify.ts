@@ -140,7 +140,7 @@ async function sendEmail(
   html: string,
 ): Promise<string> {
   const key = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("TRIP_PLAN_EMAIL_FROM") ?? "Avy Comparison <trips@akrfp.com>";
+  const from = Deno.env.get("TRIP_PLAN_EMAIL_FROM") ?? "Whumpf <trips@avycomparison.kaiconsulting.ai>";
   if (!key) throw new Error("RESEND_API_KEY not configured");
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

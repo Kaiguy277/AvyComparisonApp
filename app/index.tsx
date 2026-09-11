@@ -802,7 +802,7 @@ export default function Index() {
                 className="text-frost-400"
                 style={{ fontSize: 10, letterSpacing: 2 }}
               >
-                AVY · COMPARISON
+                WHUMPF
               </Text>
             </Touchable>
             <View style={{ flex: 1 }} />
@@ -1794,7 +1794,7 @@ export default function Index() {
                 marginTop: 22,
               }}
             >
-              © 2026 AVY COMPARISON{"\n"}
+              © 2026 WHUMPF{"\n"}
               DATA FROM NATIONAL AVALANCHE CENTER, NOAA/NWS, SYNOPTIC
             </Text>
           </View>

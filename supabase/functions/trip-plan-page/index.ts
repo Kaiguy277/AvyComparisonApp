@@ -143,7 +143,7 @@ details summary{cursor:pointer;font-weight:600}img.photo{max-width:160px;border-
 `;
 
 function page(title: string, body: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title><style>${CSS}</style></head><body><main>${body}<p class="small" style="margin-top:32px">Sent from Avy Comparison · This page was shared by the person named above so you know where they are and what to do if they don't come back. It does not monitor their safety or contact rescuers.</p></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title><style>${CSS}</style></head><body><main>${body}<p class="small" style="margin-top:32px">Sent from Whumpf · This page was shared by the person named above so you know where they are and what to do if they don't come back. It does not monitor their safety or contact rescuers.</p></main></body></html>`;
 }
 
 function row(label: string, value: unknown): string {

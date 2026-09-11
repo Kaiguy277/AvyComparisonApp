@@ -1,4 +1,4 @@
-# CLAUDE.md — Avy Comparison (mobile app)
+# CLAUDE.md — Whumpf (mobile app, formerly "Avy Comparison")
 
 Working agreements for AI-assisted development on this project.
 
@@ -18,6 +18,10 @@ Working agreements for AI-assisted development on this project.
 
 - Expo SDK 54 / RN 0.81 / React 19, expo-router v6, NativeWind v4, strict TypeScript.
   iPhone-first, distributed via EAS Build → TestFlight (`com.kaimyers.avycomparison`).
+- **Renamed to `Whumpf` on 2026-09-11.** Only the *display* name changed. The bundle id,
+  EAS slug (`AvyComparisonApp`), scheme, Supabase project ref and the
+  `avycomparison.supabase.co` vanity host all keep the old string on purpose — changing
+  them orphans the App Store record, the EAS project, or live share links.
 - Backend: self-owned Supabase (9 edge functions, pg_cron refresh, Postgres caches).
   Shared with the AvalancheComparison web app (`../AvalancheComparison`).
 - Current branch: `main`. Work on short-lived branches, merge to `main`, delete the branch.

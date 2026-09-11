@@ -21,6 +21,31 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (late night) — Renamed to **Whumpf**
+- **Why rename at all:** the old name started with "Avy", which is literally NWAC's app.
+  Given Kai's whole framing to NAC is "I'm not a rip-off and not a competitor", the name
+  was working against the pitch. Renaming does that job permanently instead of having to
+  explain it in an email.
+- **Why Whumpf:** the sound a collapsing weak layer makes — the most visceral red flag in
+  avalanche terrain, so it reads as "built by someone who's been out there". Verified
+  clear: no App Store app, company or trademark using it; `whumpf.app`, `.io`, `.ai` and
+  `getwhumpf.com` all unregistered (`.com` and `.co` are taken). Known cost: beginners
+  can't spell it from hearing it, so the subtitle "Compare avalanche forecasts" and the
+  keyword field carry search. Rejected along the way: MTN WX (lands on the crowded
+  mountain-weather shelf — Mountain-Forecast.com, PeakWeather, Mountain Weather — and
+  hides the cross-center comparison advantage), Snowline, Zonecast, Treeline, The Call.
+- **Scope of the change — display name only.** Changed: `app.json` name, the home
+  wordmark, the onboarding wordmark, the footer, Settings-permission copy (3 places),
+  the PDF receipt line, the trip-plan page footer, the `legal` pages, the email
+  sender name (`TRIP_PLAN_EMAIL_FROM` → `Whumpf <trips@avycomparison.kaiconsulting.ai>`),
+  and the NWAC draft. **Deliberately unchanged:** bundle id `com.kaimyers.avycomparison`,
+  EAS slug `AvyComparisonApp`, scheme, Supabase project ref, and the
+  `avycomparison.supabase.co` vanity host — each is an identity key whose change would
+  orphan the App Store record, the EAS project, or already-sent share links.
+- Support page now opens by explaining the word, for anyone who lands there not knowing it.
+- All 4 edge functions redeployed (page copy is server-side). Gates: tsc, eslint 0
+  warnings, Vitest 113/113.
+
 ## 2026-09-11 (night) — App Store prep: privacy + support pages live
 - **Kai's call: submit to the App Store *before* sending the NWAC email** — so the first
   thing they see is a real, installable app rather than a pitch.

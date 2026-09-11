@@ -92,7 +92,7 @@ export function PermissionsIntro({ visible, onComplete }: Props) {
               letterSpacing: -0.5,
             }}
           >
-            AVY
+            WHUMPF
           </Text>
           <Text
             variant="display"

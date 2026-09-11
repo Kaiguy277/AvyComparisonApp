@@ -68,7 +68,7 @@ export function PhotoField({
       if (perm.status !== "granted") {
         Alert.alert(
           fromCamera ? "Camera permission needed" : "Photos permission needed",
-          "Open Settings → Avy Comparison to allow access.",
+          "Open Settings → Whumpf to allow access.",
         );
         return;
       }
