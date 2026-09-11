@@ -21,6 +21,28 @@ Format per entry:
 
 ---
 
+## 2026-09-11 (late night) — Subtitle, and an honest answer to the staging problem
+- **Subtitle** (30-char cap, measured not guessed): `Avalanche forecasts, obs, plan` —
+  exactly 30. Keeps "Avalanche" because the name Whumpf tells a stranger nothing about
+  the domain, and names all three features. Rejected: "Compare avalanche forecasts"
+  (misses obs + trip plan), "Compare, report, check in" (no domain word),
+  "Avalanche zones, obs, trip plan" (31).
+- **Kai's call on the TEST MODE question: keep the button, be honest about it.** Tapping
+  send while `observationApiConfig.isStaging` now opens an explanation — production access
+  from NAC is pending, so the app can't file it — and offers to **send the same
+  observation to the center by email**, formatted, with the PDF receipt and photos
+  attached, or just save the PDF. Nothing silently posts into a test system any more.
+  Button reads SEND OBSERVATION; the footer explains rather than saying "TEST MODE".
+  New `lib/observation/emailFallback.ts` (expo-mail-composer).
+- **Verified center addresses only.** `VERIFIED_CENTER_EMAIL` holds just HPAC
+  (`info@hpavalanche.org`) today — a wrong address sends someone's field observation into
+  a void, which is worse than asking them to pick. Unknown centers open the composer with
+  no recipient. This is now a concrete reason the center-outreach effort
+  (`docs/CENTER_OUTREACH.md`) pays for itself: each reply adds an address.
+- App Review notes updated so a reviewer knows the button explains rather than submits.
+- **In App Store Connect:** name → `Whumpf`, subtitle set, category Weather / Sports,
+  content rights declared (third-party forecast data, rights held). Saved.
+
 ## 2026-09-11 (late night) — Renamed to **Whumpf**
 - **Why rename at all:** the old name started with "Avy", which is literally NWAC's app.
   Given Kai's whole framing to NAC is "I'm not a rip-off and not a competitor", the name
