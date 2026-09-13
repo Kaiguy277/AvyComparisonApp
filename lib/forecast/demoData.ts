@@ -36,6 +36,28 @@ function displayDate(offsetHours: number): string {
   });
 }
 
+const DIR_DEGREES: Record<string, number> = {
+  N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315,
+};
+
+// Deterministic hourly series (oldest first, ending an hour ago) so the
+// charts have something to draw and screenshots are reproducible.
+function hourly(
+  hours: number,
+  at: (hoursAgo: number) => number,
+): { timestamp: string; value: number }[] {
+  const points = [];
+  for (let h = hours; h >= 1; h--) {
+    points.push({
+      timestamp: iso(-h),
+      value: Math.round(at(h) * 10) / 10,
+    });
+  }
+  return points;
+}
+
+// Typed against the real shape, no cast: an earlier version guessed at the
+// field names and rendered "undefined MPH" in the store screenshots.
 function station(
   name: string,
   elevation: number,
@@ -45,6 +67,16 @@ function station(
   snow24: number,
   depth: number,
 ): WeatherObservation {
+  const dirDeg = DIR_DEGREES[windDir] ?? 0;
+  const temp = (h: number) => tempF + 5 * Math.sin((h / 24) * 2 * Math.PI) - h * 0.05;
+  const speed = (h: number) => Math.max(0, windMph + 6 * Math.sin(h / 3) - h * 0.1);
+  const gust = (h: number) => speed(h) + 10 + 3 * Math.cos(h / 2);
+  const dir = (h: number) => (dirDeg + 20 * Math.sin(h / 5) + 360) % 360;
+  // Snowfall front-loaded into the last ~18 hours, in inches of SWE per hour.
+  const precip = (h: number) => (h <= 18 ? snow24 / 12 / 18 : 0.005);
+  const max24 = Math.round(Math.max(...hourly(24, gust).map((p) => p.value)));
+  const max72 = Math.round(Math.max(...hourly(72, gust).map((p) => p.value)));
+
   return {
     stationTriplet: name.toUpperCase().replace(/\s+/g, "_"),
     stationName: name,
@@ -53,27 +85,48 @@ function station(
     snow: {
       depth,
       depth24hrChange: snow24,
-      depth72hrChange: snow24 * 2.2,
-      depth7dayChange: snow24 * 3.4,
-      precip24hr: snow24 / 12,
-      precip72hr: (snow24 * 2.2) / 12,
-      precip48hr: (snow24 * 1.6) / 12,
-      precip7day: (snow24 * 3.4) / 12,
-      swe: depth / 9,
+      depth72hrChange: Math.round(snow24 * 2.2),
+      depth7dayChange: Math.round(snow24 * 3.4),
+      precip24hr: Math.round((snow24 / 12) * 10) / 10,
+      precip72hr: Math.round(((snow24 * 2.2) / 12) * 10) / 10,
+      precip48hr: Math.round(((snow24 * 1.6) / 12) * 10) / 10,
+      precip7day: Math.round(((snow24 * 3.4) / 12) * 10) / 10,
+      swe: Math.round((depth / 4) * 10) / 10,
       snowPercentage24hr: 100,
       snowPercentage72hr: 100,
+      hourlyPrecip24hr: hourly(24, precip),
+      hourlyPrecip72hr: hourly(72, precip),
     },
     temperature: {
       current: tempF,
       high24hr: tempF + 5,
       low24hr: tempF - 8,
+      high72hr: tempF + 9,
+      low72hr: tempF - 11,
+      avg24hr: tempF - 2,
+      avg72hr: tempF - 1,
+      trend: "cooling",
+      hourly24hr: hourly(24, temp),
+      hourly72hr: hourly(72, temp),
     },
     wind: {
-      speed: windMph,
+      speedCurrent: windMph,
+      speedAvg24hr: Math.round(windMph * 0.8),
+      speedMax24hr: max24,
+      speedAvg72hr: Math.round(windMph * 0.7),
+      speedMax72hr: max72,
       direction: windDir,
-      gust: windMph + 14,
+      direction24hr: windDir,
+      direction72hr: windDir,
+      hourlySpeed24hr: hourly(24, speed),
+      hourlySpeed72hr: hourly(72, speed),
+      hourlyGust24hr: hourly(24, gust),
+      hourlyGust72hr: hourly(72, gust),
+      hourlyDirection24hr: hourly(24, dir),
+      hourlyDirection72hr: hourly(72, dir),
     },
-  } as unknown as WeatherObservation;
+    dataQuality: "good",
+  };
 }
 
 interface DemoZoneSpec {

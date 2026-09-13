@@ -16,6 +16,33 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-13 (evening) — The screenshots were lying twice
+
+The store screenshots were "verified 1290×2796" last session, and they were: exactly the
+right size, and wrong in content. One showed `undefined MPH`, one had a problems card the
+size of a billboard, two were empty forms. Same lesson as the text/plain blocker, a day
+later: I checked the property that was easy to measure (pixel dimensions, bytes) instead
+of looking at the thing. This time I only caught it because I happened to glance at the
+ASC thumbnail strip after uploading.
+
+Both defects came from shortcuts that hid their own failure. `as unknown as
+WeatherObservation` in the demo builder let me guess the field names (`wind.speed`
+instead of `wind.speedCurrent`) with the compiler's blessing; the render code checks
+`!== null`, so `undefined` sailed through as a string. Removing the cast was the fix —
+the type now catches it. And the CSS `transform: scale(3)` capture trick faked a phone
+for text but not for layout: RN Web sizes the zone tiles from the real window width, so
+the tiles were laid out for a 1290px desktop and then scaled. A genuine
+`deviceScaleFactor: 3` context is the honest version of the same idea.
+
+Also worth remembering: the age-rating questionnaire changed shape (Capabilities step
+with User-Generated Content). Kai chose Yes because the Observations tab really does show
+public obs; the rating still came out 4+. If a reviewer invokes Guideline 1.2 and wants a
+report/block control, the answer is probably a "report this observation" link to the
+center's page rather than an in-app moderation system — the centers own that content.
+
+And the "gates green" in the handoff was already stale — `deploy/main.ts` had broken
+`tsc` since the proxy commit. Gates are only as current as the last time they ran.
+
 ## 2026-09-13 — Handoff: what's live, what's left, and the two lessons
 
 Where we are: the app is renamed **Whumpf**, the whole backend is live and verified, and

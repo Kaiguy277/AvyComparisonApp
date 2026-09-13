@@ -40,6 +40,25 @@ Format per entry:
   hourly series. Demo-only; real data is typed `number | null`. (Same cause: home shows
   wind "—".) store-02 has a huge empty Problems box; store-04/05 are mostly blank. Also
   uploaded in parallel so ASC order is scrambled.
+- **Screenshots redone and re-uploaded in order** (6.9" slot; 6.5" inherits):
+  home, zone, stations, **problems** (new, replaces the blank obs form), **trip form
+  filled in**. `demoData.ts` `station()` now typed against the real shape with
+  deterministic hourly series (no cast). Capture moved to `docs/store-screenshots/
+  capture.mjs`: headless Chrome with a real `deviceScaleFactor: 3` at 430×932 — the old
+  CSS-transform trick is what made the zone tiles desktop-width (RN Web read the 1290px
+  window). Clock pinned to Jan 16 via `clock.install` + `resume()` (a `setFixedTime`
+  frozen clock stalled the home fade-in → empty home).
+- **Gate regression fixed:** `tsc` was failing on `deploy/main.ts` (Deno globals) since
+  137e507 — the handoff's "gates green" predates it. Excluded `deploy/` in `tsconfig.json`
+  and `eslint.config.js`, same as `supabase/`. Gates now: tsc 0, eslint 0, Vitest 113.
+- **TestFlight build #31** (`fd1d2b3`, EAS build 60d2c7c5, submission fb19caad) — picks up
+  bf55cad (26 center contact addresses) that #30 lacked. Kai chose to submit #31. #30
+  attached for now; swap once #31 finishes processing.
+- **App Review Information filled (not yet saved):** Sign-in required unchecked; contact
+  Kai Myers / kai.myers.a@gmail.com; notes = the exact text now at the top of
+  `docs/APP_REVIEW_NOTES.md` (location note corrected — the prompt appears on first
+  favorite, not an onboarding screen — plus obs-staging and UGC notes). ASC won't save
+  without a **phone number — waiting on Kai**. Release = automatic after approval (Kai).
 
 ## 2026-09-13 — SESSION HANDOFF / current state (read this first next session)
 **App is renamed `Whumpf`, backend is fully live, App Store submission is ~70% set up.**
