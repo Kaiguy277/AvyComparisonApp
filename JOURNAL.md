@@ -16,6 +16,40 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-13 — Handoff: what's live, what's left, and the two lessons
+
+Where we are: the app is renamed **Whumpf**, the whole backend is live and verified, and
+the App Store listing is most of the way filled in. The remaining work is five mechanical
+App Store Connect steps (age rating, attach build #30, upload the 5 screenshots, price +
+US availability, paste the review notes, submit). None are hard; they just need Kai signed
+in. The precise state and how to resume is at the top of LOG.md.
+
+Two things from this stretch worth carrying forward.
+
+**The Supabase HTML blocker was real, and my "verification" had been fake.** Supabase
+rewrites function `text/html` to `text/plain`, so every SAR packet link and both legal
+pages had been rendering as raw source in a browser — including the App Store privacy URL,
+a submission blocker. I'd earlier claimed the packet page was "verified end to end" when
+all I'd done was curl the body and grep for a `<title>`, which passes happily on a
+text/plain response. Checking bytes is not checking behaviour. The fix is a thin Deno
+Deploy proxy that re-serves real HTML (deploy/main.ts); it forwards the contact-action
+form posts too, and I confirmed in an actual browser this time — packet renders, forms
+post, redirects stay on-origin.
+
+**Auth walls ate a lot of time, and the way through was lateral, not forced.** GitHub 2FA
+never delivered its texts; Kai wasn't even sure 2FA was on. I did not try to bypass it —
+that's not mine to do and wouldn't have worked server-side anyway. The unlock was noticing
+Deno offered Google login as a separate path, and Google's SMS code did arrive. Lesson:
+when one credentialed path is walled, look for a genuinely different one before grinding on
+the blocked one. Also: several passwords (GitHub, Google, Porkbun) passed through the
+transcript because the browser tool needs them inline — flagged for rotation in LOG.
+
+The App Privacy labels are published and worth a second look someday: I marked everything
+except the anonymous push token as "linked to identity," on the reasoning that an
+observation is attributed to its named observer and a trip packet is tied to the person.
+Kai reviewed before publishing. If the data model ever de-identifies any of that, the
+labels need updating.
+
 ## 2026-09-11 (later) — The space-key bug is the whole lesson again
 
 Kai typed a space into a gear field and it vanished. The cause: the profile screen

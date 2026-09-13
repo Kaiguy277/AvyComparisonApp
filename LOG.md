@@ -21,6 +21,46 @@ Format per entry:
 
 ---
 
+## 2026-09-13 — SESSION HANDOFF / current state (read this first next session)
+**App is renamed `Whumpf`, backend is fully live, App Store submission is ~70% set up.**
+
+### Live infrastructure (all working, verified)
+- **Supabase** project `tfvxhsgwrwvendrnbrgf` (vanity host `avycomparison.supabase.co`).
+  Edge fns deployed: trip-plans, trip-plan-page (`--no-verify-jwt`), trip-plan-sweeper,
+  legal, plus the forecast/obs stack. Cron sweep + purge active.
+- **SAR packet + legal pages** are served through a **Deno Deploy proxy** because
+  Supabase serves function HTML as text/plain. Origin: `https://whumpf-pages.kaimyersa.deno.net`
+  (`/p?t=…`, `/privacy`, `/support`). Deno org `kaimyersa` (Google login on the account).
+  `TRIP_PLAN_PAGE_BASE` points at `…/p`. **To redeploy the proxy:** see `deploy/README.md`
+  — must run `deno run -A --node-modules-dir=auto jsr:@deno/deploy … main.ts` (the `deno
+  deploy` wrapper double-forwards flags); token = org token from console.deno.com ›
+  Settings › Organization Tokens.
+- **Email:** Resend, sender `Whumpf <trips@avycomparison.kaiconsulting.ai>` (verified).
+- **Push** fixed (RPC `register_device_token`). Observation submit is on NAC **staging** —
+  the app explains this and offers to email the report to the center instead
+  (26/28 center addresses in `lib/observation/emailFallback.ts`).
+
+### App Store Connect — app 6765956364, version 1.0 "Prepare for Submission"
+DONE: name Whumpf, subtitle, description, keywords, promo text, copyright, Support +
+Marketing URLs, content rights, category (Weather/Sports), Privacy Policy URL, and the
+**App Privacy questionnaire (published)**.
+**STILL TO DO (all in ASC, needs Kai logged in; I can drive each):**
+1. Age rating questionnaire (all lowest → expect 4+).
+2. Attach **build #30** (already on TestFlight) to the version.
+3. Upload the 5 screenshots in `docs/store-screenshots/` (store-01…05, 1290×2796).
+4. Price = Free; Availability = **US only for 1.0** (Kai to confirm scope — my rec).
+5. App Review Information: paste the two notes from `docs/APP_REVIEW_NOTES.md`
+   (Always-location; observation submits to NAC staging + email fallback), and UNCHECK
+   "Sign-in required" if set.
+6. Then "Add for Review" / Submit.
+
+### Other open threads
+- NWAC production-access email is **drafted in Kai's Gmail, unsent** (to developer@nwac.us).
+- Post-launch: center weather-station outreach (`docs/CENTER_OUTREACH.md`).
+- Latest TestFlight build is **#30**. Gates green: tsc, eslint 0, Vitest 113.
+- **Rotate creds** that passed through the transcript: GitHub, Google, Porkbun passwords;
+  optionally the Resend key and the Deno org token.
+
 ## 2026-09-13 (later) — App Store Connect metadata + App Privacy published
 - **Version 1.0 metadata saved:** subtitle `Avalanche + weather, obs, plan`; full
   description; keywords (`avalanche,forecast,backcountry,ski,snowmachine,snowpack,SNOTEL,
