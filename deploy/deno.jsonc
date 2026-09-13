@@ -1,0 +1,7 @@
+{
+  "deploy": {
+    "org": "kaimyersa",
+    "app": "whumpf-pages"
+  }
+}
+
