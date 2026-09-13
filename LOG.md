@@ -52,8 +52,8 @@ Format per entry:
   137e507 — the handoff's "gates green" predates it. Excluded `deploy/` in `tsconfig.json`
   and `eslint.config.js`, same as `supabase/`. Gates now: tsc 0, eslint 0, Vitest 113.
 - **TestFlight build #31** (`fd1d2b3`, EAS build 60d2c7c5, submission fb19caad) — picks up
-  bf55cad (26 center contact addresses) that #30 lacked. Kai chose to submit #31. #30
-  attached for now; swap once #31 finishes processing.
+  bf55cad (26 center contact addresses) that #30 lacked. Kai chose to submit #31. #31 processed
+  (Ready to Submit) and is now the attached build (unsaved until the phone number is in).
 - **App Review Information filled (not yet saved):** Sign-in required unchecked; contact
   Kai Myers / kai.myers.a@gmail.com; notes = the exact text now at the top of
   `docs/APP_REVIEW_NOTES.md` (location note corrected — the prompt appears on first
