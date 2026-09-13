@@ -21,6 +21,26 @@ Format per entry:
 
 ---
 
+## 2026-09-13 — BLOCKER cleared: Deno Deploy proxy serves the HTML
+- **Chosen fix:** a thin proxy on **Deno Deploy** (free), not a port. All logic/auth/DB
+  stay in the Supabase functions; `deploy/main.ts` forwards `/p`, `/privacy`, `/support`
+  and re-serves as real `text/html`. It also forwards the packet's contact-action POSTs
+  and rewrites their 303 back to its own origin so the pretty URL stays.
+- **Live:** `https://whumpf-pages.kaimyersa.deno.net` (org `kaimyersa`, Google login on
+  the account — GitHub was walled by 2FA that never delivered; Google's SMS code did).
+  `TRIP_PLAN_PAGE_BASE` repointed at `…/p`. **Verified in a browser** (not just curl this
+  time): packet renders, `/privacy` + `/support` render, the note and extend forms post
+  and land, redirects stay on-origin, bad token 404s.
+- **Two CLI gotchas, both documented in `deploy/README.md`:** (1) the `deno deploy`
+  wrapper in deno 2.9.6 **double-forwards every flag** ("Option --x can only occur once"),
+  so deploys run the jsr tool directly: `deno run -A --node-modules-dir=auto
+  jsr:@deno/deploy …`. (2) The new console.deno.com uses `ddo_` **org tokens** (Settings ›
+  Organization Tokens), which the classic `deployctl` rejects — must use the new tool.
+- **Old Supabase share links still resolve** (as source), so nothing already sent breaks
+  further; everything new uses the Deno origin.
+- **Still to do (needs ASC login):** set the App Store privacy + support URLs to
+  `https://whumpf-pages.kaimyersa.deno.net/privacy` and `/support`.
+
 ## 2026-09-11 (late night) — **BLOCKER: Supabase won't serve HTML. The packet page doesn't render.**
 - Found while trying to screenshot a sample packet: the page loads as **raw HTML source**
   in a browser. `curl -D -` shows why — the response comes back

@@ -10,9 +10,11 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
 ## A. Blockers (ASC will not accept the submission without these)
 
 - [x] **Privacy policy URL** — DONE, live and reviewer-reachable:
-      `https://avycomparison.supabase.co/functions/v1/legal/privacy`
-      (served by the `legal` edge function, deployed `--no-verify-jwt`; source in
-      `supabase/functions/legal/index.ts`). Covers on-device storage, what goes to NAC
+      `https://whumpf-pages.kaimyersa.deno.net/privacy`
+      (served by the `legal` edge function through the Deno Deploy proxy — Supabase serves
+      function HTML as text/plain, so the raw Supabase URL renders as source; the deno.net
+      host re-serves real HTML. Source: `supabase/functions/legal/index.ts` +
+      `deploy/main.ts`). Covers on-device storage, what goes to NAC
       on an observation, trip plans + 7-day deletion, the push token, the three uses of
       location incl. "background is a trigger, coordinates never read", service
       providers, children, deletion requests, and the safety disclaimer.
@@ -63,7 +65,7 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
 - [ ] **Keywords** (100 chars): `avalanche,forecast,backcountry,ski,snowmachine,
       snow,danger,CNFAIC,NWAC,SNOTEL,weather,touring`
 - [x] **Support URL** — DONE:
-      `https://avycomparison.supabase.co/functions/v1/legal/support`
+      `https://whumpf-pages.kaimyersa.deno.net/support`
       (what the app does, why EXPIRED appears, why background location is asked for,
       Low Power Mode and background refresh, what submitting an observation does, how
       trip plans work, deletion, bug-report guidance, data sources + no-affiliation
