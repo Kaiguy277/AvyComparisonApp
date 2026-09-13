@@ -21,6 +21,26 @@ Format per entry:
 
 ---
 
+## 2026-09-13 (evening) — ASC submission, continued
+- **Browser handover:** the ASC Playwright Chrome was still owned by the previous Claude
+  session's MCP server (pipe-controlled, profile `mcp-chrome-bc2da72`), so this session
+  couldn't attach. Killed only that MCP process (PID 168205); the restart dropped Apple's
+  session cookie and Kai re-logged in.
+- **Age rating saved: 4+** (172 regions; Brazil ALL, Korea 00+). New questionnaire has a
+  Capabilities step: **User-Generated Content = Yes** (Kai's call — the Observations tab
+  shows public NAC obs), everything else No/None. Needs a review note explaining the obs
+  come from the NAC public API and are moderated by the centers.
+- **Price = Free** ($0.00 confirmed in Current Price). **Availability = US + Canada** (Kai).
+- **Unchecked Apple silicon Mac + Vision Pro availability** — iPhone-first, untested on
+  either; re-enable any time.
+- **Screenshots uploaded to the 6.9" slot, but they need redoing.** Found on inspection:
+  store-03 shows `undefined MPH` and "Not enough hourly data" everywhere because
+  `lib/forecast/demoData.ts` `station()` builds `wind: {speed, direction, gust}` and casts
+  `as unknown as WeatherObservation` — the real shape is `speedCurrent`/`speedMax24hr`/
+  hourly series. Demo-only; real data is typed `number | null`. (Same cause: home shows
+  wind "—".) store-02 has a huge empty Problems box; store-04/05 are mostly blank. Also
+  uploaded in parallel so ASC order is scrambled.
+
 ## 2026-09-13 — SESSION HANDOFF / current state (read this first next session)
 **App is renamed `Whumpf`, backend is fully live, App Store submission is ~70% set up.**
 
