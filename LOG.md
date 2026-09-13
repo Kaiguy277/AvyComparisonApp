@@ -21,6 +21,29 @@ Format per entry:
 
 ---
 
+## 2026-09-13 (later) — App Store Connect metadata + App Privacy published
+- **Version 1.0 metadata saved:** subtitle `Avalanche + weather, obs, plan`; full
+  description; keywords (`avalanche,forecast,backcountry,ski,snowmachine,snowpack,SNOTEL,
+  weather,touring,splitboard`); promotional text; copyright `2026 Kai Myers`; Support URL
+  `https://whumpf-pages.kaimyersa.deno.net/support`; Marketing URL = the privacy page.
+- **Privacy Policy URL** set to `https://whumpf-pages.kaimyersa.deno.net/privacy`.
+- **App Privacy questionnaire completed and PUBLISHED** (Kai reviewed, then had me click
+  Publish). 10 data types, all purpose = App Functionality, none used for tracking:
+  Name, Email, Phone, Physical Address, Health, Precise Location, Contacts,
+  Photos/Videos, Other User Content — all **linked to identity**; **Device ID (push
+  token) NOT linked** (stored anonymously). Reasoning: observations are attributed to the
+  named observer and trip packets are tied to the person; the push token has no
+  name/account. No analytics/ads/tracking SDKs in the app, so no other types apply.
+- **Automation note:** ASC's per-type privacy flow is a 5–6 step modal each; drove all 10
+  via a single page-context driver (App Functionality → linked yes/no → skip 2 info
+  screens → No tracking → Save). The "Set Up <type>" targets are clickable `<p>`s, not
+  buttons.
+- **Still blocking submission (all inside ASC):** age rating questionnaire; attach build
+  #30; upload the 5 screenshots from `docs/store-screenshots/`; set price (Free) +
+  availability (US); App Review notes already drafted in `docs/APP_REVIEW_NOTES.md`
+  (Always-location + the observation email-fallback note) — paste into the version's
+  App Review Information.
+
 ## 2026-09-13 — BLOCKER cleared: Deno Deploy proxy serves the HTML
 - **Chosen fix:** a thin proxy on **Deno Deploy** (free), not a port. All logic/auth/DB
   stay in the Supabase functions; `deploy/main.ts` forwards `/p`, `/privacy`, `/support`

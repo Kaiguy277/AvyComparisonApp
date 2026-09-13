@@ -18,7 +18,8 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
       on an observation, trip plans + 7-day deletion, the push token, the three uses of
       location incl. "background is a trigger, coordinates never read", service
       providers, children, deletion requests, and the safety disclaimer.
-- [ ] **App Privacy questionnaire** (Get Started → Publish). Based on the code today:
+- [x] **App Privacy questionnaire** — DONE + published 2026-09-13 (10 types, App
+      Functionality, no tracking, Device ID unlinked). Prior text: (Get Started → Publish). Based on the code today:
       - Contact Info · Name, Email, Phone — collected, **not linked** to identity by us
         (sent to NAC when the user submits an observation), used for App Functionality.
       - Location · Precise — collected for observation submissions only (user-entered
@@ -48,7 +49,7 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
       reads EXPIRED outside the season. Method: Expo web at a 430×932 layout scaled 3×
       for true-resolution text — see LOG 2026-09-11. Review before upload; swap for
       device captures mid-winter if preferred.
-- [ ] **Description** (4,000 max). Draft:
+- [x] **Description** — set. Prior draft: (4,000 max). Draft:
       > Compare avalanche forecasts side by side. Avy Comparison pulls the daily
       > forecast for every zone you care about — danger ratings by elevation,
       > avalanche problems, the forecaster's discussion, NWS weather, and nearby
@@ -62,7 +63,7 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
       > Forecast data is provided by the National Avalanche Center and its member
       > forecasting centers (avalanche.org). Always read the full forecast and make
       > your own decisions in the field.
-- [ ] **Keywords** (100 chars): `avalanche,forecast,backcountry,ski,snowmachine,
+- [x] **Keywords** — set. Prior: (100 chars): `avalanche,forecast,backcountry,ski,snowmachine,
       snow,danger,CNFAIC,NWAC,SNOTEL,weather,touring`
 - [x] **Support URL** — DONE:
       `https://whumpf-pages.kaimyersa.deno.net/support`
@@ -70,7 +71,7 @@ below is unset unless marked ✅. Draft values are proposals — edit, then past
       Low Power Mode and background refresh, what submitting an observation does, how
       trip plans work, deletion, bug-report guidance, data sources + no-affiliation
       note).
-- [ ] **Copyright** — `2026 Kai Myers` (or K.AI Consulting).
+- [x] **Copyright** — `2026 Kai Myers`. Prior: — `2026 Kai Myers` (or K.AI Consulting).
 - [ ] **Build** — Add Build → 20.
 - [ ] **App Review Information**: uncheck **Sign-in required** (there is no login);
       fill contact first/last/phone/email; paste the Always-location note from
