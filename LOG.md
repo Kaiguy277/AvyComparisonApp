@@ -21,6 +21,17 @@ Format per entry:
 
 ---
 
+## 2026-09-14 — Review info saved; iPad blocker → iPhone-only build #32
+- **Version page saved** with build #31, contact Kai Myers / +1 916 955 8064 /
+  kai.myers.a@gmail.com, notes, sign-in unchecked, auto-release.
+- **"Add for Review" refused:** "You must upload a screenshot for 13-inch iPad displays."
+  Cause: `app.json` `ios.supportsTablet: true` (Expo template default), never tested on
+  iPad. **Kai chose iPhone-only** → `supportsTablet: false` (e97a80a). iPad users still
+  install it in iPhone compatibility mode; adding iPad later is fine, removing it after
+  release is what Apple blocks — so this was the moment to decide.
+- **TestFlight build #32** (EAS build 8e96ab5d, auto-submit) started from `e97a80a`.
+  Once processed: swap #31 → #32 on the version, then Add for Review.
+
 ## 2026-09-13 (evening) — ASC submission, continued
 - **Browser handover:** the ASC Playwright Chrome was still owned by the previous Claude
   session's MCP server (pipe-controlled, profile `mcp-chrome-bc2da72`), so this session
