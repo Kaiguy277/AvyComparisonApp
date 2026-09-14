@@ -21,6 +21,17 @@ Format per entry:
 
 ---
 
+## 2026-09-14 (afternoon) — **SUBMITTED FOR APP REVIEW** (Whumpf 1.0, build #32)
+- Build #32 (iPhone-only, `e97a80a`) processed; swapped #31 → #32 on the version, saved,
+  Add for Review → Draft Submission showed "iOS App 1.0 · 1.0.0 (32) · Ready to Submit"
+  → **Submit for Review** at ~1:05 PM AKDT. ASC: "1 Item Submitted… up to 48 hours".
+- Release is **automatic after approval**, so approval = live in US + Canada.
+- While in review, metadata is partly editable; a new build requires removing the version
+  from review first.
+- **If rejected:** most likely angles are Guideline 5.1.1 (Always location — reply with
+  the internal reasoning in `docs/APP_REVIEW_NOTES.md`, it's an appeal not a code change)
+  or 1.2 (UGC — add a "report this observation" link to the center's page).
+
 ## 2026-09-14 — Review info saved; iPad blocker → iPhone-only build #32
 - **Version page saved** with build #31, contact Kai Myers / +1 916 955 8064 /
   kai.myers.a@gmail.com, notes, sign-in unchecked, auto-release.

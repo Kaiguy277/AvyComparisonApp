@@ -16,6 +16,24 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-14 — Submitted, and the last blocker was a template default
+
+Whumpf 1.0 is in App Review. The final blocker was one nobody chose: `supportsTablet:
+true` came from the Expo template, which made App Store Connect demand 13-inch iPad
+screenshots. It was the right moment to notice, because Apple lets you add iPad support
+later but blocks removing it after release — once shipped on iPad, we'd have owned an
+untested iPad layout forever. Kai went iPhone-only.
+
+Two operational notes. App Store Connect's session doesn't survive a browser restart
+or a long idle, so every resume starts with Kai logging in again. And background polling
+loops of `npx eas-cli build:view` got killed twice for memory pressure on this 16 GB box —
+spawning a Node CLI every few minutes isn't free with VS Code and Firefox open. Asking
+Kai to say when the build lands was cheaper and just as fast.
+
+Now it's wait-and-see. If review pushes back, the two likely fronts are Always location
+(5.1.1) and the observations feed as UGC (1.2); the reasoning for both is in
+`docs/APP_REVIEW_NOTES.md`.
+
 ## 2026-09-13 (evening) — The screenshots were lying twice
 
 The store screenshots were "verified 1290×2796" last session, and they were: exactly the
