@@ -51,17 +51,33 @@ export function peakDanger(d: ElevationDanger | undefined | null): string | null
   return best >= 0 ? DANGER_ORDER[best] : null;
 }
 
-// Pull today's rating out of a cached zone payload. Prefers the entry whose
-// date matches, falling back to the first entry (NAC puts today first).
-// Returns null when the zone has nothing ratable for today — the caller
-// skips it rather than sending yesterday's number.
+// Pull today's rating out of a cached zone payload.
+//
+// IMPORTANT, and not what you'd guess from the type: `forecast[].date` is a
+// LABEL, not a date. Production rows carry "Today" and "Tomorrow" (verified
+// against forecast_cache on 2026-09-17), because that is what the upstream
+// NAC summary produces. An earlier version of this compared it against an
+// ISO date, which never matched and silently fell through to index 0 — it
+// happened to be right, but nothing was actually guarding it.
+//
+// The real freshness guard is the caller's `forecast_date = <today>` filter
+// on forecast_cache, which is the date the row was written. This function
+// then picks today's entry out of that row: the "Today" label when present,
+// otherwise an ISO date match, otherwise the first entry (NAC orders today
+// first).
+//
+// Returns null when the zone has nothing ratable, so the caller skips it
+// rather than announcing a rating it cannot stand behind.
 export function zoneDangerFor(
   payload: ZonePayload | null | undefined,
   today: string,
   fallbackName: string,
 ): ZoneDanger | null {
   const forecasts = payload?.forecast || [];
-  const todays = forecasts.find((f) => f.date === today) || forecasts[0];
+  const todays =
+    forecasts.find((f) => (f.date || "").trim().toLowerCase() === "today") ||
+    forecasts.find((f) => f.date === today) ||
+    forecasts[0];
   const danger = peakDanger(todays?.danger);
   if (!danger) return null;
   return { name: payload?.name || fallbackName, danger };

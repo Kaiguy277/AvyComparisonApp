@@ -42,7 +42,35 @@ describe("peakDanger", () => {
 describe("zoneDangerFor", () => {
   const today = "2026-09-17";
 
-  it("prefers the entry matching today's date", () => {
+  // THE REAL PRODUCTION SHAPE. forecast[].date is a label, not a date —
+  // forecast_cache rows carry "Today"/"Tomorrow" (verified 2026-09-17).
+  // The previous test used ISO dates, which never occur, so it was passing
+  // while exercising a branch production never takes.
+  it("picks the entry labelled Today, not Tomorrow", () => {
+    const payload = {
+      name: "Turnagain Pass",
+      forecast: [
+        { date: "Today", danger: { alpine: "MODERATE" } },
+        { date: "Tomorrow", danger: { alpine: "EXTREME" } },
+      ],
+    };
+    expect(zoneDangerFor(payload, today, "zone-id")).toEqual({
+      name: "Turnagain Pass",
+      danger: "MODERATE",
+    });
+  });
+
+  it("finds Today even when it is not first, and ignores case", () => {
+    const payload = {
+      forecast: [
+        { date: "Tomorrow", danger: { alpine: "EXTREME" } },
+        { date: "today", danger: { alpine: "LOW" } },
+      ],
+    };
+    expect(zoneDangerFor(payload, today, "z")?.danger).toBe("LOW");
+  });
+
+  it("still honours an ISO date if the upstream shape ever changes", () => {
     const payload = {
       name: "Turnagain Pass",
       forecast: [
@@ -50,10 +78,7 @@ describe("zoneDangerFor", () => {
         { date: today, danger: { alpine: "MODERATE" } },
       ],
     };
-    expect(zoneDangerFor(payload, today, "zone-id")).toEqual({
-      name: "Turnagain Pass",
-      danger: "MODERATE",
-    });
+    expect(zoneDangerFor(payload, today, "zone-id")?.danger).toBe("MODERATE");
   });
 
   it("falls back to the first entry when no date matches", () => {
