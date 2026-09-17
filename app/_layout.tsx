@@ -34,6 +34,7 @@ import { palette } from "@/constants/design";
 // the actual iOS permission requests.
 import { registerBackgroundRefresh } from "@/lib/backgroundRefresh";
 import { registerIfPermitted } from "@/lib/pushNotifications";
+import { cleanUpLegacyLocationWake } from "@/lib/legacyTaskCleanup";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -88,6 +89,9 @@ export default function RootLayout() {
   useEffect(() => {
     registerBackgroundRefresh();
     registerIfPermitted();
+    // Remove the dead background-location task left by builds <= 32, which
+    // crashed build 33 on upgrade. See lib/legacyTaskCleanup.ts.
+    void cleanUpLegacyLocationWake();
   }, []);
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;
