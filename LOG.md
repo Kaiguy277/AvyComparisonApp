@@ -21,6 +21,30 @@ Format per entry:
 
 ---
 
+## 2026-09-17 (night) — **1.0 SUBMISSION CANCELLED**; everything ships as one release
+- **Kai's call:** don't wait for 1.0 approval if 1.1 follows immediately — one review cycle
+  instead of two. I argued for banking the approval first (if the combined build is rejected,
+  nothing is live); **he reaffirmed, so we cancelled.** Recorded because it raises the stakes:
+  with background location in the only submission, **the screen recording and device testing
+  are now mandatory-path, not optional.**
+- **Submission cancelled in ASC.** Version 1.0 is now **`Developer Rejected`** (ASC's term for
+  a developer-cancelled submission) with **`Add for Review`** available again. Build 33 still
+  attached; all listing metadata, screenshots and review notes intact.
+- **`feat/1.1-push-and-tracking` merged to `main`** (`0d6505c`), branch deleted.
+  **Version stays `1.0.0`** — nothing was ever released, so these features ship *in* the first
+  App Store release rather than as a 1.1 update. "1.1" remains internal shorthand only.
+- Gates on merged main: tsc 0, eslint 0, **Vitest 134**, and `deno check` clean on all four
+  edge functions (trip-plans, trip-plan-page, send-forecast-alerts, legal).
+- **Privacy policy now discloses trip tracking** and was deployed
+  (`legal --no-verify-jwt --use-api`). Verified live: the tracking bullet, the "stops when you
+  check in or cancel" wording and the new data-table row are present, and the interim
+  "does not track you in the background" line is gone. The policy has now been correct for
+  each binary in turn — build 33 (no tracking), then this one (tracking).
+- **Next, in order:** build 34 → Kai device-tests (`docs/RELEASE_1_1_CHECKLIST.md` §4) and
+  records the screen capture (§5) → App Privacy labels updated + published → attach 34, paste
+  the 1.1 review notes, attach the recording → **Add for Review**.
+- **Build budget: 3 iOS builds left.** Each failed device test costs one.
+
 ## 2026-09-17 (evening, later) — privacy docs corrected; 1.1 release checklist
 - **LIVE PRIVACY POLICY WAS CONTRADICTING OUR OWN REVIEW NOTES.** It still described
   background location as a refresh trigger ("In the background (\"Always\") — only as a

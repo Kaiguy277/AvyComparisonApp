@@ -86,6 +86,10 @@ publicly is your choice in the form. We do not keep a copy on our servers.</td><
 <tr><th>Trip plans</th><td>When you send a trip plan, the details you entered and the
 contacts you chose are stored on our server so we can show your contacts a web page and
 email them if you don't check in. Contacts receive a link that works without the app.</td></tr>
+<tr><th>Trip tracking</th><td>If you turn on location sharing for a trip, your position is
+sent to our server while that trip is open, and shown to the contacts holding that trip's
+share link. It stops when you check in or cancel, and the trail is deleted with the trip plan.
+It is off unless you turn it on for that trip.</td></tr>
 <tr><th>Push notification token</th><td>If you allow notifications, an anonymous device token
 is stored so the server can wake the app to refresh your saved zones. It isn't linked to a
 name or an account.</td></tr>
@@ -94,16 +98,21 @@ information.</td></tr>
 </table>
 
 <h2>Location</h2>
-<p>Location is used two ways, both optional, and only while you are using the app:</p>
+<p>Location is used three ways, all of them optional:</p>
 <ul>
 <li><strong>Setting a point</strong> — when you tap "Use current location", the app reads your
 position once to fill in the coordinates and elevation of an observation. You can type
 coordinates by hand or pick the spot on a map instead.</li>
 <li><strong>Trip plans</strong> — a trailhead location you choose is included in the plan you
 send.</li>
+<li><strong>Trip tracking, only if you turn it on</strong> — when you switch on location
+sharing for a trip, the app records your position while that trip is open and sends it to our
+server, so the contacts you chose can see where you are and which way you were heading. It is
+<strong>off unless you switch it on for that specific trip</strong>, it is not a setting that
+stays on between trips, and it <strong>stops when you check in or cancel</strong>. Only people
+holding that trip's share link can see it, and the trail is deleted along with the trip plan.
+This is the only circumstance in which the app records where you go.</li>
 </ul>
-<p><strong>The app does not track you in the background.</strong> It does not ask for "Always"
-location, and it does not record where you go.</p>
 
 <h2>Photos and camera</h2>
 <p>Photos are used only where you add them: attached to an observation you submit, or as a
@@ -175,9 +184,11 @@ has, marked expired, rather than showing nothing. Tap through to the center's ow
 current product.</p>
 
 <h3>Does the app track my location?</h3>
-<p>No. It asks for location only while you are using it, and only to fill in a point you asked
-for — the coordinates of an observation, or a trailhead on a trip plan. It does not ask for
-"Always" location and does not record where you go.</p>
+<p>Only if you ask it to, and only during a trip. Location sharing is off by default and is a
+choice you make per trip — it is not a setting you turn on once and forget. While it is on,
+your position goes to the contacts on that trip plan and nowhere else, and it stops when you
+check in. The rest of the time the app only reads your location when you tap a button asking
+it to.</p>
 
 <h3>My forecasts aren't updating in the background.</h3>
 <p>iOS turns off Background App Refresh in Low Power Mode, and pauses it when the battery is
