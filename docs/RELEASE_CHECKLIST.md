@@ -1,18 +1,26 @@
-# Whumpf 1.1 — release checklist
+# Whumpf — first release checklist
 
-Everything that must be true before 1.1 is built and submitted. Written 2026-09-17,
-while 1.0 (build 33) was in review.
+Everything that must be true before the app is submitted. Written 2026-09-17.
 
-**Order matters.** 1.1 re-introduces background location, and the whole point is that the
-metadata must match the binary this time. Build 32 was rejected under Guideline 2.5.4
-because it did not.
+**This ships as version 1.0, not 1.1.** The 1.0 submission was cancelled on 2026-09-17
+(Kai's call: don't wait for an approval that would be replaced within days), so the
+push, notification and tracking work goes out *in* the first release. "1.1" survives
+only as internal shorthand in older LOG entries.
+
+**Order matters.** This release re-introduces background location, and the whole point is
+that the metadata must match the binary this time. Build 32 was rejected under Guideline
+2.5.4 because it did not.
+
+**There is no approved version to fall back on.** If this is rejected, nothing is live.
+That is why §4 and §5 are not optional.
 
 ---
 
 ## 0. Preconditions
 
-- [ ] **1.0 is approved and released.** Do not submit 1.1 while 1.0 is in review — App
-      Store Connect only takes one version at a time.
+- [x] The previous submission is cancelled (2026-09-17). Version 1.0 sits at
+      `Developer Rejected` with `Add for Review` available and build 33 attached; all
+      listing metadata, screenshots and review notes survived.
 - [x] Migrations applied to production (2026-09-17). `device_tokens.alerts_enabled/zones/
       last_alert_date`, `trip_plan_locations`, `trip_plans.tracking_enabled`,
       `set_device_zones`, `trim_trip_plan_locations`, and the `register_device_token`
@@ -116,6 +124,21 @@ The app surfaces its own diagnostics for exactly this reason — read them off t
 - [ ] **Trip tracking.** Create a trip with the toggle ON. Confirm the iOS Always prompt
       appears, the blue location indicator shows, positions land in `trip_plan_locations`,
       the packet page shows "Last known position", and **checking in stops it**.
+- [ ] **"ZONES NEAR YOU" strip.** Once Always is granted and the app has had a location
+      fix, the home screen should offer the zones of the nearest center. Tapping it should
+      add them to favourites (and they should then appear in `device_tokens.zones`).
+      Before granting, the same strip should instead read "KEEP FORECASTS ON YOUR PHONE".
+- [ ] **Movement-triggered refresh fires.** Long-press the wordmark to turn on debug mode,
+      then drive far enough to cross cell towers. Expect `BG WAKE · HH:MM VIA LOCATION`.
+      This is the whole point of the release — the forgetful user who never opens the app —
+      so if only this one thing gets tested properly, make it this.
+- [ ] **Session handoff.** Only one location session runs at a time. Start a tracked trip:
+      the blue indicator should appear (tracking). Check in: it should disappear, and the
+      low-power monitor should resume (no indicator, but `VIA LOCATION` wakes continue).
+- [ ] **Temperature formatting.** Station temps should read consistently — no "52.34°"
+      beside "36.9°". Whole degrees show no decimal.
+- [ ] **Daily alert wakes a backgrounded app.** With the app backgrounded (not killed) when
+      the alert arrives, the cache should refresh, not just show the banner.
 
 ---
 
@@ -144,5 +167,9 @@ that visibly stops when the trip ends.
 
 ## 6. Build budget
 
-12 of 15 iOS builds used in this period as of 2026-09-17 (**3 left**). Do sections 1–3
-before spending one, so the single 1.1 build is the one that gets device-tested.
+As of build 35 (2026-09-17), **1 iOS build left** in this billing period. Build 34 was
+superseded before submission and is irrelevant.
+
+That is the reason §4 is written as one sitting rather than a loop: there is room for
+exactly one round of "found a bug, fixed it, rebuilt". Work through the whole list and
+collect every problem before asking for another build.

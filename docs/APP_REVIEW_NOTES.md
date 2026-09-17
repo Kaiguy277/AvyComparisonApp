@@ -32,7 +32,7 @@ which user action triggers it; a reviewer who has to infer it rejects faster.
 ## 1.1 — App Review Notes (paste this INSTEAD of the 1.0 block when submitting 1.1)
 
 1.1 re-introduces the `location` background mode, this time behind a real feature. Apple
-asked for a screen recording; attach it (see `docs/RELEASE_1_1_CHECKLIST.md` §5) and say
+asked for a screen recording; attach it (see `docs/RELEASE_CHECKLIST.md` §5) and say
 so in the notes. Do not submit 1.1 without it.
 
 ```

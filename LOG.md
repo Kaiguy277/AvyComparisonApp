@@ -73,7 +73,7 @@ Format per entry:
   check in or cancel" wording and the new data-table row are present, and the interim
   "does not track you in the background" line is gone. The policy has now been correct for
   each binary in turn — build 33 (no tracking), then this one (tracking).
-- **Next, in order:** build 34 → Kai device-tests (`docs/RELEASE_1_1_CHECKLIST.md` §4) and
+- **Next, in order:** build 34 → Kai device-tests (`docs/RELEASE_CHECKLIST.md` §4) and
   records the screen capture (§5) → App Privacy labels updated + published → attach 34, paste
   the 1.1 review notes, attach the recording → **Add for Review**.
 - **Build budget: 3 iOS builds left.** Each failed device test costs one.
@@ -91,7 +91,7 @@ Format per entry:
   - `legal` takes `--no-verify-jwt` for the same reason `trip-plan-page` does: the Deno
     proxy (`deploy/main.ts`) forwards with **no auth headers at all**. Dropping the flag
     would 401 both legal pages.
-- **`docs/RELEASE_1_1_CHECKLIST.md` written** — preconditions, the privacy-policy copy to
+- **`docs/RELEASE_CHECKLIST.md` written** — preconditions, the privacy-policy copy to
   deploy *with* 1.1 (not before), the App Privacy label analysis, device verification
   steps, the screen-recording shot list Apple asked for, and the build budget.
 - **App Privacy label analysis for 1.1:** *Precise Location* needs **no change** — it is
