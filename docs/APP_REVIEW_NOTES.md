@@ -1,21 +1,16 @@
 # App Store review notes
 
-## As pasted into App Store Connect (1.0, 2026-09-13)
+## To paste into App Store Connect (1.0, updated 2026-09-17 after the 2.5.4 rejection)
 
-This is the exact text in *App Review Information → Notes*. Edit here first, then
-re-paste. The older per-topic drafts below are kept for their internal reasoning; the
-location one had a stale "onboarding screen" verify step (the prompt actually appears
-the first time a zone is favorited) and the old app name.
+This is the text for *App Review Information → Notes*. Edit here first, then re-paste.
+**The LOCATION paragraph was rewritten after build 32 was rejected** — the old one
+described a background-location wake that no longer exists, so do not resurrect it.
 
 ```
-BACKGROUND LOCATION ("ALWAYS")
-Whumpf is an avalanche-forecast app for backcountry travelers, who routinely drive out of cell service into remote mountain terrain. So the latest avalanche and weather data for a user's saved zones is already on the phone before they lose signal, the app refreshes that data in the background as they travel.
+LOCATION
+Whumpf requests location only as "When In Use", and only for one feature: when a user is recording an avalanche observation, the location field offers a "Use current location" button that fills in the coordinates and elevation of the observation site. Location is read at that moment and nowhere else. The user can also type coordinates manually or pick the spot on a map, so the feature is fully usable with location denied.
 
-The app requests "Always" location for one purpose: to receive iOS significant-location-change events, used only as a trigger to run that background refresh. The app does not read, store, log, transmit, or share the device's location; the coordinates delivered with these events are never accessed by our code.
-
-It is strictly opt-in. The request is shown in context with a plain-language explanation the first time the user adds a favorite zone, never at launch, and the app is fully functional without it (foreground use, pull-to-refresh, Background App Refresh and silent push all work with location denied).
-
-How to verify: on the home screen, add a zone to your favorites; the explainer appears, and tapping enable shows the iOS prompt. Significant-location-change only fires on real coarse-location changes; in the simulator use Features > Location > Freeway Drive to trigger the refresh.
+Build 32 declared the "location" UIBackgroundModes key for a background-refresh wake. That has been removed entirely: this build declares only "fetch" and "remote-notification", it never requests Always authorization, and the Info.plist no longer contains NSLocationAlwaysUsageDescription or NSLocationAlwaysAndWhenInUseUsageDescription. Background refresh now runs solely through Background App Refresh and silent push.
 
 OBSERVATION SUBMISSION
 Tapping "Send observation" does not file the report directly. Whumpf is waiting on production API access from the National Avalanche Center, so the app says so plainly and offers to send the completed observation to the avalanche center by email instead, with a PDF copy and the user's photos attached. Nothing is submitted to a live forecasting system until that access is granted. You can complete the form and tap the button to see the explanation; choosing "Save a PDF" exercises the whole flow without sending anything.
@@ -28,58 +23,53 @@ No sign-in is required; all features are available without an account.
 
 ---
 
-Paste the relevant block into **App Store Connect → your version → App Review
-Information → Notes** before submitting. Reviewers reject "Always" location
-faster when they have to infer why it's requested — leading with a clear
-explanation heads that off.
+Paste the whole block into **App Store Connect → your version → App Review
+Information → Notes** before resubmitting. Say plainly what each permission is for and
+which user action triggers it; a reviewer who has to infer it rejects faster.
 
 ---
 
-## Background location ("Always") — reviewer note
+## Location — history and the 2.5.4 rejection (internal note, do not paste)
 
-> Avy Comparison is an avalanche-forecast app for backcountry travelers. Users
-> routinely drive from areas with cell service into remote mountain terrain that
-> has none. So that the most recent avalanche and weather data for a user's saved
-> zones is already on the device before they lose signal, the app refreshes that
-> data in the background as the user travels toward the trailhead.
->
-> The app requests "Always" location for a single purpose: to receive iOS
-> significant-location-change events, which are used **only as a trigger** to run
-> a background data refresh. The app does **not** read, store, log, transmit, or
-> share the device's location — the coordinates delivered with these events are
-> never accessed by our code. The event is used solely as a "the device has moved,
-> refresh now" heartbeat. This is a standard mechanism for keeping content fresh
-> after the app has been terminated on iOS.
->
-> Background location is strictly **opt-in**: it is presented on a dedicated
-> onboarding screen with a plain-language explanation, and the app is fully
-> functional without it — foreground use, manual pull-to-refresh, Background App
-> Refresh, and silent-push refresh all work with location permission denied.
->
-> **How to verify:** In the app, star one or more forecast zones (Favorites), then
-> grant location when prompted on the onboarding "Location · Always" screen. The
-> "significant location change" API only fires on real cell-tower/coarse-location
-> changes, so in the simulator you can exercise it via **Features → Location →
-> Freeway Drive** (or Xcode's location simulation), which triggers the background
-> refresh. No location data leaves the device at any point.
+**Build 32 was rejected on 2026-09-17 under Guideline 2.5.4.** Apple's words:
+"The app declares support for location in the UIBackgroundModes key in your Info.plist
+file but we are unable to locate any features that require persistent location."
 
----
+They were right, and the prior review note made it easy for them: it openly explained
+that the app registered a significant-location-change monitor it never read, purely to
+get iOS to relaunch the app after force-quit. An earlier internal note in this file
+claimed a reviewer pushback would be "an appeal, not a code change." **That was wrong.**
+Apple does not accept a background mode used as a wake trick, however honestly it is
+described — the whole test is whether a *user-facing feature* requires persistent
+location, and none did.
 
-### Why this is defensible (internal note, do not paste)
+**What was removed (2026-09-17):**
+- `lib/locationWake.ts` and `components/onboarding/LocationPrompt.tsx` — deleted.
+- The first-favorite Always-location explainer and the "LOCATION OFF · LIMITED REFRESH"
+  banner in `app/index.tsx` — deleted.
+- `registerLocationWakeIfPermitted()` from `app/_layout.tsx`.
+- `isIosBackgroundLocationEnabled` → false, and both `locationAlways*` strings dropped
+  from the `expo-location` config in `app.json`.
 
-- The Info.plist usage strings (`app.json` → `expo-location` plugin) already state
-  the purpose and that location is not stored/shared/used for anything else.
-- Location is iOS-only (`lib/locationWake.ts`) and used purely as a wake heartbeat
-  (`refreshFavoritesSnapshot` never reads the coordinates).
-- If a reviewer still rejects under Guideline 5.1.1, reply reiterating the above —
-  background-refresh-via-location without collection is an accepted pattern (many
-  weather apps ship it). It's an appeal, not a code change.
-- Fallback if you'd rather not carry the risk at all: remove the location-wake
-  path entirely (Background App Refresh + silent push still cover the common,
-  not-force-quit case) — you lose only the force-quit-survival refresh.
+**What remains, and why it is legitimate:** `components/observation/LocationField.tsx`
+uses `requestForegroundPermissionsAsync` + `getCurrentPositionAsync` when the user taps
+"Use current location" while filling in an observation. That is a real, visible,
+user-initiated feature, so When In Use is justified.
 
+**The cost we accepted:** background refresh no longer survives a force-quit. Background
+App Refresh and silent push still cover the ordinary case (app backgrounded, not killed).
+Apple's suggestion to "use the significant-change location service" instead is a dead end
+here — sig-change still requires Always authorization, and we still have no feature that
+needs it, so it would invite a 5.1.1 rejection next.
 
----
+**Do not reintroduce background location** without first shipping a genuine feature that
+requires persistent location (e.g. live trip tracking that a partner can watch), and be
+ready to supply the screen recording on a physical device that Apple asked for.
+
+**Verification:** `npx expo config --type introspect` must show
+`UIBackgroundModes: ['fetch', 'remote-notification']` and exactly one NSLocation key
+(`NSLocationWhenInUseUsageDescription`). `plugins/withTrimmedPermissions.js` enforces
+this by deleting the keys expo-location and expo-image-picker add unconditionally.
 
 ## Observation submission — reviewer note
 

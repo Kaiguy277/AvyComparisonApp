@@ -21,6 +21,52 @@ Format per entry:
 
 ---
 
+## 2026-09-17 — **REJECTED (2.5.4)** → background location removed entirely
+- **Apple rejected 1.0 (32)** on 2026-09-17 (message 2026-09-16 11:48 PM), reviewed on an
+  iPad Air 11-inch (M3) in compat mode. Submission `586a9a86-a854-468e-a9d9-351c14e508b1`.
+  **Guideline 2.5.4:** "The app declares support for location in the UIBackgroundModes key
+  … but we are unable to locate any features that require persistent location."
+  **One issue only — no UGC/1.2 finding.** Their prescribed fix: remove `location` from
+  `UIBackgroundModes`.
+- **The rejection was correct.** `lib/locationWake.ts` registered a significant-location-
+  change monitor purely to get iOS to relaunch the app after force-quit and never read the
+  coordinates — its own header comment said so, and the submitted review note explained the
+  trick in plain language. The prior internal note in `docs/APP_REVIEW_NOTES.md` claiming
+  this was "an appeal, not a code change" **was wrong**; the fallback it listed was right.
+- **Removed:** `lib/locationWake.ts`, `components/onboarding/LocationPrompt.tsx` (deleted);
+  `registerLocationWakeIfPermitted()` from `app/_layout.tsx`; the first-favorite Always
+  explainer, the `LocationWakeBanner` ("LOCATION OFF · LIMITED REFRESH") and all their
+  state/callbacks from `app/index.tsx`; `isIosBackgroundLocationEnabled` → false and both
+  `locationAlways*` strings from `app.json`.
+- **Kept:** foreground location in `components/observation/LocationField.tsx` ("Use current
+  location" fills an observation's coordinates + elevation) — a real user-initiated
+  feature, so When In Use is justified. Its usage string now describes that feature
+  instead of background refresh.
+- **New `plugins/withTrimmedPermissions.js`.** expo-location writes all three NSLocation
+  usage strings unconditionally (generic default when unset, no opt-out — see
+  `node_modules/expo-location/plugin/build/withLocation.js`), so the plist still advertised
+  Always after the config change. The plugin deletes `NSLocationAlwaysUsageDescription`,
+  `NSLocationAlwaysAndWhenInUseUsageDescription` and — same defect class — expo-image-
+  picker's `NSMicrophoneUsageDescription` (both pickers are `mediaTypes: ["images"]`, the
+  mic is never used).
+  **Ordering gotcha:** Expo composes `withInfoPlist` mods **last-registered-first**, so the
+  plugin must be listed **FIRST** in `app.json` `plugins` to run **last**. Listed after
+  expo-location it ran before it and saw nothing to delete.
+- **Verified against the generated plist, not the config:** `npx expo config --type
+  introspect` now shows `UIBackgroundModes: ['fetch', 'remote-notification']` and exactly
+  one NSLocation key (`NSLocationWhenInUseUsageDescription`). Both remaining background
+  modes are genuinely used (expo-background-fetch, silent push).
+- **Cost accepted:** background refresh no longer survives force-quit. Background App
+  Refresh + silent push still cover the backgrounded-but-alive case. Apple's hint to use
+  the significant-change service instead is a dead end — it still needs Always auth with
+  no feature behind it, i.e. a 5.1.1 rejection next time.
+- `docs/APP_REVIEW_NOTES.md` rewritten: new LOCATION paragraph for the Notes field, and the
+  old "it's an appeal" reasoning replaced with the history and a do-not-reintroduce rule.
+- Gates green on branch `fix/remove-background-location`: tsc 0, eslint 0, Vitest 113.
+- **Next:** bump build number, EAS build + auto-submit, swap the build on the version,
+  re-paste the Notes, then **Resubmit to App Review** (the submission page has a
+  "Resubmit to App Review" action; version is editable while rejected).
+
 ## 2026-09-14 (afternoon) — **SUBMITTED FOR APP REVIEW** (Whumpf 1.0, build #32)
 - Build #32 (iPhone-only, `e97a80a`) processed; swapped #31 → #32 on the version, saved,
   Add for Review → Draft Submission showed "iOS App 1.0 · 1.0.0 (32) · Ready to Submit"

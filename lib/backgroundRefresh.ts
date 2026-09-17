@@ -25,6 +25,11 @@ const LAST_REFRESH_KEY = "avy-last-bg-refresh-v1";
 
 export interface LastRefreshRecord {
   at: string;
+  // "location" is LEGACY and no longer produced: the background-location
+  // wake was removed on 2026-09-17 after the 2.5.4 rejection. It stays in
+  // the union because this record is persisted in AsyncStorage, so an
+  // install upgrading from build 32 can still read one back (it only ever
+  // renders as the "VIA …" label in app/index.tsx). Don't re-add a writer.
   source: "bg-task" | "push" | "foreground" | "location";
   zones: number;
 }

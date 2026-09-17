@@ -8,7 +8,6 @@ import {
   Image,
   Linking,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   View,
@@ -60,15 +59,6 @@ import {
   requestAndRegister,
   type PushDiagnostic,
 } from "@/lib/pushNotifications";
-import {
-  hasShownLocationPrompt,
-  isLocationBannerSnoozed,
-  isLocationWakeGranted,
-  markLocationPromptShown,
-  promptOrOpenLocationSettings,
-  snoozeLocationBanner,
-} from "@/lib/locationWake";
-import { LocationPrompt } from "@/components/onboarding/LocationPrompt";
 import {
   readLastRefresh,
   refreshFavoritesSnapshot,
@@ -213,52 +203,6 @@ export default function Index() {
     markOnboardingComplete().catch(() => {});
     setShowOnboarding(false);
   }, []);
-
-  // Contextual "enable Always location" explainer — shown the first time
-  // the user favorites a zone, NOT at launch. Location is the one
-  // permission that reads as invasive, so we ask for it only once the
-  // value is concrete (you just saved a zone worth keeping fresh).
-  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
-  const [locationPromptBusy, setLocationPromptBusy] = useState(false);
-  const locationPromptHandledRef = useRef(false);
-  const prevFavCountRef = useRef<number | null>(null);
-
-  const maybePromptLocation = useCallback(async () => {
-    if (Platform.OS !== "ios") return;
-    if (locationPromptHandledRef.current) return;
-    if (await hasShownLocationPrompt()) return;
-    if (await isLocationWakeGranted()) return;
-    locationPromptHandledRef.current = true;
-    await markLocationPromptShown();
-    setShowLocationPrompt(true);
-  }, []);
-
-  // Fire when the favorites set GROWS from a user action. The first
-  // observation after prefs load is the baseline (defaults seed / restored
-  // list) and is skipped, so only a deliberate add — via the star or the
-  // pickers — triggers the prompt.
-  useEffect(() => {
-    if (!prefsLoaded || showOnboarding !== false) return;
-    const prev = prevFavCountRef.current;
-    prevFavCountRef.current = favoriteZoneIds.length;
-    if (prev !== null && favoriteZoneIds.length > prev) {
-      void maybePromptLocation();
-    }
-  }, [favoriteZoneIds, prefsLoaded, showOnboarding, maybePromptLocation]);
-
-  const onEnableLocation = useCallback(async () => {
-    setLocationPromptBusy(true);
-    try {
-      await promptOrOpenLocationSettings();
-    } finally {
-      setLocationPromptBusy(false);
-      setShowLocationPrompt(false);
-    }
-  }, []);
-  const onDismissLocationPrompt = useCallback(() => {
-    if (locationPromptBusy) return;
-    setShowLocationPrompt(false);
-  }, [locationPromptBusy]);
 
   // Subtle reveal anim when results arrive
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -653,12 +597,6 @@ export default function Index() {
         visible={showOnboarding === true}
         onComplete={dismissOnboarding}
       />
-      <LocationPrompt
-        visible={showLocationPrompt}
-        busy={locationPromptBusy}
-        onEnable={onEnableLocation}
-        onDismiss={onDismissLocationPrompt}
-      />
       <TopoBackground height={320} intensity="low" />
 
       <ScrollView
@@ -744,13 +682,6 @@ export default function Index() {
             </View>
           </View>
         ) : null}
-
-        {/* Location-wake nudge — shows whenever the always-location
-            background wake isn't running. Lets users who skipped the
-            modal (or declined initially) enable it later without
-            digging through Settings. Hides itself once registration
-            completes. */}
-        <LocationWakeBanner />
 
         {/* Unsent observation drafts — shown when the user submitted
             while offline and the form was queued locally. Tap goes
@@ -2064,12 +1995,6 @@ function PushDiagnosticLine() {
   );
 }
 
-// Inline nudge to enable Always Location after onboarding has been
-// completed. The onboarding modal only fires once per install (gated
-// by an AsyncStorage flag), so users who declined location during
-// onboarding — or upgraded from a build that didn't ask — would have
-// no path to enable it short of digging through Settings. This banner
-// auto-hides once the diagnostic reports "ok".
 // Banner that surfaces locally-queued observation drafts. Drafts get
 // created when the user submits while offline (or hits a 5xx).
 // Tapping the banner walks them back to the submit form so they can
@@ -2157,98 +2082,6 @@ function ObservationDraftsBanner() {
         color={palette.aspen[400]}
       />
     </Touchable>
-  );
-}
-
-// Gentle "location off, missing full utility" reminder. Shows only once
-// the user has met the feature (seen the first-favorite explainer) and
-// hasn't enabled Always location — and it reflects the ACTUAL permission
-// state rather than a stale diagnostic, so it also appears after a
-// "Not now". Dismiss snoozes it for a few days (a nudge, not a fixture).
-function LocationWakeBanner() {
-  const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const reload = useCallback(async () => {
-    if (Platform.OS !== "ios") return setShow(false);
-    const [prompted, granted, snoozed] = await Promise.all([
-      hasShownLocationPrompt(),
-      isLocationWakeGranted(),
-      isLocationBannerSnoozed(),
-    ]);
-    setShow(prompted && !granted && !snoozed);
-  }, []);
-
-  useEffect(() => {
-    reload();
-    // Re-check periodically so the banner disappears the moment the
-    // permission is granted (e.g. via the Settings escalation).
-    const t = setInterval(reload, 5000);
-    return () => clearInterval(t);
-  }, [reload]);
-
-  if (!show) return null;
-
-  const onEnable = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await promptOrOpenLocationSettings();
-      await reload();
-    } finally {
-      setBusy(false);
-    }
-  };
-  const onDismiss = async () => {
-    await snoozeLocationBanner();
-    setShow(false);
-  };
-
-  return (
-    <View
-      style={{
-        marginTop: 8,
-        marginHorizontal: 16,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        borderWidth: 0.5,
-        borderColor: palette.frost[500],
-        backgroundColor: palette.frost[500] + "1A",
-        opacity: busy ? 0.6 : 1,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-      }}
-    >
-      <Touchable
-        onPress={onEnable}
-        disabled={busy}
-        style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
-      >
-        <Ionicons name="location-outline" size={16} color={palette.frost[400]} />
-        <View style={{ flex: 1 }}>
-          <Text
-            variant="mono"
-            weight="bold"
-            style={{ fontSize: 11, letterSpacing: 1.4, color: palette.frost[400] }}
-          >
-            LOCATION OFF · LIMITED REFRESH
-          </Text>
-          <Text
-            className="text-ink-200"
-            style={{ fontSize: 12, lineHeight: 16, marginTop: 2 }}
-          >
-            Tap to turn on Always Location so your favorites stay fresh even
-            after you close the app or drop out of service.
-          </Text>
-        </View>
-      </Touchable>
-      {/* Dismiss (snooze) */}
-      <Touchable onPress={onDismiss} disabled={busy} hitSlop={8}>
-        <Ionicons name="close" size={16} color={palette.ink[400]} />
-      </Touchable>
-    </View>
   );
 }
 
