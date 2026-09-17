@@ -38,6 +38,7 @@ interface ExpoPushMessage {
   to: string;
   title?: string;
   body?: string;
+  _contentAvailable?: boolean;
   priority?: "default" | "high";
   sound?: string | null;
   data?: Record<string, unknown>;
@@ -135,8 +136,21 @@ serve(async (req) => {
       to: d.token,
       title: copy.title,
       body: copy.body,
-      // Visible alert: priority 10 is correct here (unlike the silent
-      // refresh push in send-snapshot-pushes, which must use priority 5).
+      // Also ask iOS to wake the app so it can pull the FULL forecast and
+      // station data, not just show the rating. This reaches an app that is
+      // merely backgrounded; it does NOT reach one the user force-quit,
+      // because iOS runs no code for a killed app on any push. For that
+      // case the banner still carries today's danger rating, tapping it
+      // launches the app (which refreshes on mount), and a tracked trip
+      // refreshes via the location wake.
+      //
+      // Safe to add: if the wake is throttled, the hourly silent push in
+      // send-snapshot-pushes still covers backgrounded refresh, so nothing
+      // regresses — this only adds an earlier opportunity.
+      _contentAvailable: true,
+      // Visible alert: priority 10 is correct here (unlike the pure silent
+      // refresh push in send-snapshot-pushes, which must use priority 5 or
+      // Apple drops it).
       priority: "high",
       sound: null,
       data: { kind: "forecast-alert", date: today },

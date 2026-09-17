@@ -25,11 +25,13 @@ const LAST_REFRESH_KEY = "avy-last-bg-refresh-v1";
 
 export interface LastRefreshRecord {
   at: string;
-  // "location" is LEGACY and no longer produced: the background-location
-  // wake was removed on 2026-09-17 after the 2.5.4 rejection. It stays in
-  // the union because this record is persisted in AsyncStorage, so an
-  // install upgrading from build 32 can still read one back (it only ever
-  // renders as the "VIA …" label in app/index.tsx). Don't re-add a writer.
+  // "location" is written again as of build 35, but by a different and
+  // legitimate path: the live trip-tracking task (lib/tripPlan/tracking.ts)
+  // refreshes the snapshot on wakes it is already receiving to record the
+  // user's position. That is the only mechanism that reaches a force-quit
+  // app, so it is how a tracked trip stays current on the drive out.
+  // It is NOT the reason the app holds the location permission — tracking is.
+  // (Builds <= 32 also wrote this, from the wake trick that 2.5.4 rejected.)
   source: "bg-task" | "push" | "foreground" | "location";
   zones: number;
 }

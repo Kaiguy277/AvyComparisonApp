@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { callTripPlans } from "./api";
 import { loadActivePlan, loadPlanSecret } from "./store";
+import { refreshFavoritesSnapshot } from "../backgroundRefresh";
 
 // Live trip tracking.
 //
@@ -133,6 +134,44 @@ async function recordLocations(locations: Location.LocationObject[]): Promise<vo
 
   await writeBuffer([...(await readBuffer()), ...points]);
   await flushTrackingBuffer();
+
+  // Piggy-back a forecast refresh on this wake.
+  //
+  // This is the one path that reaches a FORCE-QUIT app: expo-location's
+  // startLocationUpdatesAsync also registers significant-location-change
+  // monitoring, which iOS restores after the user swipes the app away —
+  // unlike Background App Refresh and silent push, which it drops.
+  //
+  // So during a tracked trip, someone who killed the app and is driving to
+  // the trailhead still gets the current forecast and station data cached
+  // before they lose service. That is the whole point of the app.
+  //
+  // This is NOT the reason we hold the location permission — trip tracking
+  // is, and the position is the feature. We're already awake here for that
+  // reason; refreshing the snapshot while we are is free.
+  await maybeRefreshForecast();
+}
+
+// Don't refetch on every fix. Positions arrive on distance or a ~10 minute
+// timer; forecasts move once or twice a day and stations hourly, so this is
+// generous and still keeps data fresh over a drive out.
+const REFRESH_MIN_INTERVAL_MS = 20 * 60 * 1000;
+const LAST_TRACK_REFRESH_KEY = "avy-track-refresh-at-v1";
+
+async function maybeRefreshForecast(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_TRACK_REFRESH_KEY);
+    const last = raw ? Number(raw) : 0;
+    if (Number.isFinite(last) && Date.now() - last < REFRESH_MIN_INTERVAL_MS) {
+      return;
+    }
+    await AsyncStorage.setItem(LAST_TRACK_REFRESH_KEY, String(Date.now()));
+    await refreshFavoritesSnapshot("location");
+  } catch (err) {
+    // Never let a refresh failure affect position recording — the trail is
+    // the safety-critical part of this task.
+    console.warn("[trip-tracking] forecast refresh failed", err);
+  }
 }
 
 // Defined at module load so iOS can dispatch into it when the OS delivers a
