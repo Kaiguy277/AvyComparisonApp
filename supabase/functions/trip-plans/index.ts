@@ -73,6 +73,7 @@ const createSchema = z.object({
     )
     .min(1)
     .max(LIMITS.maxContacts),
+  tracking_enabled: z.boolean().optional(),
   packet: z.object({
     version: z.literal(1),
     createdAt: instant,
@@ -229,6 +230,7 @@ async function handleCreate(supabase: ReturnType<typeof serviceClient>, raw: unk
     worry_by: b.worry_by,
     worry_by_original: b.worry_by,
     packet: b.packet,
+    tracking_enabled: b.tracking_enabled ?? false,
   });
   if (planErr) throw new Error(`insert plan: ${planErr.message}`);
 

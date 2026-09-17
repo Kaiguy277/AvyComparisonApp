@@ -1,5 +1,11 @@
 // The client-side send / check-in / sync flows. Screens call these; the
 // outbox does the retrying.
+import {
+  clearTrackingBuffer,
+  flushTrackingBuffer,
+  startTripTracking,
+  stopTripTracking,
+} from "./tracking";
 
 import {
   tripPlanDraftSchema,
@@ -68,6 +74,7 @@ export async function createPlan(
       email: c.email,
     })),
     createdAt: now,
+    trackingEnabled: draft.trackingEnabled,
   };
   await saveActivePlan(active);
 
@@ -91,8 +98,21 @@ export async function createPlan(
         email: c.email,
       })),
       packet,
+      tracking_enabled: draft.trackingEnabled,
     },
   });
+
+  // Start background location only once the plan exists locally and only
+  // when the user asked for it on THIS trip. A failure here (permission
+  // declined) must not fail trip creation — the plan and its packet are the
+  // safety-critical part; tracking is an addition to it.
+  if (draft.trackingEnabled) {
+    const started = await startTripTracking();
+    if (started !== "started") {
+      console.warn("[trip] tracking requested but not started:", started);
+      await updateActivePlan((p) => ({ ...p, trackingEnabled: false }));
+    }
+  }
 
   await recordTripAsTemplate(input, { id: newId });
   await saveDraft(null);
@@ -118,7 +138,16 @@ async function userAction(
       idempotency_key: `${planId}:${action}`,
     },
   });
-  await updateActivePlan((p) => ({ ...p, checkInQueuedAt: at }));
+  await updateActivePlan((p) => ({ ...p, checkInQueuedAt: at, trackingEnabled: false }));
+
+  // The trip is over as far as the user is concerned, so stop recording
+  // immediately rather than waiting for the server round trip. One last
+  // flush pushes anything still queued — the final positions are the ones
+  // that matter most if the check-in itself is the thing that's late.
+  await flushTrackingBuffer().catch(() => {});
+  await stopTripTracking();
+  await clearTrackingBuffer();
+
   return entry;
 }
 
