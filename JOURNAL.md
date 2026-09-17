@@ -16,6 +16,56 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-17 — We told Apple exactly what we were doing, and they believed us
+
+Rejected under 2.5.4, and it is the cleanest rejection we could have got: "we are unable
+to locate any features that require persistent location." True. `lib/locationWake.ts`
+opened with a comment explaining that it registered a location monitor it never read,
+purely to make iOS relaunch the app after force-quit — and the review note we submitted
+said the same thing in reviewer-facing prose. We handed them the finding.
+
+The thing worth sitting with is that a previous session wrote, in this repo, that a 5.1.1
+pushback here would be "an appeal, not a code change — many weather apps ship it." That
+was confident, plausible, and wrong, and it cost a review cycle. It was wrong for a
+specific reason: the apps it pointed at *do* use the location — they show you the weather
+where you are. Whumpf never read the coordinate. The argument borrowed the legitimacy of a
+pattern whose essential ingredient it had removed. The honest version of that note would
+have been "we have no location feature, so this is a background mode with nothing behind
+it," and that sentence answers itself. Same note also listed the correct fix as a
+fallback, which is its own lesson: when you write down an option you're hoping not to
+take, you've usually already worked out that it's the right one.
+
+Kai diagnosed it from memory before I'd read the rejection — "asking for location services
+but not actually using location for anything." That was the whole finding.
+
+The mechanical part had one genuine trap. Setting `isIosBackgroundLocationEnabled: false`
+drops the background mode but does **not** drop the `NSLocationAlways*` usage strings:
+expo-location's plugin writes all three keys unconditionally and falls back to a generic
+"Allow Whumpf to access your location" for any you don't supply, with no opt-out. So the
+plist would still have advertised Always for an app that never asks for it. I only caught
+it because I ran `expo config --type introspect` and looked at the generated plist instead
+of trusting the config I'd just edited — which is the same lesson this journal has now
+recorded three times (text/plain, the screenshots, the RLS grant). It is starting to look
+less like a recurring mistake and more like the single failure mode of this project:
+checking the input rather than the output.
+
+Then the fix itself didn't work, and the *reason* is a keeper. Expo composes
+`withInfoPlist` mods **last-registered-first**, so my cleanup plugin listed after
+expo-location ran *before* it and found nothing to delete. It has to be listed **first**
+to run **last**. I found that by instrumenting the plugin with a console.error rather than
+reasoning about it, which was the right call — I'd have guessed the ordering backwards.
+While in there I also dropped the microphone string expo-image-picker adds: both pickers
+are images-only, so it was another declared permission with no feature behind it. Exactly
+the thing we just got rejected for, sitting one line away.
+
+What we actually gave up: background refresh no longer survives a force-quit. Background
+App Refresh and silent push still handle the ordinary backgrounded case. Apple's own
+suggestion — use the significant-change service instead — is a trap, because sig-change
+still requires Always authorization, so we would be back with the same missing feature and
+a 5.1.1 next time. If background location is ever wanted again, it has to follow a real
+feature that needs it (live trip tracking a partner can watch is the obvious candidate,
+and it fits this app), not precede one.
+
 ## 2026-09-14 — Submitted, and the last blocker was a template default
 
 Whumpf 1.0 is in App Review. The final blocker was one nobody chose: `supportsTablet:

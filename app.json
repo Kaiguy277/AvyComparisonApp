@@ -29,6 +29,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withTrimmedPermissions.js",
       "expo-router",
       [
         "expo-splash-screen",
@@ -59,10 +60,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location so it can keep your favorite zones' avalanche and weather data fresh in the background — even when the app is closed. We do not store, share, or use your location for anything else.",
-          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to refresh your favorite zones' avalanche and weather data in the background. We do not store, share, or use your location for anything else.",
-          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location so it can keep your favorite zones' data fresh while the app is open.",
-          "isIosBackgroundLocationEnabled": true,
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to fill in the coordinates and elevation of an avalanche observation you are recording. Location is only read when you tap \"Use current location\".",
+          "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
         }
       ],
