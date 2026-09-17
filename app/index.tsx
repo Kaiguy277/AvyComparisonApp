@@ -55,10 +55,11 @@ import {
 // Push registration moved to app/_layout.tsx (every-launch no-prompt
 // retry); the PermissionsIntro modal calls requestAndRegister directly.
 import {
+  promptOrOpenNotificationSettings,
   readPushDiagnostic,
-  requestAndRegister,
   type PushDiagnostic,
 } from "@/lib/pushNotifications";
+import { syncDeviceZones } from "@/lib/deviceZoneSync";
 import {
   readLastRefresh,
   refreshFavoritesSnapshot,
@@ -246,6 +247,7 @@ export default function Index() {
           setFavoriteZoneIds(DEFAULT_ZONE_IDS);
           setDisplayedZoneIds(DEFAULT_ZONE_IDS);
           await saveFavorites(DEFAULT_ZONE_IDS);
+          void syncDeviceZones(DEFAULT_ZONE_IDS);
         } else {
           setFavoriteZoneIds(favs);
           setDisplayedZoneIds(favs.length > 0 ? favs : DEFAULT_ZONE_IDS);
@@ -314,6 +316,7 @@ export default function Index() {
         if (prev.every((id) => set.has(id))) return prev;
         const next = prev.filter((id) => set.has(id));
         saveFavorites(next).catch(() => {});
+        void syncDeviceZones(next);
         return next;
       });
     },
@@ -334,6 +337,7 @@ export default function Index() {
         if (prev.includes(zoneId)) {
           const next = prev.filter((id) => id !== zoneId);
           saveFavorites(next).catch(() => {});
+          void syncDeviceZones(next);
           return next;
         }
         // Insert and re-sort by current display order so favorites read in
@@ -347,6 +351,7 @@ export default function Index() {
           return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
         });
         saveFavorites(next).catch(() => {});
+        void syncDeviceZones(next);
         return next;
       });
     },
@@ -361,6 +366,7 @@ export default function Index() {
       const favSet = new Set(prev);
       const next = nextOrder.filter((id) => favSet.has(id));
       saveFavorites(next).catch(() => {});
+      void syncDeviceZones(next);
       return next;
     });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -374,6 +380,7 @@ export default function Index() {
       if (!prev.includes(zoneId)) return prev;
       const next = prev.filter((id) => id !== zoneId);
       saveFavorites(next).catch(() => {});
+      void syncDeviceZones(next);
       return next;
     });
   }, []);
@@ -1892,6 +1899,14 @@ function PushDiagnosticLine() {
   // soft "skipped-offline" state (network was unreachable, retries
   // automatically next launch). Only surface real errors that need
   // user action.
+  //
+  // "ok-alerts-off" is NOT an error: background refresh is working, the
+  // user just declined alerts, so daily forecast notifications can't be
+  // delivered. It's shown as a soft offer rather than a failure, and
+  // "permission-denied" (written by 1.0) is treated the same way since it
+  // means the same thing to the user.
+  const alertsOff =
+    diag?.step === "ok-alerts-off" || diag?.step === "permission-denied";
   const showPush =
     diag && diag.step !== "ok" && diag.step !== "skipped-offline";
   // The "BG WAKE · HH:MM VIA …" line is a diagnostic — useful while
@@ -1905,7 +1920,9 @@ function PushDiagnosticLine() {
 
   const onTap = async () => {
     Haptics.selectionAsync().catch(() => {});
-    await requestAndRegister();
+    // Prompts when iOS will still ask; deep-links to Settings when the
+    // user already declined and iOS won't ask again.
+    await promptOrOpenNotificationSettings();
     reload();
   };
 
@@ -1926,10 +1943,7 @@ function PushDiagnosticLine() {
               width: 6,
               height: 6,
               borderRadius: 3,
-              backgroundColor:
-                diag!.step === "permission-denied"
-                  ? palette.aspen[400]
-                  : "#DC2626",
+              backgroundColor: alertsOff ? palette.aspen[400] : "#DC2626",
             }}
           />
           <Text
@@ -1937,14 +1951,14 @@ function PushDiagnosticLine() {
             style={{
               fontSize: 10,
               letterSpacing: 1.2,
-              color:
-                diag!.step === "permission-denied"
-                  ? palette.aspen[400]
-                  : "#DC2626",
+              color: alertsOff ? palette.aspen[400] : "#DC2626",
             }}
           >
-            PUSH · {diag!.step.toUpperCase()}
-            {diag!.message ? ` · ${diag!.message.slice(0, 60)}` : ""}
+            {alertsOff
+              ? "ALERTS OFF · NO DAILY FORECAST"
+              : `PUSH · ${diag!.step.toUpperCase()}${
+                  diag!.message ? ` · ${diag!.message.slice(0, 60)}` : ""
+                }`}
           </Text>
           <Text
             variant="mono"
@@ -1954,7 +1968,7 @@ function PushDiagnosticLine() {
               color: palette.ink[400],
             }}
           >
-            · TAP TO RETRY
+            {alertsOff ? "· TAP TO TURN ON" : "· TAP TO RETRY"}
           </Text>
         </Touchable>
       ) : null}

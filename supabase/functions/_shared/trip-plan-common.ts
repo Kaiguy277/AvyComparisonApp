@@ -59,6 +59,7 @@ export interface PlanRowFull {
   return_by: string;
   worry_by: string;
   worry_by_original: string;
+  tracking_enabled?: boolean;
   packet: Record<string, unknown> & {
     draft: {
       subject: { fullName?: string; phone?: string };
@@ -182,6 +183,27 @@ export async function loadContacts(
     .eq("plan_id", planId)
     .order("created_at");
   return (data as ContactRowFull[] | null) ?? [];
+}
+
+// Live tracking trail, newest first. Only populated when the owner turned
+// tracking on for this trip; empty otherwise.
+export async function loadLocations(
+  supabase: SupabaseClient,
+  planId: string,
+  limit = 200,
+) {
+  const { data } = await supabase
+    .from("trip_plan_locations")
+    .select("at, lat, lng, accuracy_m")
+    .eq("plan_id", planId)
+    .order("at", { ascending: false })
+    .limit(limit);
+  return (data ?? []) as {
+    at: string;
+    lat: number;
+    lng: number;
+    accuracy_m: number | null;
+  }[];
 }
 
 export async function loadEvents(supabase: SupabaseClient, planId: string, limit = 50) {

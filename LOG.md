@@ -21,6 +21,144 @@ Format per entry:
 
 ---
 
+## 2026-09-17 (evening, later) — privacy docs corrected; 1.1 release checklist
+- **LIVE PRIVACY POLICY WAS CONTRADICTING OUR OWN REVIEW NOTES.** It still described
+  background location as a refresh trigger ("In the background (\"Always\") — only as a
+  trigger… the app does not read, store, transmit, or share the coordinates"), which build
+  33 removed, while the App Review notes told Apple the app "never requests Always
+  authorization". A reviewer cross-checking the Privacy Policy URL against the notes —
+  while we are in review *for a location issue* — would have found the two disagreeing.
+  Rewrote the Location section and the FAQ to match build 33 ("The app does not track you
+  in the background") and **deployed `legal --no-verify-jwt --use-api`**. Verified live:
+  `/privacy` + `/support` 200 text/html, and the old Always claim is gone.
+  - `legal` takes `--no-verify-jwt` for the same reason `trip-plan-page` does: the Deno
+    proxy (`deploy/main.ts`) forwards with **no auth headers at all**. Dropping the flag
+    would 401 both legal pages.
+- **`docs/RELEASE_1_1_CHECKLIST.md` written** — preconditions, the privacy-policy copy to
+  deploy *with* 1.1 (not before), the App Privacy label analysis, device verification
+  steps, the screen-recording shot list Apple asked for, and the build budget.
+- **App Privacy label analysis for 1.1:** *Precise Location* needs **no change** — it is
+  already declared collected + linked to identity for App Functionality, and a trip plan
+  is already tied to the named subject. The genuinely new item is **`device_tokens.zones`**
+  (which zones a device follows, stored against an anonymous token), not covered by any
+  current answer; recommend **Usage Data → Product Interaction, App Functionality, NOT
+  linked**. Kai published the labels personally last time and should again.
+- **`docs/APP_REVIEW_NOTES.md`: added the 1.1 LOCATION block** to paste instead of the 1.0
+  one, framing tracking as the feature the background mode exists for, with the per-trip
+  scoping and teardown spelled out, and referencing the attached screen recording.
+- **Sequencing rule recorded:** App Privacy answers are app-level, not version-level, so
+  they must NOT be edited until 1.1 is actually being submitted — editing now would
+  misdescribe the 1.0 build in review.
+
+## 2026-09-17 (evening) — 1.0 resubmitted; 1.1 backend deployed to production
+- **Whumpf 1.0 build 33 RESUBMITTED — `Waiting for Review`.** Swapped 32 → 33 on the
+  version, saved, then **Update Review** (note: "Resubmit to App Review" on the
+  submission-details page stays *disabled*; attaching a new build moves the version to
+  "Prepare for Submission" and the live control is **Update Review** on the version page).
+- **The first `--auto-submit` hung.** Build finished 12:07 but never uploaded; the process
+  had **no open network socket** and flat I/O counters 40 min later. Killed it and re-ran
+  `eas submit --id <build>`, which scheduled immediately. **Re-submitting reuses the
+  existing IPA and costs no build credit.** Lesson: don't pipe a long background command
+  through `tail` — it buffers until exit and hides exactly this.
+- **EAS build budget: 12/15 iOS builds used this period (3 left).** The "limit reached"
+  email is actually an 80% warning; it did not block anything.
+- **BUILD 33 CRASHES ON UPGRADE from ≤32, but is fine on a fresh install.** Build 32
+  registered a background-location task (`avy.location-wake`); expo-task-manager persists
+  that in the app container and restores it natively at launch. Build 33 removed both the
+  handler and `location` from `UIBackgroundModes`, and iOS throws when
+  `allowsBackgroundLocationUpdates` is set without that mode → crash before JS runs.
+  **Not a risk to the 1.0 release** (first App Store version, so every real user and the
+  reviewer are fresh installs); it only bites TestFlight upgraders. Kai chose to leave the
+  submission in review. `lib/legacyTaskCleanup.ts` (c6a4df1) fixes it for 1.1, which can
+  do what 33 could not because tracking restores the `location` background mode.
+  **Cause still INFERRED from Apple's documented behaviour — no `.ips` obtained yet.**
+- **Temp rounding fixed** (`9e6166f`): a tile showed `52.34°` beside `36.9°`/`39°`.
+  `lib/units.ts formatTempF` — 1dp, trailing `.0` dropped. Deliberately NOT whole degrees:
+  near 32°F, 31.6 vs 32.4 is rain vs snow. Vitest 134.
+- **Four migrations APPLIED TO PRODUCTION** (`208ada0`). Renamed `20260917240000` →
+  `20260917235500` (**hour 24 is not a valid timestamp**; the CLI printed it unparsed).
+  - **Histories had diverged**: the Aug/Sep work was applied out-of-band under different
+    ids, so `db push` would have run 8 migrations including re-scheduling live crons.
+    Verified every local-only old migration was already live in substance, then
+    `migration repair --status applied` on those four.
+  - `db push` still refused (six remote-only ids absent locally) and suggested marking
+    them **reverted** — which would erase the only record those changes happened.
+    **Declined.** Applied the four new files with `supabase db query --linked -f` and
+    recorded them with `migration repair`, leaving the six remote entries intact.
+  - Verified against the live schema: `device_tokens` has `alerts_enabled`/`zones`/
+    `last_alert_date`; `trip_plan_locations` and `trip_plans.tracking_enabled` exist;
+    `set_device_zones` + `trim_trip_plan_locations` exist; **`register_device_token` is
+    now an overloaded pair, so build 33 clients still resolve the 2-arg form.**
+  - Cron `avy-forecast-alerts-early` (16:00 UTC) + `-late` (17:00 UTC) both **active**.
+- **Three edge functions deployed:** `send-forecast-alerts` (new), `trip-plans`,
+  `trip-plan-page` (**`--no-verify-jwt`**, per `docs/TRIP_PLAN_OPS.md`).
+  **Smoke-verified by behaviour, not deploy output:** trip-plan-page without auth → 404
+  (not 401, so the flag held); proxy `/p` bad token → 404 html; `/privacy` + `/support` →
+  200 html; send-forecast-alerts without the cron key → 401; `trip-plans` unknown action →
+  400; the new `location` action with a bogus plan → 404 `plan_not_found`; and a real
+  cron-key invocation of send-forecast-alerts → **`{"success":true,"sent":0}`** (correct —
+  no device has `zones` yet).
+- **Prod/repo divergence noted, left alone:** production runs
+  `avy-refresh-stations-cache` at `45 * * * *`, migration `20260502010000` says `15`.
+- **Still blocking the 1.1 app build:** App Privacy answers + privacy policy still say
+  location isn't collected; device verification of the push-token decoupling and the
+  tracking permission flow; the physical-device screen recording Apple asked for.
+
+## 2026-09-17 (afternoon) — 1.1 built on `feat/1.1-push-and-tracking`
+Branch deliberately NOT merged to `main` until 1.0 is approved, so a further
+1.0 fix can be built from a clean `main` matching what's in review.
+
+- **Push token decoupled from alert permission** (`68112fd`). `lib/pushNotifications
+  .ts:125` returned before minting a token when permission was denied, so declining
+  notifications also killed silent-push refresh. iOS never required this —
+  `getDevicePushTokenAsync` just calls `registerForRemoteNotifications()` with no
+  permission check (`PushTokenModule.swift`). Client now always registers and reports
+  `alerts_enabled`. New diagnostic step `ok-alerts-off`; `permission-denied` kept in the
+  union as legacy (persisted in AsyncStorage). Migration `20260917210000`: column +
+  3-arg RPC overload; **the 2-arg RPC is kept** because 1.0 installs still call it.
+  **Unverified on device:** that `getExpoPushTokenAsync` resolves with permission denied.
+- **Daily forecast alert** (`4d68f98`). Visible pushes ARE delivered to force-quit apps;
+  silent ones are not — so this covers the exact gap the location wake did, with no
+  location permission. Migration `20260917220000`: `device_tokens.zones` +
+  `last_alert_date` + `set_device_zones` RPC. `lib/deviceZoneSync.ts` is its own module
+  to dodge an import cycle (offlineCache ← backgroundRefresh ← pushNotifications).
+  New fn `send-forecast-alerts`; cron `20260917230000` at 16:00 and 17:00 UTC (second
+  pass is a safe retry thanks to the per-device dedupe).
+  **`setNotificationHandler` was returning false for everything** — it would have
+  swallowed this alert whenever the app was open. Now shows anything with a title/body.
+  Safety rules under test: a zone without TODAY's forecast is skipped rather than
+  alerted with yesterday's rating; an unreadable/NO_RATING band never lowers the
+  reported danger (alert carries the max across bands). +15 tests, 128 total.
+- **Live trip tracking** (`03a4fb4`, `ac8e6ec`). Migration `20260917235500`:
+  `trip_plans.tracking_enabled` + `trip_plan_locations` (ON DELETE CASCADE so the trail
+  dies with the plan via the existing sweeper), RLS-locked like `device_tokens`,
+  `trim_trip_plan_locations` caps the trail at 1000 points (~a week at the ~10 min
+  cadence). New `location` action on `trip-plans`, plan_secret authed, refuses when
+  tracking is off or the plan is closed. `lib/tripPlan/tracking.ts` buffers points in
+  AsyncStorage and flushes opportunistically — no signal is the NORMAL case here.
+  Opt-in toggle in `app/trip/new.tsx`, off by default, asked per trip. Packet page gains
+  "Last known position" with decimal degrees, Maps links, a >3h staleness warning and a
+  collapsible route table.
+- **`app.json`: Always location restored**, with copy describing the real feature, and
+  `plugins/withTrimmedPermissions.js` no longer strips the location keys or the
+  background mode (doing so would now silently break tracking); it still strips
+  expo-image-picker's unused mic string. Verified against the generated plist:
+  `UIBackgroundModes: ['fetch','location','remote-notification']`.
+- **Gate gap found:** `npm run typecheck` does NOT cover `supabase/` (tsconfig excludes
+  it), so none of the edge-function work is checked by it. Used
+  `PATH=$HOME/.deno/bin:$PATH deno check supabase/functions/*/index.ts` instead — all
+  clean. **Consider adding a deno check to the gate list.**
+- **CLAUDE.md correction:** the live cache tables are `forecast_cache`, `stations_cache`,
+  `observations_cache` — NOT `avalanche_forecast_cache` / `avalanche_daily_forecasts` as
+  the "Hard-earned rules" section claims. Confirmed via `supabase gen types typescript
+  --linked`, which reads the live schema through the management API and needs no DB
+  password — a good way to check production shape.
+- **NOT DONE / blocking 1.1 ship:** migrations and both new functions are committed but
+  **not applied or deployed**; App Privacy answers + privacy policy still say location
+  isn't collected (tracking makes that false, and `device_tokens.zones` is new collected
+  data too); the physical-device screen recording Apple asked for; device verification of
+  the push-token decoupling.
+
 ## 2026-09-17 — **REJECTED (2.5.4)** → background location removed entirely
 - **Apple rejected 1.0 (32)** on 2026-09-17 (message 2026-09-16 11:48 PM), reviewed on an
   iPad Air 11-inch (M3) in compat mode. Submission `586a9a86-a854-468e-a9d9-351c14e508b1`.

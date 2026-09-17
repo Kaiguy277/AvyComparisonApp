@@ -9,6 +9,7 @@ import { displayStatus } from "../_shared/trip-plan-state.ts";
 import {
   loadContacts,
   loadEvents,
+  loadLocations,
   loadPlan,
   log,
   pageBase,
@@ -87,8 +88,12 @@ serve(async (req) => {
 
   const contacts = await loadContacts(supabase, plan.id);
   const events = await loadEvents(supabase, plan.id, 100);
+  // Only query the trail when the owner actually opted in.
+  const locations = plan.tracking_enabled
+    ? await loadLocations(supabase, plan.id, 200)
+    : [];
   log({ fn: "trip-plan-page", plan_id: plan.id, contact_id: contact.id, status: 200 });
-  return html(200, render(plan, contact, contacts, events, token, flash));
+  return html(200, render(plan, contact, contacts, events, locations, token, flash));
 });
 
 async function contactByToken(supabase: ReturnType<typeof serviceClient>, token: string) {
@@ -131,6 +136,10 @@ const CSS = `
 :root{--bg:#F6EFDD;--ink:#1B1916;--muted:#5C534A;--line:#A89A82;--warn:#B25437;--ok:#2D5F95;--danger:#ED1C24}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;padding:16px}
 main{max-width:720px;margin:0 auto}h1{font-size:26px;margin:0 0 4px}h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:28px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.trail{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px}
+.trail th{text-align:left;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 8px 4px 0}
+.trail td{padding:3px 8px 3px 0;border-top:1px solid rgba(128,128,128,.25);font-variant-numeric:tabular-nums}
+details summary{cursor:pointer;margin-top:10px;font-size:14px}
 .status{display:flex;gap:16px;flex-wrap:wrap;margin:8px 0 16px;font-size:15px}.status b{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .box{border:1.5px solid var(--ink);border-radius:12px;padding:16px;margin:12px 0}.box.warn{border-color:var(--danger);background:#fff2f0}.box.ok{border-color:var(--ok);background:#eef4fb}
 .big{font-size:22px;font-weight:700}.tel{font-size:22px;font-weight:700;text-decoration:none;color:var(--ink)}
@@ -156,6 +165,7 @@ function render(
   me: ContactRowFull,
   contacts: ContactRowFull[],
   events: Awaited<ReturnType<typeof loadEvents>>,
+  locations: Awaited<ReturnType<typeof loadLocations>>,
   token: string,
   flash: string,
 ): string {
@@ -243,6 +253,45 @@ function render(
 
   const others = contacts.map((x) => `${x.display_name}${x.phone_e164 ? ` · ${x.phone_e164}` : ""}${x.id === me.id ? " (you)" : ""}`).join("<br>");
 
+  // Live position. The single most useful thing on this page to someone
+  // deciding whether to call it in, so it sits directly under the status
+  // line rather than down with the packet detail. Coordinates are shown in
+  // plain decimal degrees because that is what a dispatcher will ask for.
+  let tracking = "";
+  if (locations.length > 0) {
+    const last = locations[0];
+    const fix = `${last.lat.toFixed(5)}, ${last.lng.toFixed(5)}`;
+    const age = ago(now - Date.parse(last.at));
+    const acc = last.accuracy_m ? ` · ±${Math.round(last.accuracy_m)} m` : "";
+    const stale = now - Date.parse(last.at) > 3 * 3_600_000;
+    const maps = `https://maps.apple.com/?ll=${last.lat},${last.lng}&q=${encodeURIComponent(first + "'s last position")}`;
+    const gmaps = `https://www.google.com/maps/search/?api=1&query=${last.lat},${last.lng}`;
+
+    // Oldest-first so the trail reads as a journey out from the trailhead.
+    const trail = [...locations].reverse();
+    const rows = trail
+      .map(
+        (l) =>
+          `<tr><td>${fmt(l.at, tz)}</td><td>${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</td></tr>`,
+      )
+      .join("");
+
+    tracking = `
+<h2>Last known position</h2>
+<div class="box${stale ? " warn" : ""}">
+<div class="big">${esc(fix)}</div>
+<p>Recorded ${esc(age)} ago${acc}. ${stale ? "<b>This fix is more than three hours old.</b> " : ""}Position sharing runs only while the trip is open, so it stops when ${esc(first)} checks in.</p>
+<p><a href="${esc(maps)}">Open in Apple Maps</a> · <a href="${esc(gmaps)}">Open in Google Maps</a></p>
+</div>
+<details><summary>Route travelled (${trail.length} point${trail.length === 1 ? "" : "s"}) — read these to a dispatcher</summary>
+<table class="trail"><thead><tr><th>Time</th><th>Coordinates</th></tr></thead><tbody>${rows}</tbody></table>
+</details>`;
+  } else if (plan.tracking_enabled) {
+    tracking = `
+<h2>Last known position</h2>
+<div class="box"><p>${esc(first)} turned on location sharing, but no position has come through yet — that usually means no cell coverage since leaving. Positions will appear here as soon as the phone finds signal.</p></div>`;
+  }
+
   const body = `
 ${flash ? `<p class="flash">${esc(flash)}</p>` : ""}
 <p class="small">Shared with <b>${esc(me.display_name)}</b> · status: <b>${status.toUpperCase()}</b></p>
@@ -250,6 +299,7 @@ ${flash ? `<p class="flash">${esc(flash)}</p>` : ""}
 <div class="status"><div><b>Expected back</b>${fmt(plan.return_by, tz)}</div><div><b>Worry by</b>${fmt(plan.worry_by, tz)}</div><div><b>Area</b>${esc(d.areaName)}</div><div><b>Cell</b>${tel}</div></div>
 ${g.satShareUrl ? `<p><b>Satellite device:</b> ${esc(g.satDeviceType ?? "")} — <a href="${esc(g.satShareUrl)}">live share page</a>${g.satMessageAddress ? ` · message: ${esc(g.satMessageAddress)}` : ""}</p>` : ""}
 ${action}
+${tracking}
 ${actions}
 
 <h2>1. Where and when</h2>

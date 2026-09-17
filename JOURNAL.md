@@ -16,6 +16,56 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-17 (afternoon) — Building the feature that earns the permission back
+
+Kai pushed back on just deleting background refresh, and he was right to. The
+interesting part of that conversation was that the honest answer narrowed the
+question a lot: the location wake was the *third* redundant refresh path, on top
+of BGAppRefreshTask and an hourly silent push that already existed. What we'd
+actually lost was one case — the user who force-quits — and once you say it that
+plainly, the fix stops looking like "restore background location" and starts
+looking like "reach force-quit users." A visible notification does that; silent
+pushes and BG fetch don't. No permission required.
+
+Two findings while building it that I'd have guessed wrong.
+
+The push-token gate was ours, not Apple's. I'd written in the previous turn that
+iOS hands out a token without notification authorization and flagged it as
+needing verification — then found `PushTokenModule.swift` calls
+`registerForRemoteNotifications()` with literally no permission check. So a user
+who declined notifications had been losing background refresh for no platform
+reason at all, purely because our code returned early. That's the second time
+this project has had a self-inflicted limitation that looked like an OS
+constraint (the first was the RLS/upsert fight in September). Worth asking, when
+something seems impossible: whose rule is this actually?
+
+And `setNotificationHandler` was returning `shouldShowBanner: false` for
+everything — correct when the only push was the silent refresh, and quietly
+fatal for the feature I was adding, since the daily alert would have been
+swallowed whenever the app was open. Nothing would have errored. It would just
+never have appeared, and only for users who happened to have the app in the
+foreground. That's the kind of bug that survives testing.
+
+On tracking: the thing that makes it defensible isn't that it's a big feature,
+it's that the coordinates are the product. The rejected code read `error` off the
+task and threw the location away. This one sends it to the people who'd be
+calling 911. I scoped it so location runs only during an active trip and stops on
+check-in, because "we declared the mode for tracking but run it always" is the
+same argument we already lost, one level up. Buffering matters more than it looks
+here — the whole use case is country with no signal, so upload failure is the
+normal path, not the error path.
+
+Also corrected a stale rule in CLAUDE.md: the live cache tables are
+`forecast_cache` / `stations_cache` / `observations_cache`, not the
+`avalanche_*` names it lists. `supabase gen types typescript --linked` reads the
+live schema through the management API with no DB password, which is a much
+better way to check production than trusting the repo — which is exactly what
+that section of CLAUDE.md was warning about in the first place.
+
+One gate gap worth fixing: `npm run typecheck` excludes `supabase/`, so every
+edge function I touched today was unchecked by it. `deno check` caught nothing
+this time, but that's luck, not process.
+
 ## 2026-09-17 — We told Apple exactly what we were doing, and they believed us
 
 Rejected under 2.5.4, and it is the cleanest rejection we could have got: "we are unable

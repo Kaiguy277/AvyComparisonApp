@@ -578,6 +578,21 @@ export default function TripNewScreen() {
             />
             <TextField label="Others who know about this trip" value={draft.othersWhoKnow ?? ""} onChangeText={(t) => set("othersWhoKnow", t)} placeholder="Names + numbers" />
             <TextField label="Local agency number (optional)" hint="Troopers post or ranger station. 911 is always on the page." value={draft.localAgencyPhone ?? ""} onChangeText={(t) => set("localAgencyPhone", t)} keyboardType="phone-pad" error={errors.localAgencyPhone} />
+
+            {/* Live tracking. Off by default and asked per trip — this is the
+                only thing in the app that sends a location anywhere, so the
+                user turns it on deliberately each time rather than setting it
+                once and forgetting it's running. */}
+            <View>
+              <FieldLabel
+                label="Share your location with these contacts while you're out"
+                hint="Your contacts see where you are and which way you were heading, on the same page as your packet. Runs only until you check in, and the trail is deleted with the plan. Uses more battery."
+              />
+              <YesNoSwitch
+                value={draft.trackingEnabled ?? false}
+                onChange={(v) => set("trackingEnabled", v)}
+              />
+            </View>
           </CollapsibleSection>
 
           {/* REVIEW + SEND */}

@@ -236,6 +236,10 @@ export interface ActivePlan {
   syncError?: string;
   status: "active" | "overdue" | "closed";
   closeReason: string | null;
+  // Live location sharing with this trip's contacts. Opt-in per trip and
+  // off by default; drives lib/tripPlan/tracking.ts. Optional because plans
+  // created by 1.0 have no such field.
+  trackingEnabled?: boolean;
   areaName: string;
   trailheadName: string;
   subjectName: string;

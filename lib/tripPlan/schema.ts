@@ -312,6 +312,12 @@ export const tripPlanDraftSchema = z
     othersWhoKnow: optionalText(300),
     localAgencyPhone: optionalPhoneSchema,
     notes: optionalText(1000),
+
+    // Live location sharing with this trip's contacts. Off unless the user
+    // turns it on for this trip — it is the only thing in the app that sends
+    // a location anywhere, so it is never on by default and never sticky
+    // across trips.
+    trackingEnabled: z.boolean().default(false),
   })
   .superRefine((d, ctx) => {
     const depart = Date.parse(d.departAt);
