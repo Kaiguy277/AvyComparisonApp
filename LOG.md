@@ -46,7 +46,7 @@ Branch deliberately NOT merged to `main` until 1.0 is approved, so a further
   Safety rules under test: a zone without TODAY's forecast is skipped rather than
   alerted with yesterday's rating; an unreadable/NO_RATING band never lowers the
   reported danger (alert carries the max across bands). +15 tests, 128 total.
-- **Live trip tracking** (`03a4fb4`, `ac8e6ec`). Migration `20260917240000`:
+- **Live trip tracking** (`03a4fb4`, `ac8e6ec`). Migration `20260917235500`:
   `trip_plans.tracking_enabled` + `trip_plan_locations` (ON DELETE CASCADE so the trail
   dies with the plan via the existing sweeper), RLS-locked like `device_tokens`,
   `trim_trip_plan_locations` caps the trail at 1000 points (~a week at the ~10 min
