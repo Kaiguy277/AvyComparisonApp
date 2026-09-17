@@ -44,6 +44,11 @@ const LIMITS = {
   maxPacketBytes: 393_216,
   createPerMin: 10,
   contactPer5Min: 30,
+  // A tracking client posts a batch every few minutes; this is generous
+  // enough for several parties behind one NAT and still bounds abuse.
+  locationPer5Min: 120,
+  maxTrailPoints: 1000,
+  maxPointsPerPost: 200,
 };
 
 const instant = z.string().refine((s) => !Number.isNaN(Date.parse(s)), "bad instant");
@@ -90,6 +95,26 @@ const userActionSchema = z.object({
   idempotency_key: z.string().max(120).optional(),
 });
 
+// Live trip tracking. Authenticated with plan_secret exactly like the other
+// user actions — a share_token holder can READ the trail on the packet page
+// but can never write to it.
+const locationActionSchema = z.object({
+  action: z.literal("location"),
+  plan_id: z.string().uuid(),
+  plan_secret: z.string().min(16).max(64),
+  points: z
+    .array(
+      z.object({
+        at: instant,
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+        accuracy_m: z.number().nonnegative().max(100_000).optional(),
+      }),
+    )
+    .min(1)
+    .max(LIMITS.maxPointsPerPost),
+});
+
 const contactActionSchema = z.object({
   action: z.enum(["opened", "extend", "heard_from", "search_started", "note"]),
   share_token: z.string().min(16).max(64),
@@ -121,6 +146,11 @@ serve(async (req) => {
       res = await handleCreate(supabase, body);
     } else if (action === "check_in" || action === "cancel" || action === "get_status") {
       res = await handleUser(supabase, body);
+    } else if (action === "location") {
+      if (await rateLimited(supabase, "location", ip, LIMITS.locationPer5Min, 300)) {
+        return json(429, { error: "rate_limited" });
+      }
+      res = await handleLocation(supabase, body);
     } else if (
       action === "opened" || action === "extend" || action === "heard_from" ||
       action === "search_started" || action === "note"
@@ -246,6 +276,49 @@ async function handleUser(supabase: ReturnType<typeof serviceClient>, raw: unkno
   const updated = (await loadPlan(supabase, plan.id))!;
   await runEffects(supabase, updated, contacts, r.effects, null, null);
   return json(200, { plan: publicPlan(updated), contacts: contactsPublic(contacts), late });
+}
+
+// ── live tracking ──────────────────────────────────────────────────────────
+
+async function handleLocation(supabase: ReturnType<typeof serviceClient>, raw: unknown) {
+  const parsed = locationActionSchema.safeParse(raw);
+  if (!parsed.success) return json(400, { error: "invalid_body" });
+  const b = parsed.data;
+
+  const plan = await loadPlan(supabase, b.plan_id);
+  if (!plan) return json(404, { error: "plan_not_found" });
+  if (!timingSafeEqual(plan.plan_secret_hash, await sha256Hex(b.plan_secret))) {
+    return json(403, { error: "unauthorized" });
+  }
+
+  // Two hard stops, both privacy guarantees the UI promises the user:
+  // tracking only happens for a trip they opted in on, and it stops the
+  // moment the trip closes. A client that keeps posting after check-in (a
+  // stale background task that hasn't been torn down yet) is refused here
+  // rather than quietly recorded.
+  if (!plan.tracking_enabled) return json(409, { error: "tracking_disabled" });
+  if (plan.status === "closed") return json(409, { error: "plan_closed" });
+
+  const rows = b.points.map((p) => ({
+    plan_id: plan.id,
+    at: new Date(p.at).toISOString(),
+    lat: p.lat,
+    lng: p.lng,
+    accuracy_m: p.accuracy_m ?? null,
+  }));
+
+  const { error } = await supabase.from("trip_plan_locations").insert(rows);
+  if (error) throw new Error(error.message);
+
+  // Bound the trail. Best-effort: the points are already stored, and a
+  // failed trim must not make the client retry and duplicate them.
+  const { error: trimErr } = await supabase.rpc("trim_trip_plan_locations", {
+    p_plan_id: plan.id,
+    p_keep: LIMITS.maxTrailPoints,
+  });
+  if (trimErr) console.warn("[trip-plans] trail trim failed", trimErr.message);
+
+  return json(200, { ok: true, accepted: rows.length });
 }
 
 // ── contact actions ────────────────────────────────────────────────────────

@@ -60,8 +60,10 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to fill in the coordinates and elevation of an avalanche observation you are recording. Location is only read when you tap \"Use current location\".",
-          "isIosBackgroundLocationEnabled": false,
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to fill in the coordinates and elevation of an avalanche observation you are recording, and to share your position with your trip contacts while a trip is active.",
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to share your location with the contacts on your trip plan while your trip is active, so they can see where you are and which way you were heading if you do not check in. This runs only during a trip you turned tracking on for, and stops when you check in.",
+          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to keep sharing your location with your trip contacts after you lock your phone or put it away, so your trip plan stays current while you are out. This runs only during a trip you turned tracking on for, and stops when you check in.",
+          "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": false
         }
       ],
