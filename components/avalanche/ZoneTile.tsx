@@ -10,6 +10,7 @@ import type {
   AvalancheZone,
   WeatherObservation,
 } from "@/lib/api/avalanche";
+import { formatTempF } from "@/lib/units";
 
 interface Props {
   zone: AvalancheZone;
@@ -235,11 +236,7 @@ export function ZoneTile({ zone, viewedDate, cachedAt }: Props) {
                   <View style={{ gap: 3 }}>
                     <StationStat
                       icon="thermometer-outline"
-                      value={
-                        station.temperature.current !== null
-                          ? `${station.temperature.current}°`
-                          : "—"
-                      }
+                      value={formatTempF(station.temperature.current)}
                     />
                     <StationStat
                       iconSet="material"

@@ -8,6 +8,7 @@ import { WindCompass } from "./WindCompass";
 import { WindDirectionRow } from "./WindDirectionRow";
 import { palette } from "@/constants/design";
 import type { WeatherObservation } from "@/lib/api/avalanche";
+import { formatTempF } from "@/lib/units";
 
 type Period = 24 | 72;
 
@@ -223,7 +224,7 @@ function TempBlock({ obs, period }: { obs: WeatherObservation; period: Period })
           lineHeight: 58,
         }}
       >
-        {t.current !== null ? `${t.current}°` : "—"}
+        {formatTempF(t.current)}
       </Text>
 
       {series && series.length >= 2 ? (

@@ -7,6 +7,7 @@ import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import type { WeatherObservation } from "@/lib/api/avalanche";
 import { AVAILABLE_ZONES } from "@/lib/zones";
+import { formatTempF } from "@/lib/units";
 
 interface Props {
   zoneId: string;
@@ -187,11 +188,7 @@ export function StationsOnlyTile({
               <View style={{ gap: 3 }}>
                 <Stat
                   icon="thermometer-outline"
-                  value={
-                    station.temperature.current !== null
-                      ? `${station.temperature.current}°`
-                      : "—"
-                  }
+                  value={formatTempF(station.temperature.current)}
                 />
                 <Stat
                   iconSet="material"
