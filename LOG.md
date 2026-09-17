@@ -21,6 +21,60 @@ Format per entry:
 
 ---
 
+## 2026-09-17 (evening) — 1.0 resubmitted; 1.1 backend deployed to production
+- **Whumpf 1.0 build 33 RESUBMITTED — `Waiting for Review`.** Swapped 32 → 33 on the
+  version, saved, then **Update Review** (note: "Resubmit to App Review" on the
+  submission-details page stays *disabled*; attaching a new build moves the version to
+  "Prepare for Submission" and the live control is **Update Review** on the version page).
+- **The first `--auto-submit` hung.** Build finished 12:07 but never uploaded; the process
+  had **no open network socket** and flat I/O counters 40 min later. Killed it and re-ran
+  `eas submit --id <build>`, which scheduled immediately. **Re-submitting reuses the
+  existing IPA and costs no build credit.** Lesson: don't pipe a long background command
+  through `tail` — it buffers until exit and hides exactly this.
+- **EAS build budget: 12/15 iOS builds used this period (3 left).** The "limit reached"
+  email is actually an 80% warning; it did not block anything.
+- **BUILD 33 CRASHES ON UPGRADE from ≤32, but is fine on a fresh install.** Build 32
+  registered a background-location task (`avy.location-wake`); expo-task-manager persists
+  that in the app container and restores it natively at launch. Build 33 removed both the
+  handler and `location` from `UIBackgroundModes`, and iOS throws when
+  `allowsBackgroundLocationUpdates` is set without that mode → crash before JS runs.
+  **Not a risk to the 1.0 release** (first App Store version, so every real user and the
+  reviewer are fresh installs); it only bites TestFlight upgraders. Kai chose to leave the
+  submission in review. `lib/legacyTaskCleanup.ts` (c6a4df1) fixes it for 1.1, which can
+  do what 33 could not because tracking restores the `location` background mode.
+  **Cause still INFERRED from Apple's documented behaviour — no `.ips` obtained yet.**
+- **Temp rounding fixed** (`9e6166f`): a tile showed `52.34°` beside `36.9°`/`39°`.
+  `lib/units.ts formatTempF` — 1dp, trailing `.0` dropped. Deliberately NOT whole degrees:
+  near 32°F, 31.6 vs 32.4 is rain vs snow. Vitest 134.
+- **Four migrations APPLIED TO PRODUCTION** (`208ada0`). Renamed `20260917240000` →
+  `20260917235500` (**hour 24 is not a valid timestamp**; the CLI printed it unparsed).
+  - **Histories had diverged**: the Aug/Sep work was applied out-of-band under different
+    ids, so `db push` would have run 8 migrations including re-scheduling live crons.
+    Verified every local-only old migration was already live in substance, then
+    `migration repair --status applied` on those four.
+  - `db push` still refused (six remote-only ids absent locally) and suggested marking
+    them **reverted** — which would erase the only record those changes happened.
+    **Declined.** Applied the four new files with `supabase db query --linked -f` and
+    recorded them with `migration repair`, leaving the six remote entries intact.
+  - Verified against the live schema: `device_tokens` has `alerts_enabled`/`zones`/
+    `last_alert_date`; `trip_plan_locations` and `trip_plans.tracking_enabled` exist;
+    `set_device_zones` + `trim_trip_plan_locations` exist; **`register_device_token` is
+    now an overloaded pair, so build 33 clients still resolve the 2-arg form.**
+  - Cron `avy-forecast-alerts-early` (16:00 UTC) + `-late` (17:00 UTC) both **active**.
+- **Three edge functions deployed:** `send-forecast-alerts` (new), `trip-plans`,
+  `trip-plan-page` (**`--no-verify-jwt`**, per `docs/TRIP_PLAN_OPS.md`).
+  **Smoke-verified by behaviour, not deploy output:** trip-plan-page without auth → 404
+  (not 401, so the flag held); proxy `/p` bad token → 404 html; `/privacy` + `/support` →
+  200 html; send-forecast-alerts without the cron key → 401; `trip-plans` unknown action →
+  400; the new `location` action with a bogus plan → 404 `plan_not_found`; and a real
+  cron-key invocation of send-forecast-alerts → **`{"success":true,"sent":0}`** (correct —
+  no device has `zones` yet).
+- **Prod/repo divergence noted, left alone:** production runs
+  `avy-refresh-stations-cache` at `45 * * * *`, migration `20260502010000` says `15`.
+- **Still blocking the 1.1 app build:** App Privacy answers + privacy policy still say
+  location isn't collected; device verification of the push-token decoupling and the
+  tracking permission flow; the physical-device screen recording Apple asked for.
+
 ## 2026-09-17 (afternoon) — 1.1 built on `feat/1.1-push-and-tracking`
 Branch deliberately NOT merged to `main` until 1.0 is approved, so a further
 1.0 fix can be built from a clean `main` matching what's in review.

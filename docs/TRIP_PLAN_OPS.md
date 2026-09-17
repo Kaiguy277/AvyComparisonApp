@@ -3,8 +3,16 @@
 Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
 
 ## Pieces in production
-- Tables `trip_plans`, `trip_plan_contacts`, `trip_plan_events`, `trip_plan_rate_limits`
-  (service-role only). RPC `trip_plan_rate_bump`.
+- Tables `trip_plans`, `trip_plan_contacts`, `trip_plan_events`, `trip_plan_rate_limits`,
+  `trip_plan_locations` (service-role only). RPCs `trip_plan_rate_bump`,
+  `trim_trip_plan_locations`.
+- **Live tracking (1.1, schema deployed 2026-09-17; app not shipped yet).** Opt-in per
+  trip via `trip_plans.tracking_enabled` (default false, so no existing plan can receive
+  positions). The app posts to the `location` action on `trip-plans`, authed with
+  `plan_secret` like the other user actions — a `share_token` holder can READ the trail
+  on the packet page but can never write it. The action refuses when tracking is off or
+  the plan is closed. The trail cascades on plan delete, so the existing `purge_after`
+  sweeper already disposes of it; there is no separate retention path.
 - Edge functions: `trip-plans` (API, JWT on), `trip-plan-page` (**deployed
   `--no-verify-jwt`** — contacts open it from a bare browser; keep that flag on every
   redeploy), `trip-plan-sweeper` (cron-key gated).
