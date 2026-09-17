@@ -1,7 +1,7 @@
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import * as TaskManager from "expo-task-manager";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -52,13 +52,23 @@ export interface PushDiagnostic {
     | "skipped-unsupported"
     | "skipped-not-device"
     | "skipped-offline"
+    // LEGACY: written by 1.0 and earlier, when a denied alert permission
+    // aborted registration entirely. No longer produced — kept in the union
+    // because the last diagnostic is persisted in AsyncStorage and an
+    // upgrading install can still read one back. See "ok-alerts-off".
     | "permission-denied"
     | "no-project-id"
     | "expo-token-error"
     | "supabase-register-error"
+    // Registered for SILENT background refresh, but the user has not
+    // granted alert permission, so visible forecast notifications can't be
+    // delivered. This is a healthy state, not an error.
+    | "ok-alerts-off"
     | "ok";
   message?: string;
   tokenPrefix?: string;
+  // Whether alert (banner) permission was granted at registration time.
+  alertsEnabled?: boolean;
 }
 
 // True when the failure looks like "device is offline, retry later"
@@ -122,14 +132,21 @@ async function runRegistration(
       const requested = await Notifications.requestPermissionsAsync();
       granted = requested.granted;
     }
-    if (!granted) {
-      await writeDiagnostic({
-        at,
-        step: "permission-denied",
-        message: `granted=${existing.granted} canAsk=${existing.canAskAgain}`,
-      });
-      return null;
-    }
+
+    // NOTE: we deliberately do NOT bail when permission is denied.
+    //
+    // iOS hands out an APNs device token without notification
+    // authorization — expo-notifications' getDevicePushTokenAsync simply
+    // calls UIApplication.shared.registerForRemoteNotifications() with no
+    // permission check (see PushTokenModule.swift). Authorization governs
+    // whether we may *display* something, not whether the app can be woken
+    // by a silent push. 1.0 returned here, which meant a user who declined
+    // notifications also silently lost background refresh — our limitation,
+    // not the platform's.
+    //
+    // So: register regardless, and record whether alerts are allowed so the
+    // server can send silent refreshes to everyone while targeting visible
+    // forecast alerts at the subset that can actually receive them.
 
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ??
@@ -175,9 +192,13 @@ async function runRegistration(
     // ON CONFLICT target, and anon must never be able to read this table
     // (world-readable push tokens = anyone can push to every device — see
     // migration 20260807000000). The RPC writes; anon still can't read.
+    // 3-arg overload (migration 20260917210000). The 2-arg form still
+    // exists for installs from 1.0, which only registered when permission
+    // was already granted.
     const { error: upsertError } = await supabase.rpc("register_device_token", {
       p_token: token,
       p_platform: Platform.OS,
+      p_alerts_enabled: granted,
     });
 
     if (upsertError) {
@@ -189,6 +210,7 @@ async function runRegistration(
         step,
         message: upsertError.message,
         tokenPrefix: token.slice(0, 24),
+        alertsEnabled: granted,
       });
       console.warn(`[push] ${step}`, upsertError);
       return null;
@@ -196,10 +218,13 @@ async function runRegistration(
 
     await writeDiagnostic({
       at,
-      step: "ok",
+      step: granted ? "ok" : "ok-alerts-off",
       tokenPrefix: token.slice(0, 24),
+      alertsEnabled: granted,
     });
-    console.log(`[push] registered ${token.slice(0, 24)}…`);
+    console.log(
+      `[push] registered ${token.slice(0, 24)}… alerts=${granted ? "on" : "off"}`,
+    );
     return token;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -232,3 +257,41 @@ export async function requestAndRegister(): Promise<string | null> {
 // Backwards-compatible alias for callsites that imported the old name.
 // Old name auto-prompted; keep that semantic here.
 export const registerPushNotifications = requestAndRegister;
+
+// True once the device is registered for silent refresh but cannot show
+// alerts — i.e. background refresh works, daily forecast notifications
+// don't. Used to offer the user a way to turn alerts on.
+export async function alertsAreOff(): Promise<boolean> {
+  if (!isSupported) return false;
+  try {
+    return !(await Notifications.getPermissionsAsync()).granted;
+  } catch {
+    return false;
+  }
+}
+
+// Enable action for the push diagnostic line. If iOS will still show a
+// prompt, request it; if the user already declined and iOS won't ask
+// again, deep-link to Settings — the only remaining path. Re-registers
+// either way so device_tokens.alerts_enabled reflects the new state.
+// Returns true if alerts are permitted afterward.
+export async function promptOrOpenNotificationSettings(): Promise<boolean> {
+  if (!isSupported) return false;
+  try {
+    const existing = await Notifications.getPermissionsAsync();
+    if (!existing.granted && existing.canAskAgain === false) {
+      Linking.openSettings().catch(() => {});
+      // The user may flip it in Settings; the next launch (or the
+      // diagnostic line's poll) re-registers with the updated value.
+      return false;
+    }
+  } catch {
+    // fall through to the request path
+  }
+  await requestAndRegister();
+  try {
+    return (await Notifications.getPermissionsAsync()).granted;
+  } catch {
+    return false;
+  }
+}
