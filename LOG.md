@@ -63,9 +63,34 @@ Format per entry:
 - `docs/APP_REVIEW_NOTES.md` rewritten: new LOCATION paragraph for the Notes field, and the
   old "it's an appeal" reasoning replaced with the history and a do-not-reintroduce rule.
 - Gates green on branch `fix/remove-background-location`: tsc 0, eslint 0, Vitest 113.
-- **Next:** bump build number, EAS build + auto-submit, swap the build on the version,
-  re-paste the Notes, then **Resubmit to App Review** (the submission page has a
-  "Resubmit to App Review" action; version is editable while rejected).
+- **Resubmit in flight:** EAS build **33** started 2026-09-17 12:01 PM AKDT
+  (`1f35795b-95c5-4feb-a75a-bc469b6d4824`, production, `--auto-submit`). Build number
+  auto-incremented by EAS (`appVersionSource: remote`), no manual bump.
+- **ASC App Review Notes replaced and saved** (verified by reload): the old
+  `BACKGROUND LOCATION ("ALWAYS")` block is gone, replaced by the LOCATION paragraph from
+  `docs/APP_REVIEW_NOTES.md`. Remaining: attach build 33 to the version once it processes,
+  then **Resubmit to App Review**.
+- **1.1 plan agreed with Kai** (build after 1.0 is approved, in this order):
+  1. **Decouple push-token registration from alert permission.** `lib/pushNotifications.ts`
+     :125 returns before `getExpoPushTokenAsync` when `!granted`, so users who decline
+     notifications get no token and therefore no silent-push refresh — an app limitation,
+     not an iOS one (iOS delivers `content-available` without notification authorization).
+     Gate only the *visible* notification on `granted`. **Verify on device** that
+     `getExpoPushTokenAsync` succeeds with permission denied — untested.
+  2. **Daily morning notification for favorited zones** (e.g. "Turnagain Pass —
+     CONSIDERABLE today"), fired off the forecast cron. Visible pushes ARE delivered to
+     force-quit apps (silent ones are not), so this covers the exact gap the location wake
+     used to, and a tap refreshes the cache. Infra already exists in
+     `supabase/functions/send-snapshot-pushes`.
+  3. **Live trip tracking** (Option B) — share location with SAR/trip-plan contacts while a
+     trip is active. This is a genuine persistent-location feature, so it re-legitimises
+     `UIBackgroundModes: location`, and cache refresh can ride its wakes.
+     **Scope decision: location follows the trip, not always-on.** Running a monitor 24/7
+     outside an active trip is the same empty-permission argument that lost 2.5.4.
+     **Consequence to plan for:** this inverts the App Privacy answers (precise location
+     becomes collected/transmitted/linked, currently declared "not stored or shared"),
+     needs a location table with retention + purge, privacy-policy copy, and the
+     **screen recording on a physical device** Apple asked for.
 
 ## 2026-09-14 (afternoon) — **SUBMITTED FOR APP REVIEW** (Whumpf 1.0, build #32)
 - Build #32 (iPhone-only, `e97a80a`) processed; swapped #31 → #32 on the version, saved,
