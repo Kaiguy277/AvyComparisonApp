@@ -94,18 +94,16 @@ information.</td></tr>
 </table>
 
 <h2>Location</h2>
-<p>Location is used three ways, all of them optional:</p>
+<p>Location is used two ways, both optional, and only while you are using the app:</p>
 <ul>
-<li><strong>While you use the app</strong> — to suggest the nearest avalanche center, and to
-set coordinates on an observation or a trailhead when you ask it to.</li>
-<li><strong>In the background ("Always")</strong> — only as a trigger. iOS tells the app the
-device has moved a significant distance, and the app uses that as a cue to refresh your saved
-zones before you lose service. <strong>The app does not read, store, transmit, or share the
-coordinates from these events.</strong> You can decline this and the rest of the app works
-normally.</li>
+<li><strong>Setting a point</strong> — when you tap "Use current location", the app reads your
+position once to fill in the coordinates and elevation of an observation. You can type
+coordinates by hand or pick the spot on a map instead.</li>
 <li><strong>Trip plans</strong> — a trailhead location you choose is included in the plan you
 send.</li>
 </ul>
+<p><strong>The app does not track you in the background.</strong> It does not ask for "Always"
+location, and it does not record where you go.</p>
 
 <h2>Photos and camera</h2>
 <p>Photos are used only where you add them: attached to an observation you submit, or as a
@@ -176,10 +174,10 @@ schedules and some pause outside the core season. The app keeps showing the last
 has, marked expired, rather than showing nothing. Tap through to the center's own page for the
 current product.</p>
 
-<h3>Why does it ask for background location?</h3>
-<p>Only as a trigger to refresh your saved zones while you drive toward the trailhead, so the
-forecast is on your phone before service drops. The app never reads or stores the coordinates
-from those events. Decline it and everything else still works.</p>
+<h3>Does the app track my location?</h3>
+<p>No. It asks for location only while you are using it, and only to fill in a point you asked
+for — the coordinates of an observation, or a trailhead on a trip plan. It does not ask for
+"Always" location and does not record where you go.</p>
 
 <h3>My forecasts aren't updating in the background.</h3>
 <p>iOS turns off Background App Refresh in Low Power Mode, and pauses it when the battery is

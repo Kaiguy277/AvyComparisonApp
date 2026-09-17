@@ -21,6 +21,35 @@ Format per entry:
 
 ---
 
+## 2026-09-17 (evening, later) — privacy docs corrected; 1.1 release checklist
+- **LIVE PRIVACY POLICY WAS CONTRADICTING OUR OWN REVIEW NOTES.** It still described
+  background location as a refresh trigger ("In the background (\"Always\") — only as a
+  trigger… the app does not read, store, transmit, or share the coordinates"), which build
+  33 removed, while the App Review notes told Apple the app "never requests Always
+  authorization". A reviewer cross-checking the Privacy Policy URL against the notes —
+  while we are in review *for a location issue* — would have found the two disagreeing.
+  Rewrote the Location section and the FAQ to match build 33 ("The app does not track you
+  in the background") and **deployed `legal --no-verify-jwt --use-api`**. Verified live:
+  `/privacy` + `/support` 200 text/html, and the old Always claim is gone.
+  - `legal` takes `--no-verify-jwt` for the same reason `trip-plan-page` does: the Deno
+    proxy (`deploy/main.ts`) forwards with **no auth headers at all**. Dropping the flag
+    would 401 both legal pages.
+- **`docs/RELEASE_1_1_CHECKLIST.md` written** — preconditions, the privacy-policy copy to
+  deploy *with* 1.1 (not before), the App Privacy label analysis, device verification
+  steps, the screen-recording shot list Apple asked for, and the build budget.
+- **App Privacy label analysis for 1.1:** *Precise Location* needs **no change** — it is
+  already declared collected + linked to identity for App Functionality, and a trip plan
+  is already tied to the named subject. The genuinely new item is **`device_tokens.zones`**
+  (which zones a device follows, stored against an anonymous token), not covered by any
+  current answer; recommend **Usage Data → Product Interaction, App Functionality, NOT
+  linked**. Kai published the labels personally last time and should again.
+- **`docs/APP_REVIEW_NOTES.md`: added the 1.1 LOCATION block** to paste instead of the 1.0
+  one, framing tracking as the feature the background mode exists for, with the per-trip
+  scoping and teardown spelled out, and referencing the attached screen recording.
+- **Sequencing rule recorded:** App Privacy answers are app-level, not version-level, so
+  they must NOT be edited until 1.1 is actually being submitted — editing now would
+  misdescribe the 1.0 build in review.
+
 ## 2026-09-17 (evening) — 1.0 resubmitted; 1.1 backend deployed to production
 - **Whumpf 1.0 build 33 RESUBMITTED — `Waiting for Review`.** Swapped 32 → 33 on the
   version, saved, then **Update Review** (note: "Resubmit to App Review" on the
