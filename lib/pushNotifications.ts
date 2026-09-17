@@ -7,6 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { supabase } from "./supabase";
 import { refreshFavoritesSnapshot } from "./backgroundRefresh";
+import { cachePushToken, syncDeviceZones } from "./deviceZoneSync";
 
 export const PUSH_REFRESH_TASK = "avy.push-refresh";
 const PUSH_DIAG_KEY = "avy-push-diagnostic-v1";
@@ -30,13 +31,26 @@ if (!isExpoGo) {
     }
   });
 
+  // Foreground presentation policy. This only governs what happens when a
+  // notification arrives while the app is OPEN — backgrounded delivery is
+  // the system's call.
+  //
+  // Two kinds arrive here: the hourly silent refresh push (data only, no
+  // title/body) which must stay invisible, and the daily forecast alert
+  // which carries real copy and should be shown. Returning false for
+  // everything — as this did before 1.1 — would silently swallow the
+  // forecast alert for anyone who happened to have the app open.
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: false,
-      shouldShowList: false,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      const { title, body } = notification.request.content;
+      const isVisible = !!(title || body);
+      return {
+        shouldShowBanner: isVisible,
+        shouldShowList: isVisible,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    },
   });
 }
 
@@ -225,6 +239,13 @@ async function runRegistration(
     console.log(
       `[push] registered ${token.slice(0, 24)}… alerts=${granted ? "on" : "off"}`,
     );
+
+    // Cache the token and push the favourite-zone list so the daily forecast
+    // alert can name the user's zones. Best-effort: registration has already
+    // succeeded at this point and must not fail on a zone-sync hiccup.
+    await cachePushToken(token);
+    void syncDeviceZones();
+
     return token;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

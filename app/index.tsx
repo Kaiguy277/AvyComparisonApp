@@ -59,6 +59,7 @@ import {
   readPushDiagnostic,
   type PushDiagnostic,
 } from "@/lib/pushNotifications";
+import { syncDeviceZones } from "@/lib/deviceZoneSync";
 import {
   readLastRefresh,
   refreshFavoritesSnapshot,
@@ -246,6 +247,7 @@ export default function Index() {
           setFavoriteZoneIds(DEFAULT_ZONE_IDS);
           setDisplayedZoneIds(DEFAULT_ZONE_IDS);
           await saveFavorites(DEFAULT_ZONE_IDS);
+          void syncDeviceZones(DEFAULT_ZONE_IDS);
         } else {
           setFavoriteZoneIds(favs);
           setDisplayedZoneIds(favs.length > 0 ? favs : DEFAULT_ZONE_IDS);
@@ -314,6 +316,7 @@ export default function Index() {
         if (prev.every((id) => set.has(id))) return prev;
         const next = prev.filter((id) => set.has(id));
         saveFavorites(next).catch(() => {});
+        void syncDeviceZones(next);
         return next;
       });
     },
@@ -334,6 +337,7 @@ export default function Index() {
         if (prev.includes(zoneId)) {
           const next = prev.filter((id) => id !== zoneId);
           saveFavorites(next).catch(() => {});
+          void syncDeviceZones(next);
           return next;
         }
         // Insert and re-sort by current display order so favorites read in
@@ -347,6 +351,7 @@ export default function Index() {
           return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
         });
         saveFavorites(next).catch(() => {});
+        void syncDeviceZones(next);
         return next;
       });
     },
@@ -361,6 +366,7 @@ export default function Index() {
       const favSet = new Set(prev);
       const next = nextOrder.filter((id) => favSet.has(id));
       saveFavorites(next).catch(() => {});
+      void syncDeviceZones(next);
       return next;
     });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -374,6 +380,7 @@ export default function Index() {
       if (!prev.includes(zoneId)) return prev;
       const next = prev.filter((id) => id !== zoneId);
       saveFavorites(next).catch(() => {});
+      void syncDeviceZones(next);
       return next;
     });
   }, []);
