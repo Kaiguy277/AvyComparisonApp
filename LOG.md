@@ -21,6 +21,39 @@ Format per entry:
 
 ---
 
+## 2026-09-17 (night, later) — movement-triggered refresh restored; Twilio parked
+- **Movement-triggered forecast refresh is back** (`ca4f644`), and this is the change Kai
+  actually wanted: trip tracking only helps someone who *filed a trip plan*, i.e. the
+  conscientious user. The safety case is the forgetful one who drives out without checking.
+  Sig-change monitoring is the only mechanism iOS restores after a force-quit.
+  **Why it is not what 2.5.4 rejected:** the app now has a real persistent-location feature
+  (tracking), AND we now **read** the coordinate instead of discarding it —
+  `nearestCenters()` resolves which centers you are near, and the home screen shows a
+  "ZONES NEAR YOU" strip offering to follow them. Build 32 threw the coordinate away, which
+  is exactly what Apple objected to. Apple's own Next Steps even suggested this mechanism.
+  Purpose strings now state **both** uses.
+  - `lib/locationRefresh.ts`: Lowest accuracy, 5 km filter, no blue bar, 20-min refresh
+    throttle **shared** with the tracking task. **Only one location session at a time** —
+    starting a tracked trip stops the monitor and the higher-accuracy task takes over both
+    jobs; ending the trip hands back. Two concurrent sessions is untested in expo-location.
+  - `nearestCenters`/`nearestZones` return the top 3, closest first, because centers
+    cluster (Anchorage → CNFAIC, HPAC, VAC). **Granularity limit:** we only hold per-CENTER
+    centroids; per-zone polygons come from NAC GeoJSON at runtime, which a headless task
+    cannot depend on. Fine in practice — CNFAIC *is* Turnagain/Summit/Seward/Girdwood.
+  - Also: daily alert now sets `_contentAvailable` so a BACKGROUNDED app pulls the full
+    forecast rather than only showing the rating. **A force-quit app cannot be made to run
+    code from any push** — that is iOS policy, not a design choice; the banner still carries
+    the rating, and the tap path already worked (`app/index.tsx:298-307` refreshes on mount
+    and on every `active` transition). Vitest 143.
+- **Twilio: account created, then PARKED.** See `docs/TRIP_PLAN_OPS.md` "Known gaps" for the
+  full reasoning. Headlines: 10DLC is carrier-mandated so no provider avoids it; carrier
+  email-to-SMS gateways rejected because they **fail silently** (fatal for an overdue
+  alert); **an automated voice call may be both more effective and exempt from 10DLC**,
+  worth researching before building SMS. No plan selected, nothing provisioned, no cost.
+- **Security note:** Twilio auto-downloaded `twilio_2FA_recovery_code.txt` into
+  `.playwright-mcp/` in the repo. **Already gitignored** (`.gitignore:48`) and git does not
+  see it, but it is plaintext on disk — move to a password manager and delete.
+
 ## 2026-09-17 (night) — **1.0 SUBMISSION CANCELLED**; everything ships as one release
 - **Kai's call:** don't wait for 1.0 approval if 1.1 follows immediately — one review cycle
   instead of two. I argued for banking the approval first (if the combined build is rejected,

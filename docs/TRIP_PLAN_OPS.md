@@ -72,4 +72,24 @@ See LOG 2026-09-09 for the sequence. Delete smoke plans afterwards:
 ## Known gaps
 - Push-to-owner ("Alex opened your plan") is a stub until `device_tokens` carries a
   trip device id.
-- SMS channel not implemented (Twilio 10DLC pending).
+- **SMS channel not implemented — and reconsider the channel before building it.**
+  Decided 2026-09-17 to park this until after the first App Store release.
+  - Email via Resend is the system of record and is genuinely solid: `nudge_failed`
+    events plus retry through the sweeper. Most people get email push on their phone,
+    so it is a better wake-up than it sounds.
+  - **A2P 10DLC is carrier-mandated, not a Twilio quirk** — Telnyx, Plivo and AWS SNS
+    all impose the same registration. Switching provider buys nothing.
+  - **Carrier email-to-SMS gateways (`number@txt.att.net` etc.) were evaluated and
+    rejected.** They need the recipient's carrier, which number portability makes
+    unguessable without a paid lookup, and they fail SILENTLY with no delivery receipt.
+    For "your person is overdue", an alert that quietly didn't arrive is worse than no
+    alert — it creates false confidence exactly when someone should be calling 911.
+  - **A VOICE CALL may beat SMS for this feature, and outbound voice does not require
+    10DLC** (that regime covers SMS/MMS). A ringing phone gets answered; a text at 9pm
+    gets glanced at. A short TwiML message would do. **Verify current voice compliance
+    requirements before committing** — the 10DLC-is-SMS-only point is solid, the rest of
+    the 2026 voice rules were not checked.
+  - Twilio account exists (created 2026-09-17, Kai) but **no plan selected and nothing
+    provisioned**. Trial is useless here regardless: it only sends to 5 pre-verified
+    numbers, and you cannot pre-verify a user's emergency contacts.
+  - If picking this up: verification is calendar time, not work time, so start it early.
