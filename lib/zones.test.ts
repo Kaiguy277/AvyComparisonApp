@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 
-import { AVAILABLE_ZONES, nearestCenter, ZONE_TO_CENTER } from "./zones";
+import { AVAILABLE_ZONES, nearestCenter, ZONE_TO_CENTER,
+  nearestCenters,
+  nearestZones,
+} from "./zones";
 // The zone catalogue is duplicated across the app and the Deno edge
 // functions (two runtimes can't share one import). The audit's finding:
 // "that sync is luck, not structure — adding one zone needs six
@@ -85,5 +88,52 @@ describe("nearestCenter", () => {
 
   it("returns null for invalid input", () => {
     expect(nearestCenter(NaN, -149)).toBeNull();
+  });
+});
+
+describe("nearestCenters / nearestZones", () => {
+  // Anchorage. CNFAIC (Turnagain) is closest; HPAC (Hatcher) and CAC/VAC
+  // are the realistic next choices for the same weekend.
+  const ANC = { lat: 61.22, lon: -149.9 };
+
+  it("returns several nearby centers, closest first", () => {
+    const r = nearestCenters(ANC.lat, ANC.lon, 3);
+    expect(r.length).toBe(3);
+    expect(r[0].centerId).toBe("CNFAIC");
+    // strictly increasing distance
+    expect(r[0].km).toBeLessThan(r[1].km);
+    expect(r[1].km).toBeLessThan(r[2].km);
+  });
+
+  it("includes Hatcher Pass for an Anchorage user, not just Turnagain", () => {
+    const ids = nearestCenters(ANC.lat, ANC.lon, 3).map((r) => r.centerId);
+    expect(ids).toContain("HPAC");
+  });
+
+  it("respects the limit", () => {
+    expect(nearestCenters(ANC.lat, ANC.lon, 1).length).toBe(1);
+    expect(nearestCenters(ANC.lat, ANC.lon, 0).length).toBe(0);
+  });
+
+  it("excludes centers beyond the range cap", () => {
+    // Miami — nothing within 600 km.
+    expect(nearestCenters(25.76, -80.19, 3).length).toBe(0);
+  });
+
+  it("rejects invalid coordinates", () => {
+    expect(nearestCenters(NaN, -149.9)).toEqual([]);
+    expect(nearestCenters(61.2, Infinity)).toEqual([]);
+  });
+
+  it("nearestZones expands centers into their zones, closest center first", () => {
+    const z = nearestZones(ANC.lat, ANC.lon, 2);
+    expect(z.length).toBeGreaterThan(1);
+    // Every zone carries its center's distance, and the first block is CNFAIC.
+    expect(z[0].center).toBe("CNFAIC");
+    expect(z.every((x) => Number.isFinite(x.km))).toBe(true);
+  });
+
+  it("nearestZones returns nothing when nothing is in range", () => {
+    expect(nearestZones(25.76, -80.19, 3)).toEqual([]);
   });
 });

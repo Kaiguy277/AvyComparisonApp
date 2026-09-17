@@ -416,6 +416,49 @@ function haversineKm(
 // boundary may resolve to a neighbor. Returns null for invalid input or a
 // point implausibly far from any center (> ~600 km — likely not in a
 // covered area), so we don't auto-fill a wildly-wrong center.
+// Nearest centers to a coordinate, closest first, within ~600 km.
+//
+// Returns several rather than one because centers cluster: from Anchorage,
+// CNFAIC, HPAC and CAC are all within a plausible day's drive, and a user
+// deciding where to go cares about all of them. Zone-level ranking would be
+// better still, but we only hold per-CENTER centroids (CENTER_COORDS) — the
+// per-zone polygons come from NAC's GeoJSON at runtime, which a headless
+// background task can't depend on. In practice a center resolves to the
+// right cluster anyway: CNFAIC covers Turnagain, Summit Lake, Seward and
+// Girdwood, which is exactly the set someone near Anchorage wants.
+export function nearestCenters(
+  lat: number,
+  lon: number,
+  limit = 3,
+  maxKm = 600,
+): { centerId: string; km: number }[] {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+  return Object.entries(CENTER_COORDS)
+    .map(([centerId, c]) => ({
+      centerId,
+      km: haversineKm(lat, lon, c.lat, c.lon),
+    }))
+    .filter((r) => r.km <= maxKm)
+    .sort((a, b) => a.km - b.km)
+    .slice(0, Math.max(limit, 0));
+}
+
+// Zones belonging to the nearest centers, closest center first. This is what
+// the app surfaces as "near you".
+export function nearestZones(
+  lat: number,
+  lon: number,
+  limit = 3,
+): { id: string; name: string; center: string; km: number }[] {
+  const centers = nearestCenters(lat, lon, limit);
+  return centers.flatMap((c) =>
+    AVAILABLE_ZONES.filter((z) => z.center === c.centerId).map((z) => ({
+      ...z,
+      km: c.km,
+    })),
+  );
+}
+
 export function nearestCenter(lat: number, lon: number): string | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   let best: string | null = null;

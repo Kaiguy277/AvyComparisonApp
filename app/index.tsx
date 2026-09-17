@@ -8,6 +8,7 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   View,
@@ -61,6 +62,13 @@ import {
 } from "@/lib/pushNotifications";
 import { syncDeviceZones } from "@/lib/deviceZoneSync";
 import {
+  isAlwaysGranted,
+  isLocationBannerSnoozed,
+  promptOrOpenLocationSettings,
+  readNearbyCenters,
+  snoozeLocationBanner,
+} from "@/lib/locationRefresh";
+import {
   readLastRefresh,
   refreshFavoritesSnapshot,
   type LastRefreshRecord,
@@ -68,7 +76,7 @@ import {
 import { toggleDebugMode, useDebugMode } from "@/lib/debugMode";
 import { loadForecastBundle } from "@/lib/forecast/loadForecastBundle";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
+import { AVAILABLE_ZONES, DEFAULT_ZONE_IDS, ZONE_TO_CENTER } from "@/lib/zones";
 import { listDrafts as listObservationDrafts } from "@/lib/observation/submitFlow";
 import { setZoneSession } from "@/lib/zoneSession";
 
@@ -689,6 +697,18 @@ export default function Index() {
             </View>
           </View>
         ) : null}
+
+        {/* Zones near you, and the offer to keep them current offline. */}
+        <NearbyZonesBanner
+          favoriteZoneIds={favoriteZoneIds}
+          onAddZones={(ids) => {
+            const next = [...new Set([...favoriteZoneIds, ...ids])];
+            setFavoriteZoneIds(next);
+            setDisplayedZoneIds((d) => [...new Set([...d, ...ids])]);
+            saveFavorites(next).catch(() => {});
+            void syncDeviceZones(next);
+          }}
+        />
 
         {/* Unsent observation drafts — shown when the user submitted
             while offline and the form was queued locally. Tap goes
@@ -2096,6 +2116,139 @@ function ObservationDraftsBanner() {
         color={palette.aspen[400]}
       />
     </Touchable>
+  );
+}
+
+// Two jobs, one strip of chrome.
+//
+// Granted: shows which avalanche zones you are actually near — the visible
+// use of the coordinate, and the thing that makes location more than a wake
+// signal. Offers to add any you don't already follow.
+//
+// Not granted: explains, in the terms that matter to the user, why turning
+// it on helps — the forecast is on the phone before service drops. This is
+// the case that matters most, because the user we're solving for is the one
+// who drives out without checking anything.
+function NearbyZonesBanner({
+  favoriteZoneIds,
+  onAddZones,
+}: {
+  favoriteZoneIds: string[];
+  onAddZones: (ids: string[]) => void;
+}) {
+  const [granted, setGranted] = useState<boolean | null>(null);
+  const [nearby, setNearby] = useState<string[]>([]);
+  const [snoozed, setSnoozed] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const reload = useCallback(async () => {
+    if (Platform.OS !== "ios") return;
+    const [g, n, sn] = await Promise.all([
+      isAlwaysGranted(),
+      readNearbyCenters(),
+      isLocationBannerSnoozed(),
+    ]);
+    setGranted(g);
+    setSnoozed(sn);
+    // Closest center first; its zones are what "near you" means.
+    const closest = n?.centers?.[0]?.centerId;
+    setNearby(
+      closest
+        ? AVAILABLE_ZONES.filter((z) => z.center === closest).map((z) => z.id)
+        : [],
+    );
+  }, []);
+
+  useEffect(() => {
+    reload();
+    const t = setInterval(reload, 15000);
+    return () => clearInterval(t);
+  }, [reload]);
+
+  if (Platform.OS !== "ios" || granted === null) return null;
+
+  const missing = nearby.filter((id) => !favoriteZoneIds.includes(id));
+  const names = (ids: string[]) =>
+    ids
+      .map((id) => AVAILABLE_ZONES.find((z) => z.id === id)?.name)
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(", ");
+
+  // Granted, nothing new to offer — stay out of the way.
+  if (granted && missing.length === 0) return null;
+  if (!granted && snoozed) return null;
+
+  const onPress = async () => {
+    if (busy) return;
+    if (granted) {
+      Haptics.selectionAsync().catch(() => {});
+      onAddZones(missing);
+      return;
+    }
+    setBusy(true);
+    try {
+      await promptOrOpenLocationSettings();
+      await reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View
+      style={{
+        marginTop: 8,
+        marginHorizontal: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 0.5,
+        borderColor: palette.frost[500],
+        backgroundColor: palette.frost[500] + "1A",
+        opacity: busy ? 0.6 : 1,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <Touchable
+        onPress={onPress}
+        disabled={busy}
+        style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
+      >
+        <Ionicons name="location-outline" size={16} color={palette.frost[400]} />
+        <View style={{ flex: 1 }}>
+          <Text
+            variant="mono"
+            weight="bold"
+            style={{ fontSize: 11, letterSpacing: 1.4, color: palette.frost[400] }}
+          >
+            {granted ? "ZONES NEAR YOU" : "KEEP FORECASTS ON YOUR PHONE"}
+          </Text>
+          <Text
+            className="text-ink-200"
+            style={{ fontSize: 12, lineHeight: 16, marginTop: 2 }}
+          >
+            {granted
+              ? `${names(missing)}${missing.length > 3 ? ` +${missing.length - 3}` : ""} — tap to follow`
+              : "Turn on location and Whumpf downloads the current forecast for the zones near you as you drive, so it's already on your phone when service drops."}
+          </Text>
+        </View>
+      </Touchable>
+      {granted ? null : (
+        <Touchable
+          onPress={async () => {
+            await snoozeLocationBanner();
+            setSnoozed(true);
+          }}
+          disabled={busy}
+          hitSlop={8}
+        >
+          <Ionicons name="close" size={16} color={palette.ink[400]} />
+        </Touchable>
+      )}
+    </View>
   );
 }
 

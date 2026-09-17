@@ -60,9 +60,9 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to fill in the coordinates and elevation of an avalanche observation you are recording, and to share your position with your trip contacts while a trip is active.",
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to share your location with the contacts on your trip plan while your trip is active, so they can see where you are and which way you were heading if you do not check in. This runs only during a trip you turned tracking on for, and stops when you check in.",
-          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to keep sharing your location with your trip contacts after you lock your phone or put it away, so your trip plan stays current while you are out. This runs only during a trip you turned tracking on for, and stops when you check in.",
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to fill in the coordinates and elevation of an avalanche observation, to show the avalanche zones nearest you, and to share your position with your trip contacts while a trip is active.",
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for two things: to download the current avalanche forecast for the zones near you as you travel, so it is already on your phone when you lose service; and, if you turn on trip tracking, to share your position with the contacts on your trip plan until you check in.",
+          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to use your location in the background for two things: to download the current avalanche forecast for the zones near you as you drive out of service, so you are not relying on stale data at the trailhead; and, if you turn on trip tracking, to share your position with your trip contacts until you check in.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": false
         }

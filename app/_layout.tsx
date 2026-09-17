@@ -35,6 +35,7 @@ import { palette } from "@/constants/design";
 import { registerBackgroundRefresh } from "@/lib/backgroundRefresh";
 import { registerIfPermitted } from "@/lib/pushNotifications";
 import { cleanUpLegacyLocationWake } from "@/lib/legacyTaskCleanup";
+import { startLocationRefreshIfPermitted } from "@/lib/locationRefresh";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -92,6 +93,9 @@ export default function RootLayout() {
     // Remove the dead background-location task left by builds <= 32, which
     // crashed build 33 on upgrade. See lib/legacyTaskCleanup.ts.
     void cleanUpLegacyLocationWake();
+    // Re-arm the movement-triggered refresh if the user already granted
+    // Always. Never prompts — the in-app explainer is what asks.
+    void startLocationRefreshIfPermitted();
   }, []);
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: palette.ink[950] }} />;
