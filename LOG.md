@@ -21,6 +21,61 @@ Format per entry:
 
 ---
 
+## 2026-09-17 (afternoon) — 1.1 built on `feat/1.1-push-and-tracking`
+Branch deliberately NOT merged to `main` until 1.0 is approved, so a further
+1.0 fix can be built from a clean `main` matching what's in review.
+
+- **Push token decoupled from alert permission** (`68112fd`). `lib/pushNotifications
+  .ts:125` returned before minting a token when permission was denied, so declining
+  notifications also killed silent-push refresh. iOS never required this —
+  `getDevicePushTokenAsync` just calls `registerForRemoteNotifications()` with no
+  permission check (`PushTokenModule.swift`). Client now always registers and reports
+  `alerts_enabled`. New diagnostic step `ok-alerts-off`; `permission-denied` kept in the
+  union as legacy (persisted in AsyncStorage). Migration `20260917210000`: column +
+  3-arg RPC overload; **the 2-arg RPC is kept** because 1.0 installs still call it.
+  **Unverified on device:** that `getExpoPushTokenAsync` resolves with permission denied.
+- **Daily forecast alert** (`4d68f98`). Visible pushes ARE delivered to force-quit apps;
+  silent ones are not — so this covers the exact gap the location wake did, with no
+  location permission. Migration `20260917220000`: `device_tokens.zones` +
+  `last_alert_date` + `set_device_zones` RPC. `lib/deviceZoneSync.ts` is its own module
+  to dodge an import cycle (offlineCache ← backgroundRefresh ← pushNotifications).
+  New fn `send-forecast-alerts`; cron `20260917230000` at 16:00 and 17:00 UTC (second
+  pass is a safe retry thanks to the per-device dedupe).
+  **`setNotificationHandler` was returning false for everything** — it would have
+  swallowed this alert whenever the app was open. Now shows anything with a title/body.
+  Safety rules under test: a zone without TODAY's forecast is skipped rather than
+  alerted with yesterday's rating; an unreadable/NO_RATING band never lowers the
+  reported danger (alert carries the max across bands). +15 tests, 128 total.
+- **Live trip tracking** (`03a4fb4`, `ac8e6ec`). Migration `20260917240000`:
+  `trip_plans.tracking_enabled` + `trip_plan_locations` (ON DELETE CASCADE so the trail
+  dies with the plan via the existing sweeper), RLS-locked like `device_tokens`,
+  `trim_trip_plan_locations` caps the trail at 1000 points (~a week at the ~10 min
+  cadence). New `location` action on `trip-plans`, plan_secret authed, refuses when
+  tracking is off or the plan is closed. `lib/tripPlan/tracking.ts` buffers points in
+  AsyncStorage and flushes opportunistically — no signal is the NORMAL case here.
+  Opt-in toggle in `app/trip/new.tsx`, off by default, asked per trip. Packet page gains
+  "Last known position" with decimal degrees, Maps links, a >3h staleness warning and a
+  collapsible route table.
+- **`app.json`: Always location restored**, with copy describing the real feature, and
+  `plugins/withTrimmedPermissions.js` no longer strips the location keys or the
+  background mode (doing so would now silently break tracking); it still strips
+  expo-image-picker's unused mic string. Verified against the generated plist:
+  `UIBackgroundModes: ['fetch','location','remote-notification']`.
+- **Gate gap found:** `npm run typecheck` does NOT cover `supabase/` (tsconfig excludes
+  it), so none of the edge-function work is checked by it. Used
+  `PATH=$HOME/.deno/bin:$PATH deno check supabase/functions/*/index.ts` instead — all
+  clean. **Consider adding a deno check to the gate list.**
+- **CLAUDE.md correction:** the live cache tables are `forecast_cache`, `stations_cache`,
+  `observations_cache` — NOT `avalanche_forecast_cache` / `avalanche_daily_forecasts` as
+  the "Hard-earned rules" section claims. Confirmed via `supabase gen types typescript
+  --linked`, which reads the live schema through the management API and needs no DB
+  password — a good way to check production shape.
+- **NOT DONE / blocking 1.1 ship:** migrations and both new functions are committed but
+  **not applied or deployed**; App Privacy answers + privacy policy still say location
+  isn't collected (tracking makes that false, and `device_tokens.zones` is new collected
+  data too); the physical-device screen recording Apple asked for; device verification of
+  the push-token decoupling.
+
 ## 2026-09-17 — **REJECTED (2.5.4)** → background location removed entirely
 - **Apple rejected 1.0 (32)** on 2026-09-17 (message 2026-09-16 11:48 PM), reviewed on an
   iPad Air 11-inch (M3) in compat mode. Submission `586a9a86-a854-468e-a9d9-351c14e508b1`.
