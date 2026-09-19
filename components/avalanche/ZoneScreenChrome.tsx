@@ -55,9 +55,15 @@ export function ZoneScreenHeader({
       <Pressable
         onPress={() => {
           Haptics.selectionAsync().catch(() => {});
-          router.back();
+          // If this screen is the first in the stack — a cold launch from a
+          // notification or link — router.back() does nothing at all, and the
+          // back button becomes a dead end. Fall back to the home screen.
+          if (router.canGoBack()) router.back();
+          else router.replace("/" as never);
         }}
         hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Back"
       >
         <Ionicons name="chevron-back" size={24} color={palette.ink[100]} />
       </Pressable>

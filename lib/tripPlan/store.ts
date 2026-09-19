@@ -33,6 +33,7 @@ export const KEYS = {
   secureProfile: "avy-tripplan-profile-secure-v1",
   templates: "avy-tripplan-templates-v1",
   active: "avy-tripplan-active-v1",
+  history: "avy-tripplan-history-v1",
   draft: "avy-tripplan-draft-v1",
   secretPrefix: "avy-tripplan-secret-",
   deviceId: "avy-tripplan-device-id-v1",
@@ -254,6 +255,89 @@ export interface ActivePlan {
   events?: { type: string; at: string; contactName: string | null; note: string | null }[];
 }
 
+// ── change notification ─────────────────────────────────────────────────
+//
+// Every screen that shows the trip holds its own copy via useTripPlan. Before
+// this existed, those copies only refreshed on mount, app-foreground or
+// reconnect — so the home screen, which stays mounted underneath the trip
+// screens, kept showing "HEADING OUT" after a trip was created, and the
+// composer then blocked with "you already have a live trip". Every write now
+// notifies every mounted copy, so no screen can disagree with the store.
+type ActivePlanListener = () => void;
+const listeners = new Set<ActivePlanListener>();
+
+export function subscribeActivePlan(fn: ActivePlanListener): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+function notifyActivePlan(): void {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      // One broken subscriber must not stop the others hearing about it.
+    }
+  }
+}
+
+// ── trip history ────────────────────────────────────────────────────────
+//
+// Before this, the app stored exactly ONE trip and DISMISS deleted it, so past
+// trips simply vanished — and the server purges a plan seven days after it
+// closes, so this has to live on the phone. Kai: "there should be a way to
+// navigate to my old trips."
+//
+// Local only. It holds where you went, when, and who you told, so it never
+// leaves the device and any entry can be removed.
+
+export const HISTORY_LIMIT = 25;
+
+// Pure, for testing: upsert a closed trip by planId, newest departure first,
+// capped. A trip already in history is REPLACED rather than duplicated — a
+// closed plan keeps getting saved as late status polls land, and the latest
+// copy carries the fullest activity timeline.
+export function mergeHistory(
+  existing: ActivePlan[],
+  plan: ActivePlan,
+  limit: number = HISTORY_LIMIT,
+): ActivePlan[] {
+  if (plan.status !== "closed") return existing;
+  const rest = existing.filter((p) => p.planId !== plan.planId);
+  return [plan, ...rest]
+    .sort((a, b) => Date.parse(b.departAt) - Date.parse(a.departAt))
+    .slice(0, Math.max(limit, 0));
+}
+
+export async function loadTripHistory(): Promise<ActivePlan[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.history);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as ActivePlan[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function archiveTrip(plan: ActivePlan): Promise<void> {
+  try {
+    const next = mergeHistory(await loadTripHistory(), plan);
+    await AsyncStorage.setItem(KEYS.history, JSON.stringify(next));
+  } catch {
+    // History is a convenience; never let it break saving the live plan.
+  }
+}
+
+export async function removeFromHistory(planId: string): Promise<void> {
+  try {
+    const next = (await loadTripHistory()).filter((p) => p.planId !== planId);
+    await AsyncStorage.setItem(KEYS.history, JSON.stringify(next));
+  } catch {}
+  notifyActivePlan();
+}
+
 export async function loadActivePlan(): Promise<ActivePlan | null> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.active);
@@ -266,9 +350,14 @@ export async function loadActivePlan(): Promise<ActivePlan | null> {
 export async function saveActivePlan(plan: ActivePlan | null): Promise<void> {
   if (plan === null) {
     await AsyncStorage.removeItem(KEYS.active).catch(() => {});
-    return;
+  } else {
+    await AsyncStorage.setItem(KEYS.active, JSON.stringify(plan));
+    // Every close path — check-in, cancel, a contact closing it from the web,
+    // expiry, a 404 — ends in a save of a closed plan. Archiving here means no
+    // path can skip history.
+    if (plan.status === "closed") await archiveTrip(plan);
   }
-  await AsyncStorage.setItem(KEYS.active, JSON.stringify(plan));
+  notifyActivePlan();
 }
 
 export async function updateActivePlan(

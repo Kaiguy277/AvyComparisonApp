@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
+import { useFocusEffect } from "expo-router";
 
 import { pendingFor } from "./outbox";
 import {
@@ -13,10 +14,12 @@ import {
   queueCheckIn,
   refreshActivePlan,
 } from "./send";
-import { loadActivePlan, type ActivePlan } from "./store";
+import { loadActivePlan, loadTripHistory, subscribeActivePlan, type ActivePlan } from "./store";
 
 export interface UseTripPlan {
   plan: ActivePlan | null;
+  // Past (closed) trips, newest first. Local to the device.
+  history: ActivePlan[];
   loaded: boolean;
   pendingActions: number;
   reload: () => Promise<void>;
@@ -28,13 +31,15 @@ export interface UseTripPlan {
 
 export function useTripPlan(): UseTripPlan {
   const [plan, setPlan] = useState<ActivePlan | null>(null);
+  const [history, setHistory] = useState<ActivePlan[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [pendingActions, setPending] = useState(0);
   const syncing = useRef(false);
 
   const reload = useCallback(async () => {
-    const p = await loadActivePlan();
+    const [p, h] = await Promise.all([loadActivePlan(), loadTripHistory()]);
     setPlan(p);
+    setHistory(h);
     setPending(p ? (await pendingFor(p.planId)).length : 0);
     setLoaded(true);
   }, []);
@@ -65,6 +70,20 @@ export function useTripPlan(): UseTripPlan {
     };
   }, [reload, sync]);
 
+  // Any write to the stored plan, from any screen or task, reloads this copy.
+  useEffect(() => subscribeActivePlan(() => void reload()), [reload]);
+
+  // Coming back to a screen also asks the SERVER, not just local storage:
+  // a contact can close the trip from the web page ("I heard from them"),
+  // and nothing on the phone knows until it asks. Cheap when there is no
+  // plan — refreshActivePlan returns early and an empty outbox makes no
+  // request.
+  useFocusEffect(
+    useCallback(() => {
+      void sync();
+    }, [sync]),
+  );
+
   // While a plan is live, poll every 60s in the foreground for open
   // receipts and contact actions.
   useEffect(() => {
@@ -94,5 +113,5 @@ export function useTripPlan(): UseTripPlan {
     await reload();
   }, [reload]);
 
-  return { plan, loaded, pendingActions, reload, sync, checkIn, cancel, dismiss };
+  return { plan, history, loaded, pendingActions, reload, sync, checkIn, cancel, dismiss };
 }

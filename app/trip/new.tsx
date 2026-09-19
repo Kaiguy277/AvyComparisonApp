@@ -45,7 +45,13 @@ import {
 } from "@/lib/tripPlan/schema";
 import { completeness, shareMessage } from "@/lib/tripPlan/packet";
 import { newId } from "@/lib/tripPlan/ids";
-import { createPlan, flushTripPlanOutbox, markShared, PacketTooLargeError } from "@/lib/tripPlan/send";
+import {
+  createPlan,
+  flushTripPlanOutbox,
+  markShared,
+  PacketTooLargeError,
+  refreshActivePlan,
+} from "@/lib/tripPlan/send";
 import {
   loadActivePlan,
   loadDraft,
@@ -81,6 +87,15 @@ export default function TripNewScreen() {
   // ── seed: template > zone param > saved draft > profile defaults ──────
   useEffect(() => {
     (async () => {
+      // Ask the server before deciding there is a live trip. The local copy
+      // can be stale in exactly the case that matters: a contact closes the
+      // trip from the web page ("I heard from them") and the phone hasn't
+      // asked since, so it would block a new trip for a plan that is over.
+      // Bounded — if we're offline this falls back to what's stored.
+      await Promise.race([
+        refreshActivePlan().catch(() => null),
+        new Promise((r) => setTimeout(r, 6000)),
+      ]);
       const [p, templates, favs, active] = await Promise.all([
         loadProfile(),
         loadTemplates(),
@@ -88,10 +103,21 @@ export default function TripNewScreen() {
         loadActivePlan(),
       ]);
       if (active && active.status !== "closed") {
+        // Previously this offered only "OK", which went back — so the alert
+        // told you to check in or cancel but gave you no way to reach the
+        // screen where you do that.
         Alert.alert(
           "You already have a live trip",
-          `Check in on the ${active.areaName} trip first, or cancel it.`,
-          [{ text: "OK", onPress: () => router.back() }],
+          `Your ${active.areaName} trip is still open. Check in or cancel it before starting another.`,
+          [
+            { text: "Not now", style: "cancel", onPress: () => router.back() },
+            {
+              text: "Go to trip",
+              style: "default",
+              onPress: () => router.dismissTo("/trip" as never),
+            },
+          ],
+          { cancelable: false },
         );
         return;
       }
@@ -295,7 +321,7 @@ export default function TripNewScreen() {
         Alert.alert(
           "Saved — not sent yet",
           "You're offline. It will send as soon as you have signal, and you'll be able to text the links from the Your People screen.",
-          [{ text: "OK", onPress: () => router.replace("/trip" as never) }],
+          [{ text: "OK", onPress: () => router.dismissTo("/trip" as never) }],
         );
         return;
       }
@@ -308,7 +334,7 @@ export default function TripNewScreen() {
           after?.sync === "failed"
             ? `The server rejected it: ${after.syncError ?? "unknown error"}.`
             : "The server hasn't confirmed yet. Links will appear on the Your People screen once it does.",
-          [{ text: "OK", onPress: () => router.replace("/trip" as never) }],
+          [{ text: "OK", onPress: () => router.dismissTo("/trip" as never) }],
         );
         return;
       }
@@ -326,7 +352,7 @@ export default function TripNewScreen() {
         if (res.action === Share.sharedAction) await markShared(active.planId, c.id);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      router.replace("/trip" as never);
+      router.dismissTo("/trip" as never);
     } catch (err) {
       Alert.alert(
         "Couldn't send",

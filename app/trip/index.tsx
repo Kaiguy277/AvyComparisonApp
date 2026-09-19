@@ -12,8 +12,9 @@ import { Text } from "@/components/ui/Text";
 import { Button } from "@/components/ui/Button";
 import { palette } from "@/constants/design";
 import { ZoneScreenContainer, ZoneScreenHeader } from "@/components/avalanche/ZoneScreenChrome";
+import { Eyebrow, PlanCard } from "@/components/trip/PlanCard";
 import { useTripPlan } from "@/lib/tripPlan/useTripPlan";
-import { formatLocal, shareMessage } from "@/lib/tripPlan/packet";
+import { shareMessage } from "@/lib/tripPlan/packet";
 import { markShared } from "@/lib/tripPlan/send";
 import { loadProfile, loadTemplates, mostRecentTemplate, rankTemplates } from "@/lib/tripPlan/store";
 import type { TripTemplate } from "@/lib/tripPlan/schema";
@@ -22,7 +23,7 @@ import { AVAILABLE_ZONES } from "@/lib/zones";
 
 export default function TripHubScreen() {
   const router = useRouter();
-  const { plan, loaded, pendingActions, sync, checkIn, cancel, dismiss, reload } = useTripPlan();
+  const { plan, history, loaded, pendingActions, sync, checkIn, cancel, dismiss, reload } = useTripPlan();
   const [templates, setTemplates] = useState<TripTemplate[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [hasProfile, setHasProfile] = useState(false);
@@ -179,161 +180,65 @@ export default function TripHubScreen() {
             </Text>
           </>
         ) : null}
+
+        {/* Past trips, shown in every state — including mid-trip. Before
+            this, a trip that closed and was dismissed was simply gone. The
+            current plan is excluded so a just-closed trip isn't listed twice. */}
+        <PastTrips
+          trips={history.filter((t) => t.planId !== plan?.planId)}
+          onOpen={(id) => router.push(`/trip/history/${encodeURIComponent(id)}` as never)}
+        />
       </ScrollView>
     </ZoneScreenContainer>
   );
 }
 
-// ─────────────────────────── pieces ────────────────────────────────────────
+const CLOSE_LABEL: Record<string, string> = {
+  checked_in: "Checked in",
+  cancelled_by_user: "Cancelled",
+  contact_heard_from: "A contact heard from you",
+  search_started: "Search started",
+  expired: "Expired, no check-in",
+};
 
-function PlanCard({
-  plan,
-  pending,
-  onCheckIn,
-  onCancel,
-  onShare,
-  onDismiss,
+function PastTrips({
+  trips,
+  onOpen,
 }: {
-  plan: NonNullable<ReturnType<typeof useTripPlan>["plan"]>;
-  pending: number;
-  onCheckIn: () => void;
-  onCancel: () => void;
-  onShare: (contactId: string) => void;
-  onDismiss: () => void;
+  trips: NonNullable<ReturnType<typeof useTripPlan>["history"]>;
+  onOpen: (planId: string) => void;
 }) {
-  const now = Date.now();
-  const closed = plan.status === "closed";
-  const overdue = !closed && now >= Date.parse(plan.worryBy);
-  const accent = closed ? palette.ink[400] : overdue ? "#DC2626" : palette.frost[400];
-  const fmt = (iso: string) => formatLocal(iso, plan.timezone, { withDate: true });
-  const statusLine = closed
-    ? {
-        checked_in: "You checked in. Your people were told.",
-        cancelled_by_user: "You cancelled this trip.",
-        contact_heard_from: "One of your people marked that they heard from you.",
-        search_started: "One of your people has started a search. If you are safe, call them now.",
-        expired: "This trip expired without a check-in.",
-      }[plan.closeReason ?? "expired"] ?? "Plan closed."
-    : overdue
-      ? "Past your worry-by time. Your people have been reminded."
-      : plan.sync === "pending"
-        ? "Not sent yet — connect to the internet to send it."
-        : plan.sync === "failed"
-          ? `Couldn't send: ${plan.syncError ?? "unknown error"}. Try again from a new trip.`
-          : "Live. Tap I'M BACK when you're out.";
-
+  if (trips.length === 0) return null;
   return (
-    <View style={{ borderRadius: 14, borderWidth: 0.5, borderColor: accent, backgroundColor: palette.ink[800], padding: 16, gap: 12 }}>
-      <Text variant="mono" weight="medium" style={{ fontSize: 11, letterSpacing: 1.4, color: accent }}>
-        {closed ? "CLOSED" : overdue ? "OVERDUE" : "LIVE"}
-        {pending > 0 ? " · SYNCING" : ""}
-      </Text>
-      <Text variant="display" className="text-ink-50" style={{ fontSize: 22, lineHeight: 26 }}>
-        {plan.areaName}
-      </Text>
-      <Text className="text-ink-300" style={{ fontSize: 13 }}>{plan.trailheadName}</Text>
-      <View style={{ flexDirection: "row", gap: 18 }}>
-        <Stat label="BACK BY" value={fmt(plan.returnBy)} />
-        <Stat label="WORRY BY" value={fmt(plan.worryBy)} />
-      </View>
-      <Text className="text-ink-200" style={{ fontSize: 13, lineHeight: 19 }}>{statusLine}</Text>
-
-      <View style={{ gap: 8 }}>
-        <Eyebrow>YOUR PEOPLE</Eyebrow>
-        {plan.contacts.map((c) => (
-          <View key={c.id} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Ionicons
-              name={c.lastOpenedAt ? "checkmark-done-outline" : c.sharedAt ? "checkmark-outline" : "ellipse-outline"}
-              size={18}
-              color={c.lastOpenedAt ? palette.frost[400] : palette.ink[400]}
-            />
-            <View style={{ flex: 1 }}>
-              <Text className="text-ink-100" style={{ fontSize: 14 }}>{c.displayName}</Text>
-              <Text className="text-ink-400" style={{ fontSize: 11 }}>
-                {c.lastOpenedAt ? `Opened ${formatLocal(c.lastOpenedAt, plan.timezone, { withDate: true })}` : c.sharedAt ? "Sent · not opened yet" : c.shareUrl ? "Not sent yet" : "Waiting for server…"}
-              </Text>
-            </View>
-            {!closed && c.shareUrl ? (
-              <Touchable onPress={() => onShare(c.id)} hitSlop={8} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, borderWidth: 0.5, borderColor: palette.ink[500] }}>
-                <Text variant="mono" weight="medium" style={{ fontSize: 11, letterSpacing: 1.1, color: palette.ink[200] }}>
-                  {c.sharedAt ? "RESEND" : "SEND"}
-                </Text>
-              </Touchable>
-            ) : null}
-          </View>
-        ))}
-      </View>
-
-      {plan.events && plan.events.length > 0 ? (
-        <View style={{ gap: 4 }}>
-          <Eyebrow>ACTIVITY</Eyebrow>
-          {plan.events.slice(0, 6).map((e, i) => (
-            <Text key={i} className="text-ink-300" style={{ fontSize: 12, lineHeight: 17 }}>
-              {formatLocal(e.at, plan.timezone)} · {describe(e)}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-
-      {!closed ? (
-        <>
-          <Touchable
-            onPress={onCheckIn}
-            disabled={!!plan.checkInQueuedAt}
-            style={({ pressed }) => ({
-              height: 58,
-              borderRadius: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: plan.checkInQueuedAt ? palette.ink[500] : pressed ? palette.ink[100] : palette.ink[50],
-            })}
-          >
-            <Text variant="mono" weight="bold" style={{ fontSize: 15, letterSpacing: 1.8, color: palette.ink[950] }}>
-              {plan.checkInQueuedAt ? "CHECK-IN QUEUED — WILL SEND ON SIGNAL" : "I'M BACK"}
-            </Text>
-          </Touchable>
-          <Touchable onPress={onCancel} hitSlop={8} style={{ alignSelf: "center", padding: 8 }}>
-            <Text variant="mono" style={{ fontSize: 11, letterSpacing: 1.2, color: palette.ink[400] }}>CANCEL TRIP</Text>
-          </Touchable>
-        </>
-      ) : (
-        <Button variant="outline" onPress={onDismiss}>DISMISS</Button>
-      )}
+    <View style={{ gap: 8, marginTop: 6 }}>
+      <Eyebrow>{`PAST TRIPS · ${trips.length}`}</Eyebrow>
+      {trips.slice(0, 10).map((t) => (
+        <QuickRow
+          key={t.planId}
+          icon={t.closeReason === "search_started" || t.closeReason === "expired" ? "alert-circle-outline" : "checkmark-circle-outline"}
+          title={t.areaName}
+          subtitle={`${formatDay(t.departAt, t.timezone)} · ${CLOSE_LABEL[t.closeReason ?? ""] ?? "Closed"}`}
+          onPress={() => onOpen(t.planId)}
+        />
+      ))}
     </View>
   );
 }
 
-function describe(e: { type: string; contactName: string | null; note: string | null }): string {
-  const who = e.contactName ?? "A contact";
-  const note = e.note ? ` — "${e.note}"` : "";
-  switch (e.type) {
-    case "created": return "Plan created";
-    case "opened": return `${who} opened the plan`;
-    case "nudge_sent": return `Reminder sent to ${who}`;
-    case "extended": return `${who} extended worry-by${note}`;
-    case "heard_from": return `${who} heard from you${note}`;
-    case "search_started": return `${who} started a search${note}`;
-    case "checked_in": return "You checked in";
-    case "cancelled": return "You cancelled";
-    case "note": return `${who}: ${e.note ?? ""}`;
-    default: return e.type;
+function formatDay(iso: string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(iso));
+  } catch {
+    return iso.slice(0, 10);
   }
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View>
-      <Text variant="mono" weight="medium" style={{ fontSize: 10, letterSpacing: 1.4, color: palette.ink[400] }}>{label}</Text>
-      <Text className="text-ink-100" weight="semibold" style={{ fontSize: 15, marginTop: 2 }}>{value}</Text>
-    </View>
-  );
-}
-
-function Eyebrow({ children }: { children: string }) {
-  return (
-    <Text variant="mono" weight="medium" style={{ fontSize: 10, letterSpacing: 1.4, color: palette.ink[400] }}>{children}</Text>
-  );
-}
+// ─────────────────────────── pieces ────────────────────────────────────────
 
 function Card({ children, eyebrow, accent }: { children: React.ReactNode; eyebrow: string; accent: string }) {
   return (

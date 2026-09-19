@@ -21,6 +21,78 @@ Format per entry:
 
 ---
 
+## 2026-09-18 (later) — trip history + always-reachable trips; heard-from wording
+- **Kai: not in airplane mode for any test.** So Trip B's ~9-minute create delay is a real,
+  **UNDIAGNOSED** bug. The backoff (5s→15s→45s→2m15s→6m45s ≈ 10 min) means ~5 consecutive
+  failed sends then success. Ruled out: rate limiting (no buckets), packet size (both trips
+  ~31 KB, no photo). **Needs the `trip-plans` edge-function logs for 2026-09-18 00:20–00:32
+  UTC**, which only the Supabase dashboard shows — the CLI has no log command and its
+  token lives in the OS keyring (not extracted). Next step: Kai logs into supabase.com in
+  the Playwright browser.
+  - Side finding, not fixed: contact actions are rate-limited by the *edge node's* IP,
+    because trip-plan-page proxies them, so the per-IP contact limit is effectively shared
+    across all contacts. Harmless at current scale.
+- **"I heard from <name>, close the trip"** (`f21a5ae`, deployed). Kai asked for it to say
+  explicitly that it closes the trip. Used the person's name rather than "them". Added a
+  line pointing a contact whose person is merely late to Extend instead.
+- **Trip history + navigation** (`4f9f92c`):
+  - Local history (`KEYS.history`, 25, newest departure first), archived inside
+    `saveActivePlan` whenever a closed plan is saved — every close path funnels through it.
+  - Hub was unreachable from home between trips. The strip now shows **"Your trips"**
+    whenever there is history or a saved trip. HEADING OUT still goes straight to the
+    composer (fast path unchanged).
+  - Hub **PAST TRIPS** → new `app/trip/history/[planId].tsx` (read-only + remove).
+  - `PlanCard` extracted to `components/trip/PlanCard.tsx`, all actions optional.
+  - **Shared `ZoneScreenHeader` back button** fell back to nothing if a screen was first in
+    the stack; now falls back to home. Covers all 22 screens using it.
+- **Not visually verified** — the app can't run here, and web rendering is unreliable for
+  layout (JOURNAL 2026-09-10/11). The new strip and past-trip screen need eyes on device.
+- Gates: tsc 0, eslint 0, **Vitest 168**.
+
+## 2026-09-18 — Trip flow audit after Kai's build-35 test (branch `fix/trip-flow`)
+Kai: "once I started a trip… there was no way of going to it" + "once you clicked on the
+link, updating the timeline broke some things". Audited the whole Heading Out flow against
+code AND production data from his two test trips.
+- **Production evidence.** Trip A `8972aab8`: created, opened by contact, then contact
+  tapped *heard from* → `contact_heard_from`, which **closes the plan server-side**. The
+  phone never learned it. Trip B `071edf1f`: create sat unsent ~9 min, a check-in queued at
+  `client_at` 00:22:40 (9 min before the server saw the plan), both flushed together, then
+  a **cancel 8s after close** (`late: true`) — the screen still showed it live.
+- **Seven bugs, fixed (`5c883c3`):**
+  1. `useTripPlan` held a per-screen copy refreshed only on mount/foreground/reconnect. Home
+     stays mounted under the trip screens, so after creating a trip it still said HEADING
+     OUT — and its 60s poll never started, since it only runs when a plan is already loaded.
+     → `store.ts` now notifies subscribers on every `saveActivePlan`; the hook subscribes.
+  2. Hook now also syncs with the **server** on screen focus, so a contact closing the trip
+     from the web shows up on return.
+  3. Composer checked LOCAL storage only → now asks the server first (bounded 6s, falls back
+     offline), and the "already have a live trip" alert offers **Go to trip**, not just OK.
+  4. `router.replace("/trip")` after sending → `router.dismissTo("/trip")`. From the hub it
+     left two hubs stacked, so Back landed on the same screen. (`dismissTo` confirmed present
+     in expo-router 6.0.24.)
+  5. A trip closed remotely (contact action, expiry, 404) now stops tracking. Only the owner's
+     own check-in/cancel used to.
+  6. DISMISS on a closed trip always works; it silently no-op'd if anything was queued. Live
+     trips still refuse (would orphan a queued check-in).
+  7. (Acting on closed trips was a symptom of 1–3.)
+  Tests: store change notification (6), `dropPendingFor` (2).
+- **Contact page "pick a time" extend was 8 hours early** (`e08384d`) — that is the
+  "timeline" bug. `<input type="datetime-local">` submits a zone-less wall time; the server
+  did `new Date(...)`, and edge runtime local time is **UTC**, while the page labels the field
+  with the plan's zone. 9 PM Alaska → 9 PM UTC → refused as `extend_backwards`. Every
+  extension-by-time failed; neither test trip has an `extended` event.
+  **Reproduced in production before fixing**, then fixed and re-verified. New
+  `_shared/zoned-time.ts` (the repo only had formatters INTO a zone), 10 tests incl. both DST
+  transitions. Picker now prefilled + `min`-bounded at the current worry-by; empty submit and
+  server errors now give sentences, not codes. **Deployed** (`--no-verify-jwt`).
+  - Smoke convention used: contact **`delivered@resend.dev`** (Resend's test sink — no real
+    mail, no reputation hit), plan deleted by id afterwards, cascade verified (0/0/0 rows).
+    Prefer this over using Kai as the smoke contact.
+  - A "MISMATCH" in the smoke was my test comparing to the second; `datetime-local` has
+    minute precision, and the stored value was exactly 00:26 AKDT.
+- **App-side fixes need a build; the page fix is already live.** 1 iOS credit left.
+- Gates: tsc 0, eslint 0, **Vitest 161**, deno check clean.
+
 ## 2026-09-17 (night, later) — movement-triggered refresh restored; Twilio parked
 - **Movement-triggered forecast refresh is back** (`ca4f644`), and this is the change Kai
   actually wanted: trip tracking only helps someone who *filed a trip plan*, i.e. the
