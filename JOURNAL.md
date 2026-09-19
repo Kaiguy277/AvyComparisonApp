@@ -16,6 +16,29 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-18 (evening) — A miscount, and moving to the machine that can see
+
+I told Kai he had one build left. He had none. The quota email said "12 of 15" and arrived
+as build 33 was being queued; I assumed 33 wasn't counted yet and did the subtraction from
+there. It was counted. Kai chose "merge and build now" partly on my number, and the build
+was refused. No harm this time — nothing ran, nothing was lost — but it's worth writing
+down plainly, because it's the same failure this journal keeps recording in other shapes:
+I did arithmetic on a proxy (a courtesy email with ambiguous timing) instead of reading the
+source (the billing page, or just asking EAS). Checking the easy thing instead of the thing.
+
+The refusal turned out to be a good push. The Mac matters for a reason bigger than the
+quota: everything I built today — the trip history, the "Your trips" strip, the past-trip
+screen, the "Go to trip" alert — was written without ever being seen. On Linux there's no
+simulator, and the phone's diagnostic services were locked behind a Developer Disk Image.
+The journal already records, twice, that web rendering lied about native layout. On the Mac
+the simulator makes the look-before-you-build step free, and the phone's crash logs become
+readable, which means the build-33 upgrade crash can finally be confirmed rather than
+inferred.
+
+If I were picking this up cold: open the simulator before touching a build. Then chase the
+nine-minute create delay — it's the one bug from today with a cause I never found, and it
+lives in the logs, not the code.
+
 ## 2026-09-18 — The phone that didn't know its own trip was over
 
 Kai's report sounded like a navigation problem — "there was no way of going to the trip" —

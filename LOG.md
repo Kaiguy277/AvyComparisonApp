@@ -21,6 +21,81 @@ Format per entry:
 
 ---
 
+## 2026-09-18 — SESSION HANDOFF → continue on Kai's Mac (read this first)
+
+**Why the move:** EAS free iOS cloud builds are spent until **Thu Oct 1 2026**. Kai has a
+Mac, so the next build is **local** (`eas build --local`), which does not use the cloud
+quota. The Mac also has the **iOS Simulator**, so UI can finally be checked before
+building — every screen below was written on Linux without being seen.
+
+### State at handoff
+- **`main` is green:** tsc 0, eslint 0, **Vitest 168**, `deno check` clean. Nothing
+  uncommitted. Pushed to `origin/main`.
+- **App Store Connect:** app 6765956364, version **1.0** is `Developer Rejected` (we
+  cancelled it ourselves), build 33 still attached, `Add for Review` available. Listing,
+  screenshots and review notes intact. **Nothing approved has ever shipped.**
+- **Builds:** 33, 34, 35 in TestFlight. Remote buildNumber is at 36 (36 was refused before
+  building), so **the next build will be 37**. Nothing in 33–35 contains the trip-flow fixes.
+- **Backend is LIVE and current** — all migrations applied, all functions deployed, cron
+  active. Server-side fixes already in production: extend-by-time (8h-early bug), "I heard
+  from <name>, close the trip" wording, privacy policy disclosing trip tracking.
+
+### What is in `main` that no build has yet
+Trip-flow fixes (stale trip state across screens, composer dead end → "Go to trip",
+duplicate hub, remote close stops tracking, DISMISS no-op), **trip history** + "Your trips"
+strip + PAST TRIPS + past-trip screen, back button that never dead-ends (22 screens),
+movement-triggered forecast refresh + ZONES NEAR YOU, temperature formatting, push-token
+decoupling, daily forecast alerts, live trip tracking, legacy location-wake cleanup.
+
+### Steps on the Mac
+```
+git clone https://github.com/Kaiguy277/AvyComparisonApp.git   # or: git pull
+cd AvyComparisonApp && npm install
+npm i -g eas-cli && eas login                    # account: k.ai_consulting
+# Local iOS builds need Xcode (+ command line tools), CocoaPods and fastlane.
+# EAS reports anything missing; install what it asks for.
+
+npm run typecheck && npm run lint && npm test    # expect 168
+
+# 1. LOOK AT IT FIRST, in the Simulator — costs nothing:
+npx expo run:ios
+#    Check: home bar pill + "Your trips" strip, trip hub + PAST TRIPS, past-trip
+#    screen, "Go to trip" alert, ZONES NEAR YOU strip, temperature formatting.
+#    (Background location, push and the daily alert need the real phone.)
+
+# 2. Production build, locally (no cloud quota):
+eas build --platform ios --profile production --local
+# 3. Submit the .ipa it produces to TestFlight (submissions aren't metered):
+eas submit --platform ios --path <the .ipa>
+```
+`.env` is tracked on purpose, so the clone has the right env. Credentials are on Expo's
+servers and download after `eas login`.
+
+### Then, to submit for review — `docs/RELEASE_CHECKLIST.md`
+1. Device pass on the real phone (§4). Highest value: the **no-dead-ends trip walkthrough**,
+   **movement refresh** (`BG WAKE · … VIA LOCATION`), and **push decoupling** (amber
+   ALERTS OFF, not PERMISSION-DENIED).
+2. **Screen recording** Apple asked for (§5) — ends with check-in and the blue location
+   indicator disappearing. Mandatory: there is no approved version to fall back on.
+3. **App Privacy labels** — not yet updated; do it only at submission (they're app-level).
+   Precise Location needs no change; add Usage Data → Product Interaction (not linked) for
+   `device_tokens.zones`. Kai publishes them himself.
+4. Attach the new build, paste the **1.1 block** from `docs/APP_REVIEW_NOTES.md`, attach the
+   recording, **Add for Review**.
+
+### Open threads
+- **9-minute trip create delay on build 35, with signal — UNDIAGNOSED.** ~5 failed sends then
+  success. Needs the `trip-plans` edge logs for 2026-09-18 00:20–00:32 UTC (Supabase
+  dashboard only). Watch for a slow create in testing.
+- **Build-33 upgrade crash cause is inferred, not confirmed.** `lib/legacyTaskCleanup.ts`
+  targets it. On the Mac, the phone's crash logs are readable (Xcode → Devices and
+  Simulators → View Device Logs, or Console.app) — worth confirming.
+- Twilio parked (no plan, nothing provisioned) — reasoning in `docs/TRIP_PLAN_OPS.md`.
+- Harmless: contact actions rate-limit by edge-node IP; local branch `feature/trip-plan` is
+  fully merged and safe to delete.
+- **On the Linux box:** `.playwright-mcp/twilio-2FA-recovery-code.txt` is gitignored (never
+  pushed) but plaintext — move to a password manager and delete.
+
 ## 2026-09-18 (evening) — build 36 REFUSED: EAS free iOS quota exhausted
 - Merged `fix/trip-flow` → `main` (`23d742e`). Gates on main green (Vitest 168), plist
   correct. **Build 36 refused by EAS before building**: "This account has used its iOS
