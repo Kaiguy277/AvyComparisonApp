@@ -120,6 +120,7 @@ export default function RootLayout() {
             <Stack.Screen name="trip/index" />
             <Stack.Screen name="trip/new" />
             <Stack.Screen name="trip/profile" />
+            <Stack.Screen name="trip/history/[planId]" />
           </Stack>
           <StatusBar style="dark" />
         </ThemeProvider>

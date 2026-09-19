@@ -14,10 +14,12 @@ import {
   queueCheckIn,
   refreshActivePlan,
 } from "./send";
-import { loadActivePlan, subscribeActivePlan, type ActivePlan } from "./store";
+import { loadActivePlan, loadTripHistory, subscribeActivePlan, type ActivePlan } from "./store";
 
 export interface UseTripPlan {
   plan: ActivePlan | null;
+  // Past (closed) trips, newest first. Local to the device.
+  history: ActivePlan[];
   loaded: boolean;
   pendingActions: number;
   reload: () => Promise<void>;
@@ -29,13 +31,15 @@ export interface UseTripPlan {
 
 export function useTripPlan(): UseTripPlan {
   const [plan, setPlan] = useState<ActivePlan | null>(null);
+  const [history, setHistory] = useState<ActivePlan[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [pendingActions, setPending] = useState(0);
   const syncing = useRef(false);
 
   const reload = useCallback(async () => {
-    const p = await loadActivePlan();
+    const [p, h] = await Promise.all([loadActivePlan(), loadTripHistory()]);
     setPlan(p);
+    setHistory(h);
     setPending(p ? (await pendingFor(p.planId)).length : 0);
     setLoaded(true);
   }, []);
@@ -109,5 +113,5 @@ export function useTripPlan(): UseTripPlan {
     await reload();
   }, [reload]);
 
-  return { plan, loaded, pendingActions, reload, sync, checkIn, cancel, dismiss };
+  return { plan, history, loaded, pendingActions, reload, sync, checkIn, cancel, dismiss };
 }

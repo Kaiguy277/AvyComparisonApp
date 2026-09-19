@@ -10,7 +10,11 @@ vi.mock("expo-secure-store", () => ({
 
 import { __store } from "../../test/mocks/asyncStorage";
 import {
+  HISTORY_LIMIT,
   loadActivePlan,
+  loadTripHistory,
+  mergeHistory,
+  removeFromHistory,
   saveActivePlan,
   subscribeActivePlan,
   updateActivePlan,
@@ -104,5 +108,74 @@ describe("active plan change notification", () => {
     expect(good).toHaveBeenCalledTimes(1);
     offA();
     offB();
+  });
+});
+
+// Kai: "there should be a way to navigate to my old trips." The app used to
+// keep exactly one trip and DISMISS deleted it.
+describe("trip history", () => {
+  const closed = (id: string, departAt: string, over: Partial<ActivePlan> = {}) =>
+    plan({ planId: id, status: "closed", closeReason: "checked_in", departAt, ...over });
+
+  it("mergeHistory ignores trips that are not closed", () => {
+    expect(mergeHistory([], plan({ status: "active" }))).toEqual([]);
+  });
+
+  it("mergeHistory orders newest departure first", () => {
+    let h: ActivePlan[] = [];
+    h = mergeHistory(h, closed("old", "2026-09-01T16:00:00Z"));
+    h = mergeHistory(h, closed("new", "2026-09-15T16:00:00Z"));
+    h = mergeHistory(h, closed("mid", "2026-09-08T16:00:00Z"));
+    expect(h.map((p) => p.planId)).toEqual(["new", "mid", "old"]);
+  });
+
+  // A closed plan keeps being saved as late status polls land; each save must
+  // update the entry, not add another copy.
+  it("mergeHistory replaces an existing entry instead of duplicating it", () => {
+    let h = mergeHistory([], closed("a", "2026-09-10T16:00:00Z", { events: [] }));
+    h = mergeHistory(h, closed("a", "2026-09-10T16:00:00Z", {
+      events: [{ type: "heard_from", at: "2026-09-10T20:00:00Z", contactName: "Sam", note: null }],
+    }));
+    expect(h.length).toBe(1);
+    expect(h[0].events?.length).toBe(1);
+  });
+
+  it("mergeHistory caps the list, dropping the oldest", () => {
+    let h: ActivePlan[] = [];
+    for (let i = 0; i < HISTORY_LIMIT + 5; i++) {
+      h = mergeHistory(h, closed(`p${i}`, new Date(Date.UTC(2026, 0, 1 + i)).toISOString()));
+    }
+    expect(h.length).toBe(HISTORY_LIMIT);
+    expect(h[0].planId).toBe(`p${HISTORY_LIMIT + 4}`); // newest kept
+    expect(h.some((p) => p.planId === "p0")).toBe(false); // oldest dropped
+  });
+
+  // The integration that matters: every close path funnels through a save of
+  // a closed plan, so saving one must archive it.
+  it("saving a closed plan archives it; saving a live one does not", async () => {
+    await saveActivePlan(plan({ planId: "live" }));
+    expect(await loadTripHistory()).toEqual([]);
+    await saveActivePlan(plan({ planId: "live", status: "closed", closeReason: "contact_heard_from" }));
+    const h = await loadTripHistory();
+    expect(h.map((p) => p.planId)).toEqual(["live"]);
+    expect(h[0].closeReason).toBe("contact_heard_from");
+  });
+
+  it("dismissing (clearing the active plan) keeps the trip in history", async () => {
+    await saveActivePlan(plan({ planId: "t1", status: "closed", closeReason: "checked_in" }));
+    await saveActivePlan(null);
+    expect(await loadActivePlan()).toBeNull();
+    expect((await loadTripHistory()).map((p) => p.planId)).toEqual(["t1"]);
+  });
+
+  it("removeFromHistory deletes one entry and notifies", async () => {
+    await saveActivePlan(plan({ planId: "a", status: "closed", departAt: "2026-09-01T16:00:00Z" }));
+    await saveActivePlan(plan({ planId: "b", status: "closed", departAt: "2026-09-02T16:00:00Z" }));
+    const fn = vi.fn();
+    const off = subscribeActivePlan(fn);
+    await removeFromHistory("a");
+    expect((await loadTripHistory()).map((p) => p.planId)).toEqual(["b"]);
+    expect(fn).toHaveBeenCalledTimes(1);
+    off();
   });
 });

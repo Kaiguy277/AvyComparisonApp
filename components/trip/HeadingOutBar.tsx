@@ -5,10 +5,11 @@
 // Replaces the single REPORT FAB and the top-of-page card: the two
 // actions people take from the truck belong together, at thumb height.
 
+import { useCallback, useState } from "react";
 import { Alert, View } from "react-native";
 import { Touchable } from "@/components/ui/Touchable";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -16,14 +17,25 @@ import { Text } from "@/components/ui/Text";
 import { palette } from "@/constants/design";
 import { useTripPlan } from "@/lib/tripPlan/useTripPlan";
 import { formatLocal } from "@/lib/tripPlan/packet";
-import { loadProfile } from "@/lib/tripPlan/store";
+import { loadProfile, loadTemplates } from "@/lib/tripPlan/store";
 
 const RED = "#DC2626";
 
 export function HeadingOutBar() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { plan, loaded, checkIn, pendingActions } = useTripPlan();
+  const { plan, history, loaded, checkIn, pendingActions } = useTripPlan();
+
+  // Saved trips count too: history only started recording in this build, so
+  // someone who planned trips before it has templates but no history yet —
+  // and the hub is where "repeat last trip" lives.
+  const [savedTrips, setSavedTrips] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      loadTemplates().then((t) => setSavedTrips(t.length)).catch(() => {});
+    }, []),
+  );
+  const hasTrips = history.length > 0 || savedTrips > 0;
 
   const live = !!plan && plan.status !== "closed";
   const overdue = live && Date.now() >= Date.parse(plan!.worryBy);
@@ -71,6 +83,42 @@ export function HeadingOutBar() {
         elevation: 1000,
       }}
     >
+      {/* The way into the trip hub. It used to render only while a plan
+          existed, and HEADING OUT goes straight to the composer — so between
+          trips the hub (past trips, saved trips, your profile) had no entry
+          point from home at all. Now it shows whenever there is a trip OR any
+          history. */}
+      {loaded && !plan && hasTrips ? (
+        <Touchable
+          onPress={goHub}
+          accessibilityRole="button"
+          accessibilityLabel="Your trips"
+          style={{
+            alignSelf: "stretch",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingVertical: 9,
+            paddingHorizontal: 14,
+            borderRadius: 12,
+            borderWidth: 0.5,
+            borderColor: palette.ink[500],
+            backgroundColor: palette.ink[800],
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.18,
+            shadowRadius: 4,
+            elevation: 6,
+          }}
+        >
+          <Ionicons name="time-outline" size={16} color={palette.ink[400]} />
+          <Text className="text-ink-200" style={{ fontSize: 12, flex: 1 }} numberOfLines={1}>
+            {history.length > 0 ? `Your trips · ${history.length} past` : "Your trips · saved trips"}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={palette.ink[400]} />
+        </Touchable>
+      ) : null}
+
       {loaded && plan ? (
         <Touchable
           onPress={goHub}
