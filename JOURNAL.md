@@ -16,6 +16,42 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-18 — The phone that didn't know its own trip was over
+
+Kai's report sounded like a navigation problem — "there was no way of going to the trip" —
+and there was one of those (the composer's alert offered only OK). But the real bug was
+underneath it: the phone held a stale opinion about whether a trip existed, and every
+screen held its own copy of that opinion.
+
+The production data made it concrete in a way the code alone wouldn't have. Trip A was
+closed by the *contact* tapping "I heard from them" on the web page. The phone had no way
+to find out except by asking, and it only asked on mount, foreground or reconnect. Trip B
+had a cancel arriving eight seconds after the trip had already closed. Neither looks like a
+bug in isolation; together they say the app's picture of reality lagged the server's, and
+the UI kept offering actions on a trip that was over. I would not have found Trip B's
+`client_at` timestamp — nine minutes before the plan existed server-side — by reading code.
+
+The fix I like is the boring one: a subscriber list on `saveActivePlan`. Every screen now
+hears every write. It's twenty lines and it removes a whole category of "these two screens
+disagree" rather than patching the instance Kai found.
+
+The timeline bug is the one worth remembering, because it's the same shape as the
+temperature and forecast-date bugs from yesterday: data crossing a boundary without the
+context that gives it meaning. A `datetime-local` value is a wall-clock time with the
+timezone stripped off. The page even *printed* the timezone next to the field — and then
+the server read the value in UTC. The label and the parser disagreed, and the state machine
+dutifully refused every extension as "shortening" the worry-by. The error message,
+`extend_backwards`, was accurate about the arithmetic and useless to a person deciding
+whether their friend is missing. Both got fixed.
+
+I reproduced it in production before fixing it, which I should have been doing all along.
+Yesterday I "smoke-tested" that page by loading it, never by submitting a form — and the
+form was the broken part. Same lesson the journal keeps recording, one layer down: a page
+that renders is not a page that works.
+
+Small process win: `delivered@resend.dev` as the smoke contact. It's Resend's test sink, so
+the extension emails went nowhere real. Earlier smokes used Kai's own address.
+
 ## 2026-09-17 (afternoon) — Building the feature that earns the permission back
 
 Kai pushed back on just deleting background refresh, and he was right to. The
