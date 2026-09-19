@@ -137,6 +137,23 @@ The app surfaces its own diagnostics for exactly this reason — read them off t
       low-power monitor should resume (no indicator, but `VIA LOCATION` wakes continue).
 - [ ] **Temperature formatting.** Station temps should read consistently — no "52.34°"
       beside "36.9°". Whole degrees show no decimal.
+- [ ] **Trip flow — no dead ends** (fixed 2026-09-18 after Kai hit them on build 35):
+  - Start a trip, go home: the bottom-left pill must say **I'M BACK**, not HEADING OUT,
+    and the strip above it must show the trip.
+  - As the contact, tap **"I heard from <name>, close the trip"** on the web page. Back in
+    the app, the trip must show as closed **without relaunching** — just return to home.
+  - With a trip live, reach the composer (e.g. via a saved trip on the hub): the alert must
+    offer **Go to trip**, and it must land on the hub.
+  - Start a trip FROM the hub. After sending, press Back once: you must reach home, not a
+    second copy of the hub.
+  - Check in, then DISMISS: it must actually dismiss.
+- [ ] **Trip history.** After a trip closes, home shows **"Your trips · N past"** between
+      trips. Hub → PAST TRIPS → a past trip shows its card and activity; REMOVE FROM HISTORY
+      removes it. Back from there returns to the hub.
+- [ ] **Contact page extend by time.** Pick a time on the web page; the app's WORRY BY must
+      show exactly that time (it used to land 8 hours early and fail).
+- [ ] **Watch for a slow create.** If a new trip takes more than a few seconds to show share
+      links, note the time — build 35 once took ~9 minutes with signal, cause not yet known.
 - [ ] **Daily alert wakes a backgrounded app.** With the app backgrounded (not killed) when
       the alert arrives, the cache should refresh, not just show the banner.
 

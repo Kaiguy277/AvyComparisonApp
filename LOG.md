@@ -21,6 +21,34 @@ Format per entry:
 
 ---
 
+## 2026-09-18 (later) — trip history + always-reachable trips; heard-from wording
+- **Kai: not in airplane mode for any test.** So Trip B's ~9-minute create delay is a real,
+  **UNDIAGNOSED** bug. The backoff (5s→15s→45s→2m15s→6m45s ≈ 10 min) means ~5 consecutive
+  failed sends then success. Ruled out: rate limiting (no buckets), packet size (both trips
+  ~31 KB, no photo). **Needs the `trip-plans` edge-function logs for 2026-09-18 00:20–00:32
+  UTC**, which only the Supabase dashboard shows — the CLI has no log command and its
+  token lives in the OS keyring (not extracted). Next step: Kai logs into supabase.com in
+  the Playwright browser.
+  - Side finding, not fixed: contact actions are rate-limited by the *edge node's* IP,
+    because trip-plan-page proxies them, so the per-IP contact limit is effectively shared
+    across all contacts. Harmless at current scale.
+- **"I heard from <name>, close the trip"** (`f21a5ae`, deployed). Kai asked for it to say
+  explicitly that it closes the trip. Used the person's name rather than "them". Added a
+  line pointing a contact whose person is merely late to Extend instead.
+- **Trip history + navigation** (`4f9f92c`):
+  - Local history (`KEYS.history`, 25, newest departure first), archived inside
+    `saveActivePlan` whenever a closed plan is saved — every close path funnels through it.
+  - Hub was unreachable from home between trips. The strip now shows **"Your trips"**
+    whenever there is history or a saved trip. HEADING OUT still goes straight to the
+    composer (fast path unchanged).
+  - Hub **PAST TRIPS** → new `app/trip/history/[planId].tsx` (read-only + remove).
+  - `PlanCard` extracted to `components/trip/PlanCard.tsx`, all actions optional.
+  - **Shared `ZoneScreenHeader` back button** fell back to nothing if a screen was first in
+    the stack; now falls back to home. Covers all 22 screens using it.
+- **Not visually verified** — the app can't run here, and web rendering is unreliable for
+  layout (JOURNAL 2026-09-10/11). The new strip and past-trip screen need eyes on device.
+- Gates: tsc 0, eslint 0, **Vitest 168**.
+
 ## 2026-09-18 — Trip flow audit after Kai's build-35 test (branch `fix/trip-flow`)
 Kai: "once I started a trip… there was no way of going to it" + "once you clicked on the
 link, updating the timeline broke some things". Audited the whole Heading Out flow against
