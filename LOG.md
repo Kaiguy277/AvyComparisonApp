@@ -21,6 +21,21 @@ Format per entry:
 
 ---
 
+## 2026-09-18 (evening) — build 36 REFUSED: EAS free iOS quota exhausted
+- Merged `fix/trip-flow` → `main` (`23d742e`). Gates on main green (Vitest 168), plist
+  correct. **Build 36 refused by EAS before building**: "This account has used its iOS
+  builds from the Free plan this month, which will reset in 11 days (on Thu Oct 01 2026)."
+- **I had the count wrong.** I told Kai 1 credit remained; there were 0. The "12/15" email
+  fired as build 33 was queued and I assumed 33 wasn't yet counted — it was. So 33, 34, 35
+  used the last three. Kai chose "build now" on the strength of my number.
+- No build ran and nothing was lost. EAS still auto-incremented the remote buildNumber to 36,
+  so the next build will be 37 — harmless, Apple only needs it to increase.
+- **Options put to Kai:** wait for the Oct 1 reset (free); EAS Starter ($45 included credit,
+  then $2/iOS build per the earlier Expo email — monthly price not quoted from memory); or
+  `eas build --local`, which for iOS needs macOS + Xcode, so not from this Linux box.
+- Lesson: read the quota from the source (billing page / `eas` output), not by arithmetic on
+  a courtesy email whose timing relative to the build was ambiguous.
+
 ## 2026-09-18 (later) — trip history + always-reachable trips; heard-from wording
 - **Kai: not in airplane mode for any test.** So Trip B's ~9-minute create delay is a real,
   **UNDIAGNOSED** bug. The backoff (5s→15s→45s→2m15s→6m45s ≈ 10 min) means ~5 consecutive
