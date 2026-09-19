@@ -237,9 +237,10 @@ function render(
 <p>What did ${esc(first)} say, and when?</p><textarea name="note" rows="2" placeholder="Texted at 6:10: “running late, out by 9”"></textarea>
 <button name="extend_hours" value="1">+1 hour</button><button name="extend_hours" value="3">+3 hours</button><button name="extend_hours" value="12">+12 hours</button>
 <p class="small">Or pick a later time (${esc(tz)}):</p><input type="datetime-local" name="extend_until" value="${esc(utcToWallTime(Date.parse(plan.worry_by), tz))}" min="${esc(utcToWallTime(Date.parse(plan.worry_by), tz))}"><button type="submit" class="primary">Extend to that time</button></form></details>
-<details><summary>I've heard from ${esc(first)} — they're fine</summary>
+<details><summary>I heard from ${esc(first)}, close the trip</summary>
 <form method="post"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="action" value="heard_from">
-<textarea name="note" rows="2" placeholder="How and when did you hear from them?"></textarea><button type="submit" class="primary">Mark heard from — closes the plan</button></form></details>
+<p class="small"><b>This ends the trip for everyone.</b> Use it only if ${esc(first)} is safe and out. If they are just running late, use <b>Extend the worry-by time</b> above instead — that keeps the trip open.</p>
+<textarea name="note" rows="2" placeholder="How and when did you hear from them?"></textarea><button type="submit" class="primary">I heard from ${esc(first)}, close the trip</button></form></details>
 <details><summary>I've started a search / called the Troopers</summary>
 <form method="post"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="action" value="search_started">
 <textarea name="note" rows="2" placeholder="Agency, case number, who you spoke to"></textarea><button type="submit" class="danger">Record that a search has started</button></form></details>
