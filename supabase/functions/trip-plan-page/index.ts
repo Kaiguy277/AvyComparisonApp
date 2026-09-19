@@ -18,6 +18,7 @@ import {
   type ContactRowFull,
   type PlanRowFull,
 } from "../_shared/trip-plan-common.ts";
+import { utcToWallTime, wallTimeToUtc } from "../_shared/zoned-time.ts";
 
 const SECURITY_HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
@@ -42,14 +43,28 @@ serve(async (req) => {
     const extendHours = Number(form.get("extend_hours") ?? 0);
     const extendUntil = String(form.get("extend_until") ?? "");
     const body: Record<string, unknown> = { action, share_token: token, note: note || undefined };
+    const back = (m: string) =>
+      Response.redirect(`${pageBase()}?t=${encodeURIComponent(token)}&m=${encodeURIComponent(m)}`, 303);
     if (action === "extend") {
       const contact = await contactByToken(supabase, token);
       const plan = contact ? await loadPlan(supabase, contact.plan_id) : null;
       if (plan) {
         const base = Math.max(Date.now(), Date.parse(plan.worry_by));
-        body.new_worry_by = extendUntil
-          ? new Date(extendUntil).toISOString()
-          : new Date(base + extendHours * 3_600_000).toISOString();
+        if (extendUntil) {
+          // datetime-local submits a wall-clock time with NO zone. It must be
+          // read in the plan's timezone — the page labels the field with it —
+          // not the runtime's, which is UTC. Reading it as UTC made every
+          // "pick a time" extension land 8-9 hours early and get rejected.
+          const at = wallTimeToUtc(extendUntil, plan.timezone);
+          if (at === null) return back("That time didn't come through. Try picking it again.");
+          body.new_worry_by = new Date(at).toISOString();
+        } else if (extendHours > 0) {
+          body.new_worry_by = new Date(base + extendHours * 3_600_000).toISOString();
+        } else {
+          // "Extend to that time" with no time picked used to resolve to the
+          // current worry-by and fail as a cryptic "extend_backwards".
+          return back("Pick a time, or use one of the +1 / +3 / +12 hour buttons.");
+        }
       }
     }
     const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/trip-plans`, {
@@ -61,7 +76,15 @@ serve(async (req) => {
       },
       body: JSON.stringify(body),
     });
-    const msg = res.ok ? "" : `Couldn't record that (${(await res.json().catch(() => ({ error: res.status }))).error}).`;
+    // Show the server's sentence, not its error code. "extend_backwards" means
+    // nothing to someone deciding whether their friend is missing.
+    let msg = "";
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+      msg = j.message
+        ? `Couldn't record that: ${j.message}`
+        : `Couldn't record that (${j.error ?? res.status}).`;
+    }
     // Redirect to the public page URL, not the runtime's internal path.
     return Response.redirect(`${pageBase()}?t=${encodeURIComponent(token)}${msg ? `&m=${encodeURIComponent(msg)}` : ""}`, 303);
   }
@@ -213,7 +236,7 @@ function render(
 <form method="post"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="action" value="extend">
 <p>What did ${esc(first)} say, and when?</p><textarea name="note" rows="2" placeholder="Texted at 6:10: “running late, out by 9”"></textarea>
 <button name="extend_hours" value="1">+1 hour</button><button name="extend_hours" value="3">+3 hours</button><button name="extend_hours" value="12">+12 hours</button>
-<p class="small">Or pick a time (${esc(tz)}):</p><input type="datetime-local" name="extend_until"><button type="submit" class="primary">Extend to that time</button></form></details>
+<p class="small">Or pick a later time (${esc(tz)}):</p><input type="datetime-local" name="extend_until" value="${esc(utcToWallTime(Date.parse(plan.worry_by), tz))}" min="${esc(utcToWallTime(Date.parse(plan.worry_by), tz))}"><button type="submit" class="primary">Extend to that time</button></form></details>
 <details><summary>I've heard from ${esc(first)} — they're fine</summary>
 <form method="post"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="action" value="heard_from">
 <textarea name="note" rows="2" placeholder="How and when did you hear from them?"></textarea><button type="submit" class="primary">Mark heard from — closes the plan</button></form></details>
