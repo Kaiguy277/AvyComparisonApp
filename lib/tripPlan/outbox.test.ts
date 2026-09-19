@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { __store } from "../../test/mocks/asyncStorage";
 import {
   BACKOFF,
+  dropPendingFor,
   enqueue,
   flushOutbox,
   isTerminalStatus,
@@ -129,5 +130,24 @@ describe("flushOutbox", () => {
       throw new Error("boom");
     }, T0 + 1);
     expect(r.deferred[0].lastError).toBe("boom");
+  });
+});
+
+// DISMISS on a closed trip used to be a silent no-op whenever anything was
+// still queued for it. Clearing that plan's entries must not touch another's.
+describe("dropPendingFor", () => {
+  it("removes only the given plan's queued actions", async () => {
+    await enqueue(entry("a:check_in", "check_in", "a"));
+    await enqueue(entry("b:check_in", "check_in", "b"));
+    await enqueue(entry("a:cancel", "cancel", "a"));
+    await dropPendingFor("a");
+    const left = await loadOutbox();
+    expect(left.map((e) => e.planId)).toEqual(["b"]);
+  });
+
+  it("is a no-op when the plan has nothing queued", async () => {
+    await enqueue(entry("b:check_in", "check_in", "b"));
+    await dropPendingFor("zzz");
+    expect((await loadOutbox()).length).toBe(1);
   });
 });

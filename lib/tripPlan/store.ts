@@ -254,6 +254,34 @@ export interface ActivePlan {
   events?: { type: string; at: string; contactName: string | null; note: string | null }[];
 }
 
+// ── change notification ─────────────────────────────────────────────────
+//
+// Every screen that shows the trip holds its own copy via useTripPlan. Before
+// this existed, those copies only refreshed on mount, app-foreground or
+// reconnect — so the home screen, which stays mounted underneath the trip
+// screens, kept showing "HEADING OUT" after a trip was created, and the
+// composer then blocked with "you already have a live trip". Every write now
+// notifies every mounted copy, so no screen can disagree with the store.
+type ActivePlanListener = () => void;
+const listeners = new Set<ActivePlanListener>();
+
+export function subscribeActivePlan(fn: ActivePlanListener): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+function notifyActivePlan(): void {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      // One broken subscriber must not stop the others hearing about it.
+    }
+  }
+}
+
 export async function loadActivePlan(): Promise<ActivePlan | null> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.active);
@@ -266,9 +294,10 @@ export async function loadActivePlan(): Promise<ActivePlan | null> {
 export async function saveActivePlan(plan: ActivePlan | null): Promise<void> {
   if (plan === null) {
     await AsyncStorage.removeItem(KEYS.active).catch(() => {});
-    return;
+  } else {
+    await AsyncStorage.setItem(KEYS.active, JSON.stringify(plan));
   }
-  await AsyncStorage.setItem(KEYS.active, JSON.stringify(plan));
+  notifyActivePlan();
 }
 
 export async function updateActivePlan(

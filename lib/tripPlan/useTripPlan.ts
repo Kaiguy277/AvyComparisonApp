@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
+import { useFocusEffect } from "expo-router";
 
 import { pendingFor } from "./outbox";
 import {
@@ -13,7 +14,7 @@ import {
   queueCheckIn,
   refreshActivePlan,
 } from "./send";
-import { loadActivePlan, type ActivePlan } from "./store";
+import { loadActivePlan, subscribeActivePlan, type ActivePlan } from "./store";
 
 export interface UseTripPlan {
   plan: ActivePlan | null;
@@ -64,6 +65,20 @@ export function useTripPlan(): UseTripPlan {
       unsubNet();
     };
   }, [reload, sync]);
+
+  // Any write to the stored plan, from any screen or task, reloads this copy.
+  useEffect(() => subscribeActivePlan(() => void reload()), [reload]);
+
+  // Coming back to a screen also asks the SERVER, not just local storage:
+  // a contact can close the trip from the web page ("I heard from them"),
+  // and nothing on the phone knows until it asks. Cheap when there is no
+  // plan — refreshActivePlan returns early and an empty outbox makes no
+  // request.
+  useFocusEffect(
+    useCallback(() => {
+      void sync();
+    }, [sync]),
+  );
 
   // While a plan is live, poll every 60s in the foreground for open
   // receipts and contact actions.

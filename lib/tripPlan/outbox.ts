@@ -176,6 +176,13 @@ export async function pendingFor(planId: string): Promise<OutboxEntry[]> {
   return (await loadOutbox()).filter((e) => e.planId === planId);
 }
 
+// Remove every queued action for one plan. Only for a plan that is already
+// closed, where a queued check-in or cancel can at best be recorded as late.
+export async function dropPendingFor(planId: string): Promise<void> {
+  const all = await loadOutbox();
+  await saveOutbox(all.filter((e) => e.planId !== planId));
+}
+
 export async function clearOutbox(): Promise<void> {
   await saveOutbox([]);
 }

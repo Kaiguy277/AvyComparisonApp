@@ -16,6 +16,7 @@ import { buildPacket, packetBytes } from "./packet";
 import { TRIP_LIMITS } from "./schema";
 import { newId, newSecret } from "./ids";
 import {
+  dropPendingFor,
   enqueue,
   flushOutbox,
   pendingFor,
@@ -154,11 +155,22 @@ async function userAction(
 export const queueCheckIn = (planId: string) => userAction(planId, "check_in");
 export const queueCancel = (planId: string) => userAction(planId, "cancel");
 
+// The trip ended without the owner tapping anything — a contact marked "I
+// heard from them" or "started a search" from the web page, or it expired.
+// Tracking was only ever torn down on the owner's own check-in/cancel, so it
+// kept recording (and battery) until an upload happened to be refused.
+async function onPlanClosedRemotely(): Promise<void> {
+  await stopTripTracking();
+  await clearTrackingBuffer();
+}
+
 // Apply a server response to the local active plan.
 async function applyServer(
   planId: string,
   body: CreateResponse | StatusResponse,
 ): Promise<void> {
+  const before = await loadActivePlan();
+  const wasOpen = before?.planId === planId && before.status !== "closed";
   await updateActivePlan((p) => {
     if (p.planId !== planId) return p;
     const contacts = p.contacts.map((c) => {
@@ -181,6 +193,7 @@ async function applyServer(
       checkInQueuedAt: body.plan.status === "closed" ? undefined : p.checkInQueuedAt,
     };
   });
+  if (wasOpen && body.plan.status === "closed") await onPlanClosedRemotely();
 }
 
 // Drain the outbox. Safe to call often (foreground, reconnect, timer).
@@ -205,6 +218,7 @@ export async function flushTripPlanOutbox(): Promise<FlushOutcome> {
       await updateActivePlan((p) =>
         p.planId === entry.planId ? { ...p, status: "closed", closeReason: "expired" } : p,
       );
+      await onPlanClosedRemotely();
     }
   }
   return outcome;
@@ -224,6 +238,7 @@ export async function refreshActivePlan(): Promise<ActivePlan | null> {
     await applyServer(plan.planId, res.body as StatusResponse);
   } else if (res.status === 404 || res.status === 410) {
     await updateActivePlan((p) => ({ ...p, status: "closed", closeReason: "expired" }));
+    await onPlanClosedRemotely();
   }
   return loadActivePlan();
 }
@@ -243,7 +258,15 @@ export async function dismissActivePlan(): Promise<void> {
   const plan = await loadActivePlan();
   if (!plan) return;
   const pending = await pendingFor(plan.planId);
-  if (pending.length > 0) return; // don't orphan a queued check-in
+  if (pending.length > 0) {
+    // On a LIVE plan, keep refusing: dismissing would orphan a queued
+    // check-in, and your people would never hear you got back.
+    if (plan.status !== "closed") return;
+    // On a CLOSED plan anything still queued can only be recorded as late or
+    // refused. Holding onto it made DISMISS a silent no-op — the button did
+    // nothing and gave no reason.
+    await dropPendingFor(plan.planId);
+  }
   await saveActivePlan(null);
   if (plan.status === "closed") await deletePlanSecret(plan.planId);
 }
