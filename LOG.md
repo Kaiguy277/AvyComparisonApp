@@ -23,6 +23,8 @@ Format per entry:
 
 ## 2026-09-18 — SESSION HANDOFF → continue on Kai's Mac (read this first)
 
+**Opening prompt for the Mac session:** `docs/MAC_SESSION_PROMPT.md`.
+
 **Why the move:** EAS free iOS cloud builds are spent until **Thu Oct 1 2026**. Kai has a
 Mac, so the next build is **local** (`eas build --local`), which does not use the cloud
 quota. The Mac also has the **iOS Simulator**, so UI can finally be checked before
