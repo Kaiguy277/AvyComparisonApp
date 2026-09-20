@@ -60,7 +60,30 @@ temperature formatting — `33.9°` next to `36°`, `49.6°` next to `43°`, on 
 is invisible in code review and obvious the moment you see four cards side by side, which is
 the whole argument for looking before building.
 
-Still unseen: everything behind a saved trip. The profile form's CELL NUMBER field will not
+**Update, later the same day: all of it is now seen.** The blocker was that only the first
+tapped field takes focus; every field after it ignores taps. **Tab and Shift+Tab move focus
+reliably**, which unlocked the whole form. Three more things the Simulator taught me: virtual
+keycodes instead of unicode strings, modifiers posted as real `flagsChanged` events (setting
+the flag alone makes Cmd+V type a literal "V"), and — for anything with a space or a symbol —
+`simctl pbcopy` plus the iOS edit menu, because controlled TextInputs reorder fast keystrokes
+into things like "Kai Kki Myers".
+
+The walkthrough itself was reassuring in a way the code review could not be. The trip-flow
+fixes are real: home flips to I'M BACK the moment a trip exists, the strip appears, DISMISS
+dismisses, and the composer's old dead end now offers "Go to trip" and actually goes there.
+That was the bug Kai hit on build 35 — "once I started a trip there was no way of going to
+it" — and it is fixed in a way I could watch rather than infer.
+
+The thing worth carrying forward is the finding that grew. I first wrote up "temperature
+formatting is inconsistent" from the four zone cards. Then the stations screen showed wind as
+6.95 MPH, 9 mph and 27.8 mph *in the same view*, with the unit cased two ways. So it is not a
+temperature bug, it is the absence of a shared number formatter, and it shows up wherever a
+measurement is rendered. I would not have found the second half by reading the first half's
+code — I found it because I kept walking screens after I had my answer.
+
+Old note, kept for the record: everything behind a saved trip was unseen at that point.
+
+Originally: everything behind a saved trip. The profile form's CELL NUMBER field will not
 take focus from a synthetic tap, and text meant for it lands in FULL NAME. I have not found
 why yet.
 

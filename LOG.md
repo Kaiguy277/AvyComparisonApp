@@ -83,6 +83,49 @@ section header live-updating; back chevron present. No clipping or overflow anyw
 3. Zone cards briefly render **absent** right after launch while forecasts load, then appear.
    Looked like a bug; it is just the loading window. Do not chase it.
 
+### Full walkthrough completed (automated, Simulator) — all 7 handoff screens SEEN
+Drove the whole Heading Out flow end to end with the tap/type harness. **Every screen on the
+Mac-prompt list has now been looked at**, plus the fixes from `fix/trip-flow` verified live:
+- **Home bar pill** ✓ · **ZONES NEAR YOU** ✓ · **`BG WAKE · VIA LOCATION`** ✓ (flipped from
+  `VIA FOREGROUND` the moment location was granted — movement refresh works).
+- **Profile gate** ✓ — HEADING OUT correctly routes to `Your profile` on a fresh install;
+  sections 1–2 gate the first trip exactly as the copy promises; autosave + live section
+  summaries work; `CONTINUE — PLAN A TRIP` skips sections 3–8.
+- **Composer** ✓ — WHEN pre-fills sensibly (leaving now, back +8h, worry +3h); packet
+  completeness meter reads 58% with an honest "Fine to send" note.
+- **Trip hub (live)** ✓ — LIVE badge, back-by/worry-by, per-contact `Not sent yet` + SEND,
+  ACTIVITY log, I'M BACK, CANCEL TRIP.
+- **BUG #1 FROM THE BUILD-35 AUDIT CONFIRMED FIXED** — after creating a trip, home now shows
+  the **trip strip** (`Tin can Ridge · back by …`) and the bottom bar switches HEADING OUT →
+  **I'M BACK**. It used to still say HEADING OUT. The `saveActivePlan` subscriber works.
+- **"Your trips" strip** ✓ — correctly **absent** with no trips, appears as
+  `Your trips · 1 past` once history exists.
+- **DISMISS on the closed card** ✓ — no longer a no-op.
+- **PAST TRIPS** ✓ (`PAST TRIPS · 1`) → **past-trip screen** ✓ (read-only, ACTIVITY preserved,
+  REMOVE FROM HISTORY).
+- **"Go to trip" alert** ✓ — reaching the composer with a live trip now gives *"You already
+  have a live trip … Check in or cancel it before starting another"* with **Not now / Go to
+  trip**, and **Go to trip navigates** (previously a dead end offering only OK).
+- **REPEAT LAST TRIP** ✓ — prefills and **auto-advances the times**, incl. next-day rollover
+  (`worry-by Tomorrow 12:30 AM`).
+- **Zone detail** ✓ and **Stations** ✓ render correctly, including the off-season empty
+  states (forecasts legitimately EXPIRED in September — not a bug).
+- **Back navigation** never dead-ended anywhere in this walkthrough.
+
+**Production note:** two real trip plans were created against production Supabase during this
+test (contact `sam@example.com`, a non-deliverable reserved domain). **Both were closed** —
+one checked-in, one cancelled — so nothing is live and no overdue reminders can fire. The
+rows still exist; they were not deleted.
+
+### Finding upgraded: numeric formatting is inconsistent app-wide, not just temperature
+Not only the zone cards (`33.9°` / `36°` / `49.6°` / `43°`). On the **stations screen, in one
+view**: wind reads **`6.95 MPH`**, **`9 mph`** and **`27.8 mph`** — three precisions for the
+same quantity — and the unit is cased **`MPH`** in one place and **`mph`** in another.
+(Temps on that screen are consistent at one decimal: 34.1 / 34.7 / 31.1.) Two decimals on a
+wind speed is also more precision than the measurement warrants. Worth a single shared
+formatter before submission; it is the kind of polish App Review does not care about but
+users notice immediately.
+
 ### UI automation harness — `scratchpad/tap3.py` (new, not in repo)
 Driving the Simulator from the CLI, since `idb`/`cliclick` are unavailable. Hard-won:
 - **The Simulator window is NOT the device screen.** It includes a title bar and a device
