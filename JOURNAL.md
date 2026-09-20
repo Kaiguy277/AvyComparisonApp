@@ -16,6 +16,54 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-20 — Four wrong diagnoses, one bad assumption underneath
+
+The app is running in the Simulator and the screens look right. Getting there took most of a
+day, and almost none of it was the app's fault.
+
+The pattern that cost the most: I kept diagnosing the thing I could see instead of the thing
+that was true. Homebrew sat silent for fifteen minutes and I narrated its child processes — a
+slow GNU mirror, a fastlane tarball — when it was compiling LLVM from source because this is
+an Intel Mac. MacPorts then started compiling Rust, and I had recommended MacPorts *because*
+it ships binaries; I had not checked that `ruby33`'s default variant is `+yjit`, whose build
+dep is Rust. Both times the general property was right and the specific case was not, and I
+did not look at the specific case until it failed.
+
+The worst one was the tapping. I wrote a helper that mapped device coordinates onto the
+Simulator window, checked that the window's aspect ratio matched the device's to three
+decimal places, and concluded the window *was* the device screen. It is not — there is a
+title bar and a bezel, and the ratio matching was a coincidence of the bezel being roughly
+proportional. So macOS delivered every click exactly where I asked, and every one landed in
+the wrong place. I then spent four rounds blaming Accessibility permission, window focus, and
+the event-tap type, because a tap that does nothing looks identical whatever the cause. The
+check that settled it in one screenshot was looking at the actual screen — which needed the
+Screen Recording grant I had not asked for, because I had not thought I needed to *see*
+anything. I had been reasoning about a window I could have simply looked at.
+
+I also told Kai that Xcode 16 would fix CocoaPods because clang 18 ships `stdckdint.h`. Apple
+clang 16 does not have it, and Apple's clang numbering does not track upstream. The real
+cause was narrower and stranger: Homebrew's bundled Ruby is **4.0.7, released four days
+ago**, and its own internal header breaks native gem builds. Four failed approaches, and the
+thing they had in common was never the thing I named. When a fix keeps failing in different
+disguises, the common factor is the bug — I should reach that conclusion two attempts earlier
+than I do.
+
+What went right is worth keeping too. The simulator runtime download printed `Done` and
+`simctl` still listed no runtimes; I checked rather than believing it, and found a stale
+CoreSimulator service. Later the zone cards were missing from home after a relaunch and it
+looked like a real rendering bug — I waited twenty seconds and they appeared. Both times the
+habit this journal keeps preaching actually paid, and the second one stopped me reporting a
+bug that did not exist.
+
+On the app itself: the screens hold up. The thing I would not have found any other way is the
+temperature formatting — `33.9°` next to `36°`, `49.6°` next to `43°`, on the same grid. That
+is invisible in code review and obvious the moment you see four cards side by side, which is
+the whole argument for looking before building.
+
+Still unseen: everything behind a saved trip. The profile form's CELL NUMBER field will not
+take focus from a synthetic tap, and text meant for it lands in FULL NAME. I have not found
+why yet.
+
 ## 2026-09-19 — Present is not the same as usable
 
 The handoff sent the work to the Mac because the Mac can build and the Mac can see. Both

@@ -21,6 +21,89 @@ Format per entry:
 
 ---
 
+## 2026-09-20 — Mac unblocked: Xcode 16.2 in, **app built, running and SEEN in the Simulator**
+
+> Scope: Mac-only, as with the 2026-09-19 entry. Linux dev is unaffected.
+
+### Blockers from yesterday, resolved
+- **Xcode 16.2 installed** (`.xip` from developer.apple.com, 2.97 GB — modern Xcode no longer
+  bundles simulator runtimes, so that size is correct). 15.3 parked at
+  `/Applications/Xcode_15.3.app`, not deleted. Now: **iOS 18.2 SDK**, Apple clang 16.
+- **CocoaPods 1.17.0** on **MacPorts ruby33 (3.3.9)**. Two traps:
+  - MacPorts `ruby33` defaults to the **`+yjit`** variant, whose build dep is **rust** → it
+    starts compiling a Rust toolchain. Use `-yjit`.
+  - MacPorts' own fetch is broken here: `curl progress callback failed: unbalanced open
+    paren ... $env(COLUMNS)` aborts each mirror. **Workaround that worked:** download the
+    tarball with curl and stage it — `sudo cp ruby-3.3.9.tar.gz
+    /opt/local/var/macports/distfiles/ruby33/` — then `sudo port install ruby33 -yjit`.
+- **CORRECTION to the 2026-09-19 entry.** I wrote that Xcode 16 would supply `stdckdint.h`.
+  It does **not** — Apple clang 16 lacks it and rejects `-std=c23`; Apple's clang numbering
+  does not track upstream LLVM. The real cause was **Homebrew's bundled portable Ruby
+  4.0.7** (released 4 days earlier), whose own `ruby/internal/stdckdint.h` breaks native gem
+  builds. **Any Ruby 3.x avoids it.** CocoaPods was a Ruby-version problem, not a clang one.
+- `npx expo prebuild --platform ios` + `pod install`: **clean**. `ios/Whumpf.xcworkspace` built
+  with **0 errors**. App installs, launches, Metro bundles 2350 modules (~35 s).
+  - ⚠️ **`expo prebuild` rewrites `package.json` scripts** (`expo start --ios` → `expo run:ios`,
+    same for android). Reverted here. It will do this on Linux too — check before committing.
+
+### Simulator traps worth remembering
+- **`xcodebuild -downloadPlatform iOS` downloads the NEWEST runtime** (18.3.1), which Xcode
+  16.2 (SDK 18.2) **cannot build against**: `xcodebuild` then reports *"Unable to find a
+  destination"* and lists only "Any iOS Device" as ineligible — misleading, since the real
+  problem is the simulator runtime, not the device platform. **Pin it:**
+  `xcodebuild -downloadPlatform iOS -buildVersion 18.2`. The 18.3.1 runtime (8.1 GB) was deleted.
+- After switching Xcode, a **stale CoreSimulator service** made `simctl list runtimes` return
+  **empty** even though the download had succeeded. Fix:
+  `sudo killall -9 com.apple.CoreSimulator.CoreSimulatorService`. Classic
+  artifact-vs-behaviour: the download said `Done`, the runtime was not usable.
+- **This Mac has 8 GB RAM.** A cold RN build plus a booted simulator (87 CoreSimulator
+  processes, **4.16 GB**) does not fit; one build was killed under memory pressure. Also found
+  **orphaned `SimLaunchHost` processes (`ppid=1`, 3–4 h old) pinning ~900 MB** — `sudo kill -9`
+  them. Check `ps -A -o rss,ppid,etime,comm` before blaming the build.
+
+### First look at the screens — written on Linux, never seen until today
+**Verified good:** onboarding layout; home **bar pill** (`CACHED` / `PUSH ·
+SKIPPED-NOT-DEVICE · TAP TO RETRY` / `BG WAKE`); **ZONES NEAR YOU** strip (appears once
+location is granted); the zones grid (4 cards, correct data); footer/About; the
+**HEADING OUT / REPORT OBS** bottom bar; profile autosave (`SAVED 12:02 PM`) with the
+section header live-updating; back chevron present. No clipping or overflow anywhere.
+- **`BG WAKE · … VIA LOCATION` confirmed** — it read `VIA FOREGROUND` before location was
+  granted and `VIA LOCATION` after. That is the movement-triggered refresh, the
+  highest-value item in `RELEASE_CHECKLIST.md` §4, working.
+- **"Your trips" strip correctly absent** on a fresh install (no history, no saved trip),
+  and **HEADING OUT correctly routes to the profile gate** rather than the composer.
+
+**Findings:**
+1. **Temperature formatting is inconsistent** — the four zone cards render **`33.9°`, `36°`,
+   `49.6°`, `43°`**: one decimal on two, none on the other two. This is the `temperature
+   formatting` item from the Mac prompt. Not yet traced to a formatter.
+2. **`expo-background-fetch` is deprecated** — warns on every launch ("Use
+   expo-background-task instead"). Background refresh is this app's premise, so this is worth
+   scheduling, though not a 1.0 blocker.
+3. Zone cards briefly render **absent** right after launch while forecasts load, then appear.
+   Looked like a bug; it is just the loading window. Do not chase it.
+
+### UI automation harness — `scratchpad/tap3.py` (new, not in repo)
+Driving the Simulator from the CLI, since `idb`/`cliclick` are unavailable. Hard-won:
+- **The Simulator window is NOT the device screen.** It includes a title bar and a device
+  bezel. Measured insets at the current zoom: **22 pt left, 81 pt top**, device screen
+  **319.5 × 693.5 pt** for a 1206 × 2622 screenshot. Assuming window == screen sent every tap
+  to the wrong place for hours and looked exactly like a permissions failure.
+- Needs **Accessibility** (for synthetic events) *and* **Screen Recording** (or
+  `screencapture` silently returns bare wallpaper with no windows) granted to the host app —
+  here, VS Code. `AXIsProcessTrusted()` is the honest check.
+- **Taps** work. **TextInputs need a longer hold (~0.35 s)** than buttons to take focus.
+- **Typing must use virtual keycodes** — `CGEventKeyboardSetUnicodeString` is ignored by the
+  Simulator and falls back to the keycode, so every character came out as `a`.
+- **Modifiers need real `flagsChanged` events**; setting `CGEventSetFlags` alone makes
+  `Cmd+V` type a literal `V`.
+- **Controlled `TextInput`s reorder fast keystrokes** (`Kai Myers` → `Kai Kki Myers`). Reliable
+  entry: `xcrun simctl pbcopy` + long-press → **Select All** → **Paste** from the iOS edit menu.
+- **OPEN:** the profile **CELL NUMBER** field will not take focus by tap (direct, long-press,
+  or blur-then-tap); typed text lands in FULL NAME instead. Trip-flow screens
+  (**"Your trips"**, trip hub **PAST TRIPS**, past-trip screen, **"Go to trip"** alert) are
+  therefore still unseen — they all require a saved trip to exist.
+
 ## 2026-09-19 — Mac setup: gates reproduce green, but **Xcode 15.3 blocks the whole plan**
 
 > **SCOPE: everything in this entry about tooling is specific to Kai's Mac** (Intel `x86_64`,
