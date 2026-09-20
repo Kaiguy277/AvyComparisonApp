@@ -117,7 +117,30 @@ test (contact `sam@example.com`, a non-deliverable reserved domain). **Both were
 one checked-in, one cancelled — so nothing is live and no overdue reminders can fire. The
 rows still exist; they were not deleted.
 
-### Finding upgraded: numeric formatting is inconsistent app-wide, not just temperature
+### CORRECTION + FIX: the temperature finding was wrong; the wind one was real
+**I was wrong about temperature.** `33.9°` next to `36°` is **deliberate**, and
+`lib/units.ts:formatTempF` documents why: one decimal, trailing `.0` dropped, *"deliberately
+NOT rounded to whole degrees: around freezing the difference between 31.6 and 32.4 is rain
+versus snow"*. Nothing to fix — reading the formatter before "fixing" it caught this.
+
+**The wind figures were a real bug.** `WeatherStationCard` rendered the headline speed raw
+(`${w.speedCurrent}` → **`6.95 MPH`**) while the zone tiles already did `Math.round(...)`, and
+`RangeStat` passed `avg`/`max` through unformatted (**`9 mph`**, **`27.8 mph`**). Three
+precisions for one quantity in a single view — exactly the bug `formatTempF`'s own comment
+describes for temperature, which got a formatter while wind never did.
+- Added **`formatWindMph`** (`lib/units.ts`) — rounds to whole mph, guards `-0`, `—` for
+  null/non-finite. It **rounds where `formatTempF` deliberately does not**, because tenths of
+  a mph change no decision, the anemometers are not that accurate, and the forecast products
+  these readings sit beside all quote whole mph. That reasoning is in the code.
+- Applied at the headline, the gust figure and both `RangeStat`s.
+- `RangeStat` only appended its unit for `number` values, so a formatted string would have
+  silently dropped `" mph"`; it now appends for strings too, never to the `—` placeholder.
+- **+3 tests** (`lib/units.test.ts`), incl. the `-0` case. Gates: tsc 0, eslint 0,
+  **Vitest 171**.
+- **Verified on screen**, not just in tests: the card now reads **`7 MPH E`**, **`gusts to
+  28`**, **`24H AVG 9 mph`**, **`24H MAX 28 mph`**.
+
+### (superseded — see the correction above) Original finding as first written
 Not only the zone cards (`33.9°` / `36°` / `49.6°` / `43°`). On the **stations screen, in one
 view**: wind reads **`6.95 MPH`**, **`9 mph`** and **`27.8 mph`** — three precisions for the
 same quantity — and the unit is cased **`MPH`** in one place and **`mph`** in another.

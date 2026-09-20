@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatTempF } from "./units";
+import { formatTempF, formatWindMph } from "./units";
 
 describe("formatTempF", () => {
   // The bug this was written for: a station reporting 52.34 rendered raw,
@@ -38,5 +38,30 @@ describe("formatTempF", () => {
     expect(formatTempF(undefined)).toBe("—");
     expect(formatTempF(NaN)).toBe("—");
     expect(formatTempF(Infinity)).toBe("—");
+  });
+});
+
+describe("formatWindMph", () => {
+  // The bug this was written for: the station card headline rendered the raw
+  // sensor value, so "6.95 MPH" sat above "24H AVG 9 mph" and "24H MAX 27.8 mph"
+  // — three precisions for one quantity in a single view.
+  it("rounds to whole mph", () => {
+    expect(formatWindMph(6.95)).toBe("7");
+    expect(formatWindMph(27.8)).toBe("28");
+    expect(formatWindMph(9)).toBe("9");
+    expect(formatWindMph(0.4)).toBe("0");
+  });
+
+  it("never renders a negative zero", () => {
+    // Math.round(-0.4) is -0, which would print as "-0 mph".
+    expect(formatWindMph(-0.4)).toBe("0");
+    expect(Object.is(Number(formatWindMph(-0.4)), 0)).toBe(true);
+  });
+
+  it("falls back to an em dash for missing or non-finite values", () => {
+    expect(formatWindMph(null)).toBe("—");
+    expect(formatWindMph(undefined)).toBe("—");
+    expect(formatWindMph(NaN)).toBe("—");
+    expect(formatWindMph(Infinity)).toBe("—");
   });
 });

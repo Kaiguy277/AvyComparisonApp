@@ -24,3 +24,23 @@ export function formatTempF(value: number | null | undefined): string {
   const safe = Object.is(rounded, -0) ? 0 : rounded;
   return `${Number.isInteger(safe) ? safe : safe.toFixed(1)}°`;
 }
+
+// Format a wind speed in mph for display.
+//
+// Station feeds return wind at sensor precision, and the headline figure on the
+// station card was rendering it straight through — so one card read "6.95 MPH"
+// above "24H AVG 9 mph" and "24H MAX 27.8 mph": three precisions for the same
+// quantity in one view.
+//
+// Unlike temperature, tenths of a mph carry no decision here. Nothing about
+// travel or terrain choice turns on 6.95 versus 7, the anemometers are not that
+// accurate, and every forecast product these readings sit next to quotes wind in
+// whole mph. So this rounds, where formatTempF deliberately does not.
+export function formatWindMph(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+  const rounded = Math.round(value);
+  // Math.round(-0.4) is -0, which would render as "-0 mph".
+  return `${Object.is(rounded, -0) ? 0 : rounded}`;
+}

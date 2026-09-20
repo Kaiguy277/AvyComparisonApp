@@ -8,7 +8,7 @@ import { WindCompass } from "./WindCompass";
 import { WindDirectionRow } from "./WindDirectionRow";
 import { palette } from "@/constants/design";
 import type { WeatherObservation } from "@/lib/api/avalanche";
-import { formatTempF } from "@/lib/units";
+import { formatTempF, formatWindMph } from "@/lib/units";
 
 type Period = 24 | 72;
 
@@ -287,7 +287,7 @@ function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period })
               className="text-ink-50"
               style={{ fontSize: 28, letterSpacing: -0.5, lineHeight: 30 }}
             >
-              {w.speedCurrent !== null ? `${w.speedCurrent}` : "—"}
+              {formatWindMph(w.speedCurrent)}
             </Text>
             <Text
               variant="mono"
@@ -320,7 +320,7 @@ function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period })
                 className="text-ink-50"
                 style={{ fontSize: 14 }}
               >
-                {max}
+                {formatWindMph(max)}
               </Text>
             </Text>
           ) : null}
@@ -366,8 +366,8 @@ function WindBlock({ obs, period }: { obs: WeatherObservation; period: Period })
       )}
 
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 14 }}>
-        <RangeStat label={`${period}H AVG`} value={avg} unit=" mph" />
-        <RangeStat label={`${period}H MAX`} value={max} unit=" mph" />
+        <RangeStat label={`${period}H AVG`} value={formatWindMph(avg)} unit=" mph" />
+        <RangeStat label={`${period}H MAX`} value={formatWindMph(max)} unit=" mph" />
         <RangeStat label={`${period}H DIR`} value={dir} mono />
       </View>
     </View>
@@ -526,12 +526,12 @@ function RangeStat({
   unit?: string;
   mono?: boolean;
 }) {
+  // Values may arrive already formatted (see formatWindMph), so append the unit
+  // for strings too — but never to the em-dash placeholder, which is not a value.
   const display =
-    value === null || value === undefined
+    value === null || value === undefined || value === "—"
       ? "—"
-      : typeof value === "number"
-        ? `${value}${unit ?? ""}`
-        : value;
+      : `${value}${unit ?? ""}`;
   return (
     <View>
       <Text
