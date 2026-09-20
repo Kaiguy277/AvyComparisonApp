@@ -21,7 +21,67 @@ Format per entry:
 
 ---
 
+## 2026-09-19 — Mac setup: gates reproduce green, but **Xcode 15.3 blocks the whole plan**
+
+> **SCOPE: everything in this entry about tooling is specific to Kai's Mac** (Intel `x86_64`,
+> macOS 14.7.7, Xcode 15.3 — a *second* machine, not a replacement). **The Linux desktop is
+> still in active use for development** and none of the Homebrew / MacPorts / Ruby / clang
+> findings below apply to it. The Mac exists in this plan for the two things Linux cannot do:
+> run the **iOS Simulator** and produce an **iOS build**. Code, gates and backend work carry
+> on as before on Linux. The Linux constraints from CLAUDE.md still hold there too: no iOS
+> simulator, and the phone's services need a Developer Disk Image.
+
+- **Repo cloned** to `~/Documents/Whumpf/AvyComparisonApp` **on the Mac**, `npm install` done
+  (697 packages).
+  Gates reproduce the handoff exactly: **tsc 0, eslint 0, Vitest 168 passed** (15 files, 2.8s).
+- **BLOCKER — Xcode 15.3 / iOS 17.4 SDK is too old.** Expo SDK 54 / RN 0.81.5 needs **Xcode
+  16.1+**, and Apple has required the **iOS 18 SDK** for App Store submissions since Apr 2025.
+  So on this machine `npx expo run:ios` will not compile *and* build 37 could not be accepted
+  even if it built. Handoff steps 2–3 are blocked until Xcode is upgraded.
+  - **The checklist asked the wrong question.** `MAC_SESSION_PROMPT.md` says "tell me if Xcode,
+    CocoaPods or fastlane are missing". Xcode was not missing — it was present and too old, so
+    it got ticked off. Present ≠ usable. Check the **SDK version**, not the app's existence.
+  - Fix: **Xcode 16.2** — last release supporting *both* Intel and macOS 14 (this Mac is
+    `x86_64`, macOS 14.7.7), ships the iOS 18.2 SDK. Must come from developer.apple.com as the
+    `.xip`; the Mac App Store only offers latest, which needs macOS 15. Kai downloading (~7 GB).
+- **This Mac is Intel (`x86_64`) — Homebrew is not a usable installer here.** `brew install
+  cocoapods fastlane` builds **from source**: the build tree pulls **llvm@22, rust, cmake,
+  ninja, python@3.14, ruby**. Two runs killed at 15 min and 10 min; nothing reached the Cellar,
+  stale `/usr/local/var/homebrew/locks/*.lock` cleared. **Don't reach for brew on this box** —
+  MacPorts is already installed (2.11.5) and still ships prebuilt Intel binaries.
+- **CocoaPods not installed.** System Ruby is **2.6.10** (EOL) and the gem graph has left it
+  behind: `ffi` needs ≥3.0, `securerandom` ≥3.1, `zeitwerk` ≥3.2. Pinning (`ffi 1.16.3`,
+  `cocoapods 1.15.2`, `--conservative`) just moved the failure downstream — a losing game.
+  **Four routes tried, all dead-ended on the SAME root cause — Xcode 15.3's clang:**
+  1. Homebrew → compiles llvm@22 + rust from source (no Intel bottles).
+  2. System Ruby 2.6 gems → endless version pins (`ffi`, `securerandom`, `zeitwerk`).
+  3. MacPorts `ruby33` → default variant is **`+yjit`**, whose build dep is **rust**; with
+     `-yjit` it is a non-default variant so no prebuilt archive exists and it builds from
+     source, then the source fetch failed. Note the fetch errors were largely a **MacPorts
+     bug**, not the network: `curl progress callback failed: unbalanced open paren ...
+     $env(COLUMNS)` aborts the fetch per-mirror when `COLUMNS` is unset.
+  4. Homebrew's bundled **portable Ruby 4.0.7** (already on the box, no install) → native
+     gem ext fails: **`stdckdint.h` file not found**. That is a **C23** header shipped by
+     clang 18 / Xcode 16; this box has **Apple clang 15.0.0** and the header is absent.
+  **Conclusion: CocoaPods is not a Ruby problem, it is the Xcode problem.** Do not spend more
+  time here — install Xcode 16.2 first, then `gem install cocoapods` against a modern Ruby.
+- **fastlane deferred** — only needed at build time, and it is the formula that drags in
+  LLVM/Rust. Once a modern Ruby is in, `gem install fastlane` is the cheap route.
+- **npm cache was broken** — `~/.npm/_cacache` had root-owned dirs; the first `npm install` and
+  `npm install -g eas-cli` both failed `EACCES`. **Both reported exit 0** because the command
+  was piped to `tail` (zsh: `$PIPESTATUS` is `$pipestatus`, so the guard printed nothing).
+  Kai ran `sudo chown -R 501:20 ~/.npm`; verified 0 root-owned files + clean `install --dry-run`.
+- **eas-cli 24.7.0** installed. `eas login` (k.ai_consulting) **not yet done**.
+- Noted, not acted on: `npm audit` reports 36 vulns (2 critical, 15 high). Deliberately not
+  touching the dep tree before a release build.
+
 ## 2026-09-18 — SESSION HANDOFF → continue on Kai's Mac (read this first)
+
+> **AMENDED 2026-09-19 — read the 2026-09-19 entry above first.** Everything below about the
+> *state of the code* still holds (main green, 168 tests, what's unbuilt). What does **not**
+> hold is that the Mac is ready to build: its Xcode is 15.3 / iOS 17.4 SDK, and Expo SDK 54 +
+> Apple's iOS 18 SDK rule both require Xcode 16.1+. Steps 1–2 below are blocked until Xcode
+> 16.2 is installed. Also: this Mac is Intel — do not use Homebrew for CocoaPods/fastlane.
 
 **Opening prompt for the Mac session:** `docs/MAC_SESSION_PROMPT.md`.
 

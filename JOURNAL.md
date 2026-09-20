@@ -16,6 +16,64 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-19 — Present is not the same as usable
+
+The handoff sent the work to the Mac because the Mac can build and the Mac can see. Both
+turned out to be conditional. Xcode was installed, so I put "Xcode 15.3 ✅" in a status table
+and moved on. It ships the iOS 17.4 SDK. RN 0.81 wants Xcode 16.1+, and Apple has refused
+submissions built against anything below the iOS 18 SDK since April 2025. So the machine we
+moved to in order to build and submit could do neither, and I had already told Kai it was fine.
+
+The prompt I wrote for this session asked "tell me if Xcode, CocoaPods or fastlane are
+missing." That question has a yes/no answer and the answer was no, nothing is missing. It is
+the easy property again — the same shape as counting build credits from a courtesy email, or
+checking that a page loads instead of submitting the form. The question that mattered was
+"does this Xcode ship an SDK that can compile RN 0.81 and that Apple will accept," and nothing
+in the checklist asked it. I've rewritten that line in the log; the prompt file needs the same
+fix.
+
+The second thing I got wrong was slower and more embarrassing. Homebrew sat for fifteen
+minutes and I narrated its child processes — a GNU mirror timing out, a fastlane tarball
+downloading, the WiFi switch that supposedly helped. All true, all irrelevant. It was
+downloading LLVM and Rust *source*, because this is an Intel Mac and Homebrew has stopped
+bottling that chain for x86_64. I was explaining the symptom I could see instead of asking why
+`brew install cocoapods` needed a compiler at all. What broke the loop was Kai saying it had
+been seven minutes and he wasn't sure it was working. He was right to be suspicious and I
+should have been suspicious first — a package manager that has not printed a line in ten
+minutes is not a slow download, it is a different activity than the one you asked for.
+
+Two standing facts for future sessions — and both are **about the Mac only**. The Mac is a
+second machine, not a replacement: Kai is still developing on the Linux desktop, and nothing
+in this entry applies there. The Mac is in the plan for exactly two things Linux cannot do,
+run the Simulator and produce an iOS build. Worth being precise about that, because "we moved
+to the Mac" in yesterday's handoff reads like the project relocated, and it did not.
+
+So, on the Mac: it is **Intel**, so Homebrew quietly turns "install a tool" into "compile a
+toolchain". And its **system Ruby is 2.6.10**, five years EOL; I burned three attempts pinning
+individual gems (`ffi`, then `securerandom`, then `zeitwerk` — each pin revealed the next) and
+that is unwinnable.
+
+I then recommended MacPorts on the strength of "it ships prebuilt Intel binaries" without
+checking the default variant, which is `+yjit` — Ruby's JIT, written in Rust. So it started
+building Rust. Disabling it made it a non-default variant, which has no prebuilt archive
+either, so it went to build Ruby from source and the fetch fell over. The same mistake twice
+in one afternoon: recommending a tool on a general property without checking the specific
+thing being asked of it.
+
+The end of it was clarifying. Homebrew already ships a portable Ruby 4.0.7 on the box — no
+install needed — and CocoaPods still failed there, on `stdckdint.h`, a C23 header that arrives
+with clang 18. This box has Apple clang 15. **CocoaPods was never a Ruby problem.** Four
+routes, one root cause, and it was the same root cause as the Xcode finding above. I should
+have seen it two routes earlier: when a fix keeps failing in different disguises, the thing
+they have in common is the actual bug.
+
+One genuinely good thing came out of this. The iOS 18 SDK rule means 1.0 could never have been
+submitted from this machine, EAS quota or not. If the free cloud builds had still been
+available we'd have built on Expo's current Xcode, shipped, and never learned that this Mac
+can't produce a submittable binary — and we'd have shipped without looking at the screens
+again. The quota running out forced the move to a machine that can see; the machine that can
+see turned out to need a day's work first. Both are better found now.
+
 ## 2026-09-18 (evening) — A miscount, and moving to the machine that can see
 
 I told Kai he had one build left. He had none. The quota email said "12 of 15" and arrived
