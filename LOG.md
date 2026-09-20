@@ -117,6 +117,46 @@ test (contact `sam@example.com`, a non-deliverable reserved domain). **Both were
 one checked-in, one cancelled — so nothing is live and no overdue reminders can fire. The
 rows still exist; they were not deleted.
 
+### BUILD 39 BUILT LOCALLY AND SIGNED ✅ (not yet submitted)
+`eas build -p ios --profile production --local` → **`build-1789944416173.ipa`, 19 MB**.
+Verified by inspecting the archive, not by trusting the success line:
+`com.kaimyers.avycomparison` · **1.0.0 (39)** · MinimumOS 15.1 · **built against
+`iphoneos18.2`** · chain `iPhone Distribution: Kai Myers (254PZ32RGR)` → WWDR → Apple Root CA.
+**This is the first binary from this Mac that Apple would accept** (the iOS 18 SDK rule).
+
+- **It is build 39, not 37.** `autoIncrement` consumes a number per *attempt*, and the first
+  two attempts failed. Harmless — Apple only needs the number to increase — but the
+  2026-09-18 handoff's "the next build will be 37" is now wrong.
+- **fastlane 2.240.1** installed in ~2 min with `sudo gem3.3 install fastlane`, versus
+  Homebrew's llvm+rust source build. Use the MacPorts Ruby for gems on this machine.
+
+#### The real blocker: an expired Apple intermediate (cost two failed builds)
+Both failures reported `Prepare credentials … Distribution certificate with fingerprint
+6415A76F… hasn't been imported successfully` — a generic message that says nothing about the
+cause. The actual state of this Mac:
+```
+security find-identity -v -p codesigning  →  0 valid identities found
+Apple WWDR Certification Authority (G3)   →  notAfter Feb 7 2023   (expired 3½ years)
+```
+EAS downloads the distribution cert and imports it into a temp keychain, then validates it
+with `find-identity -v`, which only lists identities whose **chain validates**. With the only
+intermediate expired, the import "succeeds" and the identity is still unusable.
+- Installing **WWDR G6** did **not** fix it — the leaf is an **`iPhone Distribution`** cert
+  (old style), which chains to **G3**, not G6. Read the certificate's common name before
+  picking an intermediate.
+- Fix: install Apple's **renewed G3** (`https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer`,
+  valid to 2030) into the login keychain. Next build succeeded.
+- The **expired G3 is still present in the System keychain** — `security delete-certificate`
+  fails with a write-permissions error. Harmless now that a valid G3 resolves first, but it
+  is still there and will confuse the next person who looks.
+- **This was a machine-level certificate problem, not an EAS-local one.** It had nothing to do
+  with building locally and would have surfaced anywhere this Mac signed code.
+
+#### Noted, deliberately not acted on
+`expo-doctor` reports 4 patch mismatches (`expo` 54.0.34 vs `~54.0.37`; `expo-constants`,
+`expo-font`, `expo-router`). It does not block the build. Bumping Expo packages immediately
+before a release build trades a working build for a debugging session — do it after 1.0 ships.
+
 ### CORRECTION + FIX: the temperature finding was wrong; the wind one was real
 **I was wrong about temperature.** `33.9°` next to `36°` is **deliberate**, and
 `lib/units.ts:formatTempF` documents why: one decimal, trailing `.0` dropped, *"deliberately

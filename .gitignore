@@ -46,3 +46,8 @@ app-example
 supabase/.temp/
 supabase/.branches/
 .playwright-mcp/
+
+# Local EAS build output (eas build --local writes these into the project root)
+*.ipa
+*.tar.gz
+*.app.dSYM.zip
