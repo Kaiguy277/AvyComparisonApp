@@ -117,7 +117,46 @@ test (contact `sam@example.com`, a non-deliverable reserved domain). **Both were
 one checked-in, one cancelled — so nothing is live and no overdue reminders can fire. The
 rows still exist; they were not deleted.
 
-### BUILD 39 BUILT LOCALLY AND SIGNED ✅ (not yet submitted)
+### ⛔ SUBMISSION REJECTED BY APPLE — Xcode 16.2 is not new enough either
+`eas submit` uploaded build 39 and **Apple refused it**: *"applications uploaded to App Store
+Connect [must be] built with a recent version of Xcode and the iOS SDK."*
+
+**The requirement, from Apple's own page (verified today, not recalled):**
+| in force since | requires |
+|---|---|
+| 2024-04-29 | Xcode 15+ / iOS 17 SDK |
+| **2026-04-28** | **Xcode 26+ / iOS 26 SDK** ← current |
+
+Build 39 was Xcode 16.2 / **iOS 18.2 SDK**. That satisfied the *old* rule and nothing else.
+
+**CORRECTION to the 2026-09-19 and 2026-09-20 entries.** I wrote that "Apple has required the
+iOS 18 SDK for App Store submissions since April 2025". **That is wrong** — there was no such
+rule. Until 2026-04-28 the floor was Xcode 15 / iOS 17, which **Xcode 15.3 already met**. So
+the Xcode upgrade was never justified by App Review at all.
+- It *was* still necessary: Expo SDK 54 / RN 0.81.5 needs **Xcode 16.1+** to compile, and 15.3
+  could not build the app. That reason was real and is why today's Simulator pass happened.
+- But it was **necessary, not sufficient**, and I asserted the wrong reason with confidence.
+  The right move was to read Apple's requirements page before claiming a deadline.
+
+**Can this Mac reach Xcode 26?** Probably not.
+- Xcode 26 requires **macOS Sequoia 15.6+**. This machine is on **macOS 14.7.7**.
+- `softwareupdate --list-full-installers` offers **Sequoia 15.8 at most — macOS 26 (Tahoe) is
+  not offered**, so this Mac is at the end of its OS line.
+- Hardware is **MacBookPro16,3** (13-inch Intel, 2020). Whether Xcode 26 runs on Intel at all
+  is **unverified** — Apple's page lists the OS range but I could not confirm Intel support,
+  and I am not going to assert it either way again.
+- So the local-build path needs, at minimum, a macOS upgrade to Sequoia 15.8, and may be a
+  dead end regardless.
+
+**The reliable path is EAS cloud builds**, which run current Xcode on Apple's infrastructure
+and sidestep this machine entirely. The free iOS quota **resets Thu 2026-10-01** (11 days).
+
+**What today still bought, despite the rejection:** the app was built, run and *seen* for the
+first time — all 7 handoff screens verified, the build-35 trip-flow fixes confirmed fixed on
+screen, and a real wind-formatting bug found and fixed. None of that needed a submittable
+binary. Build 39 is signed and on disk; it is simply not uploadable.
+
+### BUILD 39 BUILT LOCALLY AND SIGNED ✅ (submitted, and REJECTED — see above)
 `eas build -p ios --profile production --local` → **`build-1789944416173.ipa`, 19 MB**.
 Verified by inspecting the archive, not by trusting the success line:
 `com.kaimyers.avycomparison` · **1.0.0 (39)** · MinimumOS 15.1 · **built against
