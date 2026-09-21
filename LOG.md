@@ -157,6 +157,45 @@ production confirms it — plan `97bb13f9` (22:44→22:46 UTC), `tracking_enable
   Every tracked trip so far is 0, so the write path has never once been exercised — a real
   gap, just not the one the recording exposed. Worth one walk of >500 m with a trip open.
 
+### ⚠️ SUSPECTED BUG: trip tracking may silently fail to start (2026-09-21) — UNCONFIRMED
+**Observed on device:** three trips today with `tracking_enabled: true`, **0 rows in
+`trip_plan_locations`** for every one (and for every tracked trip ever). During an *active*
+trip the home screen showed **no blue location indicator** (screenshot, 2:57 PM, plan
+`81b01163` created 2:55). Kai granted **both** prompts, so Location is `Always`.
+
+**Read in the code — the failure path is silent and diverges from the server:**
+`lib/tripPlan/send.ts:110-116`
+```ts
+const started = await startTripTracking();
+if (started !== "started") {
+  console.warn("[trip] tracking requested but not started:", started);   // user sees nothing
+  await updateActivePlan((p) => ({ ...p, trackingEnabled: false }));      // LOCAL only
+}
+```
+The plan row was already POSTed with `tracking_enabled: true`, so **the server keeps saying
+tracking is on while the phone has quietly turned it off.** Nothing is surfaced to the user.
+
+**Why that matters beyond cosmetics:** `supabase/functions/trip-plan-page/index.ts:313-317`
+then tells the contact *"turned on location sharing, but no position has come through yet —
+**that usually means no cell coverage since leaving**"*. In a SAR context that reads as
+normal and expected, so the contact waits calmly for a position that can never arrive. A
+safety tool giving a confidently wrong reason is worse than one saying nothing.
+
+**Plausible cause, not yet proven:** `startTripTracking()` calls
+`requestBackgroundPermissionsAsync()` immediately after the foreground grant. iOS defers the
+"Always" escalation, so that can resolve `granted: false` *before* the user taps "Change to
+Always Allow" → `"background-denied"` → silent disable. The config itself is correct
+(`showsBackgroundLocationIndicator: true`, `pausesUpdatesAutomatically: false`).
+
+**NOT YET CONFIRMED.** Everything above except the code reading is circumstantial.
+**Decisive test: start a trip and move >500 m** (`distanceInterval` is 500 m). A position
+landing means tracking works and the missing indicator is just iOS deferring updates; nothing
+landing means it is not running. Release-build `console.warn` is not reliably visible, so the
+log line above may not be observable — the walk is the better test.
+
+**If confirmed, this is a 1.0 blocker** — it is the exact feature Apple rejected the app over,
+and the failure is invisible to both the user and the contact.
+
 ### Build-33 crash logs: GONE from the device — thread closed unresolved (2026-09-21)
 Phone connected (`Kai's iPhone`, **iPhone11,8 / iPhone XR, iOS 18.7.8**, UDID
 `00008020-000C65893AF3002E`). Synced device logs via Xcode → Devices → View Device Logs;
