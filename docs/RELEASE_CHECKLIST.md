@@ -128,6 +128,12 @@ The app surfaces its own diagnostics for exactly this reason — read them off t
       fix, the home screen should offer the zones of the nearest center. Tapping it should
       add them to favourites (and they should then appear in `device_tokens.zones`).
       Before granting, the same strip should instead read "KEEP FORECASTS ON YOUR PHONE".
+      **Partly verified in the Simulator, 2026-09-20:** both strip states render correctly —
+      "KEEP FORECASTS ON YOUR PHONE" before location is granted, and "ZONES NEAR YOU —
+      <nearest center> — tap to follow" after. The bar pill also flipped from
+      `BG WAKE · … VIA FOREGROUND` to `VIA LOCATION`. What still needs the phone: that
+      *tapping* it writes to `device_tokens.zones` (the Simulator never registers a push
+      token — it reports `PUSH · SKIPPED-NOT-DEVICE`).
 - [ ] **Movement-triggered refresh fires.** Long-press the wordmark to turn on debug mode,
       then drive far enough to cross cell towers. Expect `BG WAKE · HH:MM VIA LOCATION`.
       This is the whole point of the release — the forgetful user who never opens the app —
@@ -182,11 +188,13 @@ that visibly stops when the trip ends.
 
 ---
 
-## 6. Build budget
+## 6. Build budget — NO LONGER A CONSTRAINT (updated 2026-09-20)
 
-As of build 35 (2026-09-17), **1 iOS build left** in this billing period. Build 34 was
-superseded before submission and is irrelevant.
+Builds are now produced **locally on Kai's Mac** (`eas build --local`), which does not touch
+the EAS cloud quota. Rebuilds are effectively free, bounded only by ~20 min of wall clock.
 
-That is the reason §4 is written as one sitting rather than a loop: there is room for
-exactly one round of "found a bug, fixed it, rebuilt". Work through the whole list and
-collect every problem before asking for another build.
+So §4 no longer has to be one perfect sitting. Still worth collecting problems in a batch
+rather than rebuilding per fix, but a second round costs nothing now.
+
+(Historic: as of build 35 the cloud plan had 1 build left, and it ran out — build 36 was
+refused. That is what moved the work to the Mac.)
