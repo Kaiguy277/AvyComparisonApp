@@ -117,6 +117,28 @@ test (contact `sam@example.com`, a non-deliverable reserved domain). **Both were
 one checked-in, one cancelled — so nothing is live and no overdue reminders can fire. The
 rows still exist; they were not deleted.
 
+### DEVICE PASS on Kai's iPhone XR (iOS 18.7.8) — §4 checks 1 & 2 PASS (2026-09-21)
+Ad-hoc build installed over build 35 with `devicectl` — **no crash on upgrade** (not the
+`≤32` path that broke, but a data point). Phone now runs **1.0.0 (39)**, which includes the
+wind-formatter fix.
+- ✅ **Push token decoupling — CONFIRMED ON HARDWARE.** With notifications denied the home
+  screen reads exactly `ALERTS OFF · NO DAILY FORECAST · TAP TO TURN ON` (amber), **not**
+  `PUSH · PERMISSION-DENIED`. This is the behaviour that was only ever inferred from
+  `PushTokenModule.swift` and never run on a device. It works.
+- ✅ **Tapping the line deep-links to iOS Settings → Whumpf.** No permission prompt appears,
+  which is correct: iOS only ever prompts once per install, and it had already been denied.
+  The checklist already allowed for this ("or deep-link to Settings if iOS will not ask
+  again") — it is not a bug.
+- ✅ **Granting notifications clears it.** After enabling and relaunching, the amber line is
+  **gone**; only `CACHED` and `BG WAKE` remain. Full cycle verified.
+- ✅ **Wind formatter verified on device**: `6 mph E`, `4 mph NW`, `19 mph SE`, `0 mph NE` —
+  all whole numbers. Temps `34.6° / 37° / 46.9° / 46°` show `formatTempF` behaving as
+  designed.
+- Observed: **Background App Refresh was OFF** in Settings → Whumpf, which is why `BG WAKE`
+  reports `VIA FOREGROUND`. Location was already **Always**.
+- Still to do on device: trip tracking + blue indicator + check-in stopping it (which is also
+  the §5 recording Apple asked for), and the daily forecast alert.
+
 ### Build-33 crash logs: GONE from the device — thread closed unresolved (2026-09-21)
 Phone connected (`Kai's iPhone`, **iPhone11,8 / iPhone XR, iOS 18.7.8**, UDID
 `00008020-000C65893AF3002E`). Synced device logs via Xcode → Devices → View Device Logs;
