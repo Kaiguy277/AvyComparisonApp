@@ -139,6 +139,24 @@ wind-formatter fix.
 - Still to do on device: trip tracking + blue indicator + check-in stopping it (which is also
   the §5 recording Apple asked for), and the daily forecast alert.
 
+### Trip tracking on device: blue indicator ✅, **0 positions is CORRECT, not a bug**
+Kai ran the §5 recording: toggle on, trip sent, **blue location indicator present**, app
+backgrounded, checked in. The packet page said the location had not come through yet, and
+production confirms it — plan `97bb13f9` (22:44→22:46 UTC), `tracking_enabled: true`,
+**0 rows in `trip_plan_locations`**. The 2026-09-19 tracked trip is also 0.
+- **This is expected.** `lib/tripPlan/tracking.ts:203-207` sets
+  **`distanceInterval: 500` m** and **`timeInterval: 10 * 60 * 1000`** (10 min). A ~2-minute
+  stationary test cannot produce a position. The packet page's "not come through yet" is
+  honest, not broken. **Do not file this as a bug.**
+- Consequence for §5: the checklist's step 5 ("show Last known position") **cannot be
+  satisfied in a 60-second stationary take**. Either move 500 m / wait 10 min during the
+  recording, or accept that steps 3/4/6 (indicator present → persists backgrounded →
+  disappears on check-in) are what Apple actually asked for: *"persistent background
+  location usage"*. Step 5 was our own addition.
+- **Still genuinely unverified:** that a position ever reaches `trip_plan_locations` at all.
+  Every tracked trip so far is 0, so the write path has never once been exercised — a real
+  gap, just not the one the recording exposed. Worth one walk of >500 m with a trip open.
+
 ### Build-33 crash logs: GONE from the device — thread closed unresolved (2026-09-21)
 Phone connected (`Kai's iPhone`, **iPhone11,8 / iPhone XR, iOS 18.7.8**, UDID
 `00008020-000C65893AF3002E`). Synced device logs via Xcode → Devices → View Device Logs;
