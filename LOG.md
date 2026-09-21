@@ -117,6 +117,21 @@ test (contact `sam@example.com`, a non-deliverable reserved domain). **Both were
 one checked-in, one cancelled — so nothing is live and no overdue reminders can fire. The
 rows still exist; they were not deleted.
 
+### Build-33 crash logs: GONE from the device — thread closed unresolved (2026-09-21)
+Phone connected (`Kai's iPhone`, **iPhone11,8 / iPhone XR, iOS 18.7.8**, UDID
+`00008020-000C65893AF3002E`). Synced device logs via Xcode → Devices → View Device Logs;
+they land in `~/Library/Developer/Xcode/DeviceLogs/<device>/`.
+- **17 logs total, every one dated 2026-09-21**, all under `Other Logs` /
+  `Unsymbolicated Logs` (cpu_resource, JetsamEvent, SiriSearchFeedback…).
+- **None reference `Whumpf` or `com.kaimyers.avycomparison`.** iOS has rotated out everything
+  from build 33's era.
+- **So the upgrade-crash cause stays inferred and cannot now be confirmed.**
+  `lib/legacyTaskCleanup.ts` remains the fix-by-hypothesis. Per RELEASE_CHECKLIST §4, the
+  honest note is that it **went untested** — and unless a device still carries a build ≤32,
+  it cannot be tested at all. **Stop planning to confirm it; it is not recoverable.**
+- Phone currently runs **build 35**, so installing an ad-hoc build over it tests an upgrade
+  from 35 — not the ≤32 path that crashed.
+
 ### ⛔ SUBMISSION REJECTED BY APPLE — Xcode 16.2 is not new enough either
 `eas submit` uploaded build 39 and **Apple refused it**: *"applications uploaded to App Store
 Connect [must be] built with a recent version of Xcode and the iOS SDK."*
