@@ -53,9 +53,11 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
      that the plan had been upgraded; it was not.
    - `buildNumber` incremented **39 → 40 on the refused attempt** (as it did for the refused
      build 36 on 2026-09-18). Next successful build will be **41 or higher**.
-   - To proceed: `eas billing:subscribe starter --account k.ai_consulting` (or the billing
-     page), then `eas build -p ios --profile production` — **no `--local`**. Or wait for
-     the Oct 1 reset, which costs nothing.
+   - **DECIDED (Kai, 2026-09-22): wait for the free reset on Thu 2026-10-01.** Do not
+     subscribe. On or after that date, run `eas build -p ios --profile production` — **no
+     `--local`** — then `eas submit -p ios`. Nothing else blocks that build; the code is
+     ready and pushed.
+   - (If the decision changes: `eas billing:subscribe starter --account k.ai_consulting`.)
 2. **Contact pre-selection is committed but not on the phone** — it landed after the last
    ad-hoc build. The next `eas build -p ios --profile preview --local` picks it up.
 3. **Screen recording (§5)** — not done. Much stronger now the packet page shows a real trail.
