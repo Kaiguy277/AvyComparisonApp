@@ -275,15 +275,23 @@ async function attemptTripTrackingStart(): Promise<{
     // registers, `hasStartedLocationUpdatesAsync` says yes, and iOS silently
     // delivers nothing. That is precisely how this failed unnoticed: the app
     // reported tracking as running while the contact was told there was no
-    // cell coverage. Require the Always scope explicitly.
-    // Only the foreground response carries the iOS scope; the background one
-    // is a generic PermissionResponse. Read it back explicitly rather than
-    // trusting `granted`.
-    const scope = (await Location.getForegroundPermissionsAsync()).ios?.scope;
-    if (!bg.granted || (Platform.OS === "ios" && scope !== "always")) {
+    // cell coverage.
+    //
+    // Only the foreground response carries the iOS scope, and it is optional:
+    // `getForegroundPermissionsAsync()` was observed returning no `ios` block
+    // at all on a device where Always WAS granted. So absence means "not
+    // reported", NOT "denied" — an earlier version of this check read it the
+    // other way and refused to track for a user who had granted everything.
+    //
+    // Reject only what we can positively identify as insufficient.
+    const scope =
+      (await Location.getForegroundPermissionsAsync()).ios?.scope ??
+      fg.ios?.scope;
+    const insufficient = scope === "whenInUse" || scope === "none";
+    if (!bg.granted || (Platform.OS === "ios" && insufficient)) {
       return {
         result: "background-denied",
-        detail: `status=${bg.status} scope=${scope ?? "none"}`,
+        detail: `status=${bg.status} scope=${scope ?? "unreported"}`,
       };
     }
 
