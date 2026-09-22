@@ -157,6 +157,50 @@ production confirms it — plan `97bb13f9` (22:44→22:46 UTC), `tracking_enable
   Every tracked trip so far is 0, so the write path has never once been exercised — a real
   gap, just not the one the recording exposed. Worth one walk of >500 m with a trip open.
 
+### 🔴 DIAGNOSED: why no position has EVER reached the server (2026-09-22)
+Instrumentation gave the answer in one walk: **`FIX · 11:00 AM ×1 · UP HTTP:404 · BUF 2`**.
+iOS dispatches, the app captures, the **upload 404s**, points buffer. Two compounding bugs:
+
+**1. The create/upload race — structural, not bad luck.**
+`handleLocation` returns `404 plan_not_found` when `loadPlan()` misses. Trip creation goes
+through the **outbox** and flushes asynchronously, but `startLocationUpdatesAsync` makes iOS
+deliver a location almost immediately. Timings today: plan `5d0478a1` created **19:00:43Z**,
+first fix **~19:00Z**. So the first upload posts a `plan_id` the server has not been told
+about yet. **The departure position — from the trailhead, the most useful one to SAR — is the
+one guaranteed to lose this race.**
+
+**2. Check-in destroys the buffer whether or not it flushed.** `send.ts:148-150`
+```ts
+await flushTrackingBuffer().catch(() => {});   // result ignored
+await stopTripTracking();
+await clearTrackingBuffer();                   // drops everything regardless
+```
+The comment above it calls these "the final positions … the ones that matter most if the
+check-in itself is the thing that's late" — and they are precisely what gets discarded.
+
+**Together:** first fix 404s → buffered → retry only on the *next* fix (another 500 m, since
+`timeInterval` is Android-only) → user checks in → buffer cleared → positions gone. Zero rows,
+every trip, regardless of distance travelled. Consistent with every observation since 2026-09-18.
+
+**Only two things ever flush the buffer:** a location fix (`recordLocations`) and check-in.
+Nothing flushes on app foreground, on regaining connectivity, or when the outbox finally
+delivers the create — so a 404'd point has almost no chance to recover.
+
+#### Fix plan (not yet written — item 3 needs a product decision)
+1. **Scope the buffer to a plan id.** It is currently plan-less and `flushTrackingBuffer` posts
+   to whatever `loadActivePlan()` returns, so a stale buffer could upload one trip's positions
+   to the *next* trip. Must fix before any retry logic keeps points around longer.
+2. **Treat 404 as "the create has not landed yet"** — flush the outbox and retry, rather than
+   waiting for another 500 m of travel. Also flush on foreground and on reconnect.
+3. **Stop clearing the buffer on a failed flush.** Straightforward client-side, but the server
+   then rejects the retry: `handleLocation` returns **409** once `status === "closed"`, so
+   positions recorded *during* the trip are refused if they arrive after check-in. Accepting
+   points whose `at` precedes `closed_at` would keep the trail intact without weakening the
+   promise that tracking stops at check-in — **but that is a deliberate privacy call and is
+   Kai's to make, not mine.**
+4. Require **`ios.scope === "always"`** in `startTripTracking` (separate root cause, 2026-09-22
+   entry above). `expo-location` exposes it as `PermissionDetailsLocationIOS`.
+
 ### Reported from device use — NOT YET FIXED (2026-09-22)
 Captured while diagnosing tracking; neither is a blocker, both are real.
 1. **Multiline ROUTE / OBJECTIVE field traps the keyboard.** `return` inserts a newline (as it
