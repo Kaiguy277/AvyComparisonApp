@@ -157,7 +157,44 @@ production confirms it — plan `97bb13f9` (22:44→22:46 UTC), `tracking_enable
   Every tracked trip so far is 0, so the write path has never once been exercised — a real
   gap, just not the one the recording exposed. Worth one walk of >500 m with a trip open.
 
-### ⚠️ SUSPECTED BUG: trip tracking may silently fail to start (2026-09-21) — UNCONFIRMED
+### 🔴 CONFIRMED BUG: trip tracking does not run (2026-09-21)
+**Confirmed by driving across town.** Plan `550b92df` was active from 22:57 UTC and Kai drove
+across Anchorage — **four hours, far past both the 500 m `distanceInterval` and the 10-minute
+`timeInterval`** — and `trip_plan_locations` still holds **0 rows**. The packet page continued
+to tell the contact *"no position has come through yet — that usually means no cell coverage"*
+while on LTE the whole time. This is not the threshold explanation; **tracking is not running.**
+
+**Kai's own observation is the best clue:** the location prompt appears when you tap **send**,
+not when you flip the share-location toggle. That is by design (`send.ts` starts tracking only
+after the plan exists) but it puts the iOS permission escalation inside the critical path:
+`requestAlwaysAuthorization` returns *immediately* on iOS and the user's answer arrives later
+via a delegate callback, so `requestBackgroundPermissionsAsync()` can resolve `granted: false`
+while the "Change to Always Allow" sheet is still on screen → `"background-denied"` → silent
+disable. **Still a hypothesis, not proven.**
+
+**Ruled out so far:** the tracking options are correct (`showsBackgroundLocationIndicator:
+true`, `pausesUpdatesAutomatically: false`); `TaskManager.defineTask` is at module scope;
+Location is `Always`; `isSupported` should be true in a standalone build.
+
+**Noticed while reading, possibly relevant:** nothing imported `lib/tripPlan/tracking.ts` at
+app startup — only `send.ts`, lazily. Its own comment says the task is defined at module load
+"so iOS can dispatch into it … including after the app was terminated", which cannot hold if
+the module is never loaded until a trip is sent. Not changed yet, deliberately: see below.
+
+**What was done instead of another guess (`da67d6b`):** made it observable. Every exit path of
+`startTripTracking` is now recorded, `"error"` carries the thrown message, and the success path
+**verifies with `hasStartedLocationUpdatesAsync`** instead of assuming — recording
+`NOT-RUNNING-AFTER-START` if iOS did not accept the session. Shown on the home screen as a
+`TRACKING · …` line beside `BG WAKE`, same hidden debug gate, red when unhealthy. The reader
+sits in a new `lib/tripPlan/trackingDiag.ts` with **no expo-location / task-manager imports**,
+so adding the diagnostic does not change when the background task registers — otherwise a fix
+and a measurement would land in the same build and neither could be trusted.
+
+**Severity:** this is the exact feature Apple rejected the app over, it fails invisibly to both
+the user and the contact, and the contact is given a *confidently wrong* reason that reads as
+normal in a SAR context. **1.0 blocker.**
+
+#### (superseded) original note, kept for the record — was UNCONFIRMED
 **Observed on device:** three trips today with `tracking_enabled: true`, **0 rows in
 `trip_plan_locations`** for every one (and for every tracked trip ever). During an *active*
 trip the home screen showed **no blue location indicator** (screenshot, 2:57 PM, plan
