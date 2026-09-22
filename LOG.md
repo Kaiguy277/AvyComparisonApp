@@ -44,10 +44,18 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
 ### NOT done
 1. **No submittable binary can be produced on this Mac.** Apple has required **Xcode 26 /
    iOS 26 SDK** since 2026-04-28; this Intel `MacBookPro16,3` tops out at macOS Sequoia 15.8
-   and cannot run it. **Build 39 was rejected at upload for exactly this.** Kai chose to **pay
-   for EAS** and build in the cloud; `eas.json` production already pins
-   `macos-sequoia-15.6-xcode-26.2`. **The plan upgrade has not been done** — once it is, run
-   `eas build -p ios --profile production` (no `--local`).
+   and cannot run it. **Build 39 was rejected at upload for exactly this.** `eas.json`
+   production already pins `macos-sequoia-15.6-xcode-26.2`, so a cloud build is ready to go.
+   - **Attempted 2026-09-22 and REFUSED: the account is still on the Free plan**, whose iOS
+     quota is spent until **Thu 2026-10-01**. Nothing built, nothing charged.
+   - Note the quota check happens **after** the project uploads, so watching the upload
+     succeed tells you nothing about whether it will run. I briefly read it as confirmation
+     that the plan had been upgraded; it was not.
+   - `buildNumber` incremented **39 → 40 on the refused attempt** (as it did for the refused
+     build 36 on 2026-09-18). Next successful build will be **41 or higher**.
+   - To proceed: `eas billing:subscribe starter --account k.ai_consulting` (or the billing
+     page), then `eas build -p ios --profile production` — **no `--local`**. Or wait for
+     the Oct 1 reset, which costs nothing.
 2. **Contact pre-selection is committed but not on the phone** — it landed after the last
    ad-hoc build. The next `eas build -p ios --profile preview --local` picks it up.
 3. **Screen recording (§5)** — not done. Much stronger now the packet page shows a real trail.
