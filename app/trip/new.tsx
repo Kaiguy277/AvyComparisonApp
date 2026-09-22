@@ -38,6 +38,7 @@ import { gearSummary } from "@/lib/tripPlan/gear";
 import {
   TRAVEL_MODE_OPTIONS,
   TRIP_LIMITS,
+  type TripTemplate,
   emptyDraft,
   tripPlanDraftSchema,
   type TripPlanDraftInput,
@@ -57,6 +58,7 @@ import {
   loadDraft,
   loadProfile,
   loadTemplates,
+  mostRecentTemplate,
   saveDraft,
   updateProfile,
   type TripProfile,
@@ -65,6 +67,30 @@ import { forecastSnapshotFromZone } from "@/lib/tripPlan/forecast";
 import { getZoneSnapshotForDate, loadFavorites, loadSnapshot } from "@/lib/offlineCache";
 import { getZoneSession } from "@/lib/zoneSession";
 import { AVAILABLE_ZONES } from "@/lib/zones";
+
+// Who to pre-tick in the composer.
+//
+// This used to be EVERY saved contact. That quietly sent the trip plan to
+// everyone the user had ever added — and, with tracking on, a live location
+// link to all of them. Someone who saved a partner for one trip should not
+// keep receiving that person's position on every trip afterwards.
+//
+// Default to whoever they actually told last time, which is nearly always who
+// they will tell again. Everyone else stays one tap away: ContactsEditor is
+// given the full saved list either way.
+function defaultContacts(
+  saved: TripProfile["contacts"],
+  templates: TripTemplate[],
+): TripProfile["contacts"] {
+  const last = mostRecentTemplate(templates);
+  if (last && last.contactIds.length > 0) {
+    const picked = saved.filter((c) => last.contactIds.includes(c.id));
+    if (picked.length > 0) return picked.slice(0, TRIP_LIMITS.maxContacts);
+  }
+  // No history to go on. One saved contact is unambiguous; more than one is a
+  // choice the user should make rather than have made for them.
+  return saved.length === 1 ? saved.slice(0, 1) : [];
+}
 
 type SectionKey = "where" | "when" | "today" | "contacts";
 const ORDER: SectionKey[] = ["where", "when", "today", "contacts"];
@@ -132,8 +158,8 @@ export default function TripNewScreen() {
         // Today's colors start as your usual ones — change only what differs.
         clothingToday: { ...(p.gear.usualColors ?? {}) },
         party: [],
-        // Saved people are the default recipients — confirm, don't retype.
-        contacts: p.contacts.slice(0, TRIP_LIMITS.maxContacts),
+        // Last trip's people are the default recipients — confirm, don't retype.
+        contacts: defaultContacts(p.contacts, templates),
       });
       const tpl = params.templateId ? templates.find((t) => t.id === params.templateId) : undefined;
       const collapsed = new Set<SectionKey>();
@@ -195,7 +221,9 @@ export default function TripNewScreen() {
     useCallback(() => {
       if (!ready) return;
       let cancelled = false;
-      loadProfile().then((p) => {
+      // Templates as well as the profile: the contact default comes from the
+      // last trip actually sent, not from everyone in the address book.
+      Promise.all([loadProfile(), loadTemplates()]).then(([p, templates]) => {
         if (cancelled) return;
         setProfile(p);
         setDraft((d) => {
@@ -210,7 +238,10 @@ export default function TripNewScreen() {
                 ? d.clothingToday
                 : { ...(p.gear.usualColors ?? {}) },
             vehicle: d.vehicle ?? defaultVehicle,
-            contacts: (d.contacts ?? []).length > 0 ? d.contacts : p.contacts.slice(0, TRIP_LIMITS.maxContacts),
+            contacts:
+              (d.contacts ?? []).length > 0
+                ? d.contacts
+                : defaultContacts(p.contacts, templates),
           };
         });
       });
