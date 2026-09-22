@@ -157,6 +157,19 @@ production confirms it — plan `97bb13f9` (22:44→22:46 UTC), `tracking_enable
   Every tracked trip so far is 0, so the write path has never once been exercised — a real
   gap, just not the one the recording exposed. Worth one walk of >500 m with a trip open.
 
+### Reported from device use — NOT YET FIXED (2026-09-22)
+Captured while diagnosing tracking; neither is a blocker, both are real.
+1. **Multiline ROUTE / OBJECTIVE field traps the keyboard.** `return` inserts a newline (as it
+   must for a multiline field), and there is no Done affordance, so the only way out is tapping
+   some other part of the screen. On a form this long that is a guessing game. Fix: an
+   `InputAccessoryView` with **Done** above the keyboard for the multiline inputs — the
+   standard iOS answer. Check every multiline field, not just this one.
+2. **Every profile contact is pre-selected in the composer.** Kai wants **all** contacts
+   available but only the **last one he actually sent to** pre-checked. Current behaviour means
+   a rushed user sends their trip plan to everyone by default — noisy, and it quietly widens
+   who gets a live location link. Needs a "last sent to" memory (the trip template/history
+   already persists per-trip contacts, so the data is probably there).
+
 ### CORRECTION + product finding: `timeInterval` is Android-only; iOS never falls back on time
 `node_modules/expo-location/build/Location.types.d.ts:113` marks `timeInterval` **`@platform
 android`**. On iOS only **`distanceInterval: 500`** applies, so the "10 minute" fallback I
