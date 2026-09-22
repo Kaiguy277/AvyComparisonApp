@@ -145,9 +145,16 @@ async function userAction(
   // immediately rather than waiting for the server round trip. One last
   // flush pushes anything still queued — the final positions are the ones
   // that matter most if the check-in itself is the thing that's late.
-  await flushTrackingBuffer().catch(() => {});
+  //
+  // Only clear the queue if that flush actually succeeded. It used to clear
+  // unconditionally, which destroyed exactly the positions the comment above
+  // calls the most important: a phone that checked in before finding signal
+  // threw its whole trail away. What stays behind is scoped to this plan id,
+  // so it can never be posted to a later trip, and the server accepts points
+  // recorded before the plan closed — so a later flush still delivers them.
+  const flushed = await flushTrackingBuffer().catch(() => false);
   await stopTripTracking();
-  await clearTrackingBuffer();
+  if (flushed) await clearTrackingBuffer();
 
   return entry;
 }

@@ -55,23 +55,47 @@ export interface TrackPoint {
   accuracy_m?: number;
 }
 
-async function readBuffer(): Promise<TrackPoint[]> {
+// The queue is scoped to the plan it was recorded for. It used to be a bare
+// array, which meant a buffer left over from one trip would upload into
+// whatever the NEXT active plan happened to be — one party's positions
+// attributed to another's trip. Points now travel with the plan id that
+// produced them and are only ever posted to that plan.
+interface TrackBuffer {
+  planId: string;
+  points: TrackPoint[];
+}
+
+async function readBuffer(): Promise<TrackBuffer | null> {
   try {
     const raw = await AsyncStorage.getItem(BUFFER_KEY);
-    if (!raw) return [];
+    if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as TrackPoint[]) : [];
+    // Old shape: a bare array with no plan id. There is no safe way to guess
+    // which trip it belonged to, so drop it rather than risk misattributing
+    // positions.
+    if (Array.isArray(parsed)) return null;
+    if (
+      parsed &&
+      typeof parsed.planId === "string" &&
+      Array.isArray(parsed.points)
+    ) {
+      return parsed as TrackBuffer;
+    }
+    return null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function writeBuffer(points: TrackPoint[]): Promise<void> {
+async function writeBuffer(planId: string, points: TrackPoint[]): Promise<void> {
   try {
     // Keep the NEWEST when overflowing: a searcher needs where they are now
     // far more than where they were three days ago.
     const capped = points.slice(-MAX_BUFFERED);
-    await AsyncStorage.setItem(BUFFER_KEY, JSON.stringify(capped));
+    await AsyncStorage.setItem(
+      BUFFER_KEY,
+      JSON.stringify({ planId, points: capped } satisfies TrackBuffer),
+    );
   } catch {}
 }
 
@@ -84,19 +108,24 @@ export async function clearTrackingBuffer(): Promise<void> {
 // Push whatever is queued. Removes only what the server actually accepted,
 // so a mid-flush failure retries rather than dropping positions.
 export async function flushTrackingBuffer(): Promise<boolean> {
-  const plan = await loadActivePlan();
-  if (!plan || plan.status === "closed" || !plan.trackingEnabled) return false;
-  const secret = await loadPlanSecret(plan.planId);
+  // Driven by the buffer, not by the active plan. A trip that has just been
+  // checked in still has positions worth delivering — they were recorded
+  // while it was open, and the server accepts anything timestamped before it
+  // closed. Requiring an open active plan here is what silently stranded
+  // them.
+  const buf = await readBuffer();
+  if (!buf || buf.points.length === 0) return true;
+
+  const secret = await loadPlanSecret(buf.planId);
   if (!secret) return false;
 
-  let pending = await readBuffer();
-  if (pending.length === 0) return true;
+  let pending = buf.points;
 
   while (pending.length > 0) {
     const chunk = pending.slice(0, UPLOAD_CHUNK);
     const r = await callTripPlans({
       action: "location",
-      plan_id: plan.planId,
+      plan_id: buf.planId,
       plan_secret: secret,
       points: chunk,
     });
@@ -115,14 +144,26 @@ export async function flushTrackingBuffer(): Promise<boolean> {
         await stopTripTracking();
         return false;
       }
-      // Anything else (offline, 5xx, timeout): keep everything and retry
-      // on the next fix.
-      await writeBuffer(pending);
+      // 404 means the server has never heard of this plan — the create is
+      // still sitting in the outbox. iOS delivers a location almost the
+      // instant tracking starts, so the FIRST fix of every trip loses this
+      // race, and it is the position from the trailhead. Push the outbox now
+      // instead of waiting for another 500 m of travel to trigger a retry.
+      if (r.status === 404) {
+        try {
+          // Imported lazily: send.ts imports this module, so a static import
+          // back would be a cycle.
+          const { flushTripPlanOutbox } = await import("./send");
+          await flushTripPlanOutbox();
+        } catch {}
+      }
+      // Anything else (offline, 5xx, timeout): keep everything and retry.
+      await writeBuffer(buf.planId, pending);
       return false;
     }
 
     pending = pending.slice(chunk.length);
-    await writeBuffer(pending);
+    await writeBuffer(buf.planId, pending);
     await mergeTrackingRuntime({
       lastUpload: "ok",
       lastUploadAt: new Date().toISOString(),
@@ -163,7 +204,10 @@ async function recordLocations(locations: Location.LocationObject[]): Promise<vo
   }));
   if (points.length === 0) return;
 
-  await writeBuffer([...(await readBuffer()), ...points]);
+  const existing = await readBuffer();
+  const carried =
+    existing && existing.planId === plan.planId ? existing.points : [];
+  await writeBuffer(plan.planId, [...carried, ...points]);
   await flushTrackingBuffer();
 
   // Same handling as the always-on refresh monitor: remember which centers
@@ -226,8 +270,22 @@ async function attemptTripTrackingStart(): Promise<{
     if (!fg.granted) return { result: "foreground-denied" };
     // iOS requires foreground before background can even be requested.
     const bg = await Location.requestBackgroundPermissionsAsync();
-    if (!bg.granted)
-      return { result: "background-denied", detail: `status=${bg.status}` };
+    // `granted` is not enough on iOS. It comes back true for "While Using",
+    // which cannot deliver background updates — the session starts, the task
+    // registers, `hasStartedLocationUpdatesAsync` says yes, and iOS silently
+    // delivers nothing. That is precisely how this failed unnoticed: the app
+    // reported tracking as running while the contact was told there was no
+    // cell coverage. Require the Always scope explicitly.
+    // Only the foreground response carries the iOS scope; the background one
+    // is a generic PermissionResponse. Read it back explicitly rather than
+    // trusting `granted`.
+    const scope = (await Location.getForegroundPermissionsAsync()).ios?.scope;
+    if (!bg.granted || (Platform.OS === "ios" && scope !== "always")) {
+      return {
+        result: "background-denied",
+        detail: `status=${bg.status} scope=${scope ?? "none"}`,
+      };
+    }
 
     if (await isTrackingRunning())
       return { result: "started", detail: "already-running" };

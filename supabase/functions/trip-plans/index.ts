@@ -330,9 +330,29 @@ async function handleLocation(supabase: ReturnType<typeof serviceClient>, raw: u
   // stale background task that hasn't been torn down yet) is refused here
   // rather than quietly recorded.
   if (!plan.tracking_enabled) return json(409, { error: "tracking_disabled" });
-  if (plan.status === "closed") return json(409, { error: "plan_closed" });
 
-  const rows = b.points.map((p) => ({
+  // A closed plan accepts no NEW positions — that is the promise the UI
+  // makes, and a client still posting after check-in is refused below.
+  //
+  // But positions recorded DURING the trip can legitimately arrive after it
+  // ends. The whole design buffers points through country with no signal and
+  // flushes when the phone finds coverage — which is often back at the
+  // trailhead, after the user has already checked in. Refusing those threw
+  // the trail away: the promise is about WHEN LOCATION IS RECORDED, not about
+  // when the network got round to delivering it.
+  //
+  // So: accept what predates the close, drop what follows it.
+  let points = b.points;
+  if (plan.status === "closed") {
+    const closedAt = plan.closed_at ? Date.parse(plan.closed_at) : 0;
+    points = points.filter((p) => {
+      const t = Date.parse(p.at);
+      return Number.isFinite(t) && Number.isFinite(closedAt) && t <= closedAt;
+    });
+    if (points.length === 0) return json(409, { error: "plan_closed" });
+  }
+
+  const rows = points.map((p) => ({
     plan_id: plan.id,
     at: new Date(p.at).toISOString(),
     lat: p.lat,
