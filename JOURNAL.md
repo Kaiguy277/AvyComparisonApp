@@ -16,6 +16,56 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-22 — The feature that had never once worked
+
+Trip tracking has never delivered a position. Not in testing, not in the two trips from the
+build-35 audit, not once since it was written. The server row said `tracking_enabled: true`,
+the app said tracking was on, the blue indicator was up, and `trip_plan_locations` was empty
+for every trip that had ever existed. Today it works, and the thing that found it was not
+cleverness.
+
+I guessed four times. The permission race, the `trackingEnabled` flag on the local plan, the
+`isSupported` check, the task never being defined at startup — each plausible, each read
+carefully out of the code, each wrong. What actually worked was giving up on diagnosis and
+making the failure say its own name: record every exit path of `startTripTracking`, verify the
+success case instead of assuming it, print it on the home screen behind the debug gate that
+already existed for `BG WAKE`. One walk later the screen read
+`FIX · 11:00 AM ×1 · UP HTTP:404 · BUF 2` and there was nothing left to deduce. I should reach
+for that earlier than I do. Four wrong guesses is four rounds of Kai walking around the block.
+
+The diagnostic then caught my own regression within minutes. I made the Always check reject
+anything that wasn't explicitly `always`, and `getForegroundPermissionsAsync()` turned out not
+to populate `ios` at all on Kai's phone — so the app refused to track for a user who had
+granted everything. The screen said `BACKGROUND-DENIED · STATUS=GRANTED · SCOPE=NONE`, which
+is a sentence that answers itself: status granted, scope absent, my code treating absence as
+denial. Without that line I would have shipped a build that silently refused to track and
+looked identical to the bug I was fixing. Instrumentation paid for itself twice in one
+afternoon.
+
+The bug itself was two bugs that needed each other. The first upload of every trip 404s,
+because creation goes through the outbox while iOS delivers a location almost instantly — so
+the position from the trailhead always races a plan the server hasn't heard of. That alone
+would have been survivable; the point sits in the buffer. But check-in then cleared the buffer
+whether or not the flush had succeeded, and the comment directly above that line calls those
+"the final positions … the ones that matter most if the check-in itself is the thing that's
+late." The code knew what it was throwing away.
+
+What I keep thinking about is the timestamp table. The first position was captured at
+21:21:48, one second before the plan existed, and inserted at 22:16:34 — buffered for
+fifty-five minutes, then delivered when a later fix flushed the queue. That is the trailhead.
+That is where the car is parked and where a search would start. It had been silently deleted
+on every trip this app has ever recorded, and the packet page told the contact it was probably
+a coverage problem. For a tool whose entire purpose is telling someone where you went, that is
+about as bad as a bug gets, and it would have shipped in 1.0 if Kai hadn't gone for a walk.
+
+Also learned, and worth not re-learning: `timeInterval` is Android-only, so on iOS there is no
+time-based fallback at all — a party that stops moving stops reporting, full stop. And Apple
+now requires Xcode 26 / the iOS 26 SDK, which this Intel Mac cannot run, so the local build
+that took all of yesterday to make possible can compile and install to a device but can never
+produce a submittable binary. Both of those I asserted wrongly from memory first and only
+checked afterwards. The pattern is the same one as the guessing: reading the actual source
+takes a minute and saves an afternoon.
+
 ## 2026-09-20 — Four wrong diagnoses, one bad assumption underneath
 
 The app is running in the Simulator and the screens look right. Getting there took most of a

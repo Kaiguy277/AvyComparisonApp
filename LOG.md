@@ -21,6 +21,69 @@ Format per entry:
 
 ---
 
+## SESSION HANDOFF → read this first (updated 2026-09-22)
+
+**State:** `main` green — tsc 0, eslint 0, **Vitest 171**. All pushed. Supersedes the
+2026-09-18 handoff, which is now wrong in several places.
+
+### The big one: trip tracking had NEVER worked, and now does
+Fixed and **verified on Kai's phone** — 6 real positions, including the trailhead fix that was
+destroyed on every previous trip. Full diagnosis in the 2026-09-22 entries below. Four client
+faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
+
+### DONE
+- Mac toolchain: **Xcode 16.2 / iOS 18.2 SDK**, CocoaPods 1.17.0 (MacPorts ruby33), fastlane
+  2.240.1, eas-cli logged in. Phone registered for internal distribution (`KaisIphoneXR`).
+- **All 7 screens from the old Mac prompt have been seen** in the Simulator (2026-09-20).
+- Device pass §4: **push decoupling confirmed on hardware**, zones sync to
+  `device_tokens.zones`, ZONES NEAR YOU in both states, `BG WAKE · VIA LOCATION`.
+- **Trip tracking end to end** — positions land, packet page shows the trail.
+- Wind formatter fix; **departure email to contacts** (deployed); contact pre-selection now
+  defaults to the last trip's recipients instead of everyone.
+
+### NOT done
+1. **No submittable binary can be produced on this Mac.** Apple has required **Xcode 26 /
+   iOS 26 SDK** since 2026-04-28; this Intel `MacBookPro16,3` tops out at macOS Sequoia 15.8
+   and cannot run it. **Build 39 was rejected at upload for exactly this.** Kai chose to **pay
+   for EAS** and build in the cloud; `eas.json` production already pins
+   `macos-sequoia-15.6-xcode-26.2`. **The plan upgrade has not been done** — once it is, run
+   `eas build -p ios --profile production` (no `--local`).
+2. **Contact pre-selection is committed but not on the phone** — it landed after the last
+   ad-hoc build. The next `eas build -p ios --profile preview --local` picks it up.
+3. **Screen recording (§5)** — not done. Much stronger now the packet page shows a real trail.
+   iOS's red recording pill hides the blue location indicator, so film the device with a second
+   camera or record via QuickTime rather than on-device.
+4. **App Privacy labels** — Kai publishes these himself.
+5. **Build-33 upgrade crash — UNRECOVERABLE.** Device logs have rotated and no device carries
+   a build ≤32. Per §4, note that it went untested. **Stop planning to confirm it.**
+6. **Daily forecast alert** — deferred: out of season every forecast is expired so the test
+   proves nothing, and the cron key is not on this machine.
+
+### Traps this machine will spring on you
+- **Homebrew builds from source on this Intel Mac** (llvm + rust for fastlane). Use MacPorts,
+  and `gem` on the MacPorts ruby for CocoaPods/fastlane.
+- **`xcodebuild -downloadPlatform iOS` grabs the NEWEST runtime**, which Xcode 16.2 cannot
+  build against. Pin `-buildVersion 18.2`.
+- After switching Xcode, **`simctl` may list zero runtimes** until
+  `sudo killall -9 com.apple.CoreSimulator.CoreSimulatorService`.
+- **8 GB RAM**: a cold RN build plus a booted simulator does not fit. Watch for orphaned
+  `SimLaunchHost` processes pinning memory.
+- **`expo prebuild` rewrites `package.json` scripts** — revert before committing.
+- **`timeInterval` is Android-only.** On iOS only `distanceInterval` (500 m) triggers a fix, so
+  a stationary phone reports nothing, ever.
+- **Driving the Simulator from the CLI**: see the 2026-09-20 harness notes — the window is not
+  the device screen, typing needs virtual keycodes, modifiers need real `flagsChanged` events,
+  and only the first tapped field takes focus (use Tab).
+
+### Open questions worth a decision
+- The packet page says "no position … usually means no cell coverage" during the window before
+  the first 500 m — misleading in an alarming direction. Distinguishing "not yet" from "not for
+  a while" is a small copy change.
+- A party that stops moving stops reporting. Worth deciding deliberately whether a periodic fix
+  should exist rather than inheriting the distance-only default.
+- Automated phone call on no check-in (Twilio) — Kai wants it; still parked. After 1.0.
+
+
 ## 2026-09-20 — Mac unblocked: Xcode 16.2 in, **app built, running and SEEN in the Simulator**
 
 > Scope: Mac-only, as with the 2026-09-19 entry. Linux dev is unaffected.

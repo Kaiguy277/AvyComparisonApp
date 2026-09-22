@@ -31,10 +31,11 @@ Working agreements for AI-assisted development on this project.
 ## Current state
 
 **Read the SESSION HANDOFF at the top of `LOG.md` first** — it is the live status.
-In one line (2026-09-18): Whumpf 1.0 has never been approved; the last submission was
-cancelled so the push/alerts/trip-tracking work ships *in* 1.0. Everything is merged
-to `main` and passing, but **the EAS free iOS build quota is spent until Oct 1**, so
-the next build is a **local build on Kai's Mac** (`eas build --local`, see LOG).
+In one line (2026-09-22): Whumpf 1.0 has never been approved. The Mac now builds, installs
+and runs the app, and **trip tracking — which had never once delivered a position — is fixed
+and verified on device**. But **Apple requires Xcode 26 / the iOS 26 SDK and this Intel Mac
+cannot run it**, so local builds are good for testing only; the submittable build must come
+from **EAS cloud** (`eas.json` production pins an Xcode 26 image).
 
 The 2026-08-07 audit's findings are in `LOG.md` under that date.
 
