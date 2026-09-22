@@ -243,6 +243,37 @@ async function handleCreate(supabase: ReturnType<typeof serviceClient>, raw: unk
 
   const plan = (await loadPlan(supabase, b.plan_id))!;
   const contacts = await loadContacts(supabase, b.plan_id);
+
+  // Tell the contacts the trip has started.
+  //
+  // The app also opens the share sheet so the user can text the link
+  // personally, and that stays — a message from a friend gets read. But it
+  // is a step a rushed person skips, and a contact who never opens iMessage
+  // never sees it. They already get an email when the trip CLOSES, so
+  // getting nothing when it OPENS had the asymmetry backwards: departure is
+  // the message carrying the worry-by time and the packet link, and it is
+  // the one that matters if the trip goes wrong.
+  //
+  // Never let this fail trip creation. The plan and its packet are the
+  // safety-critical part; notifying is an addition to it, exactly as with
+  // tracking above.
+  try {
+    await notifyAll({
+      supabase,
+      plan,
+      contacts: contacts.map((c) => ({
+        id: c.id,
+        display_name: c.display_name,
+        email: c.email,
+        phone_e164: c.phone_e164,
+        share_url: shareUrl(c.share_token),
+      })),
+      template: "heading_out",
+    });
+  } catch (err) {
+    console.error("[trip-plans] heading_out notify failed", err);
+  }
+
   return json(201, { plan: publicPlan(plan), contacts: contactsPublic(contacts) });
 }
 

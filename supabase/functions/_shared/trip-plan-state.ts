@@ -40,6 +40,10 @@ export type SideEffect =
   | { kind: "record_late"; type: "check_in" | "cancel" };
 
 export type NotifyTemplate =
+  // Sent when the plan is created, so the contacts have the packet link and
+  // the worry-by time from the moment the party leaves — not only once
+  // something happens. See trip-plans create handler.
+  | "heading_out"
   | "nudge_1"
   | "nudge_2"
   | "extended"

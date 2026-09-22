@@ -72,6 +72,14 @@ export function renderTemplate(
   const noteLine = note ? `\nNote: "${note}"` : "";
 
   const bodies: Record<NotifyTemplate, { subject: string; text: string }> = {
+    heading_out: {
+      subject: `${name} is heading out — ${area}`,
+      text:
+        `${name} is heading to ${area} and listed you as someone to tell.\n\n` +
+        `Back by: ${back}\n` +
+        `If you haven't heard from ${name} by ${worry}, open this page — it tells you what to do and has everything Search and Rescue will ask for:\n${link}\n\n` +
+        `Nothing to do right now, and you don't need the app. Just keep this — the same page updates itself if plans change, and you'll get another email when ${name} checks in.`,
+    },
     nudge_1: {
       subject: `${name} is overdue — ${area}`,
       text:
