@@ -157,6 +157,41 @@ production confirms it — plan `97bb13f9` (22:44→22:46 UTC), `tracking_enable
   Every tracked trip so far is 0, so the write path has never once been exercised — a real
   gap, just not the one the recording exposed. Worth one walk of >500 m with a trip open.
 
+### 🔴 ROOT CAUSE FOUND: tracking accepts a lesser authorization than it needs (2026-09-22)
+**The app treats "While Using / Ask Next Time" as sufficient for background tracking. It is
+not.** Two runs, same code, same diagnostic, opposite reality:
+
+| Location setting | `TRACKING` line | blue indicator | iOS delivering |
+|---|---|---|---|
+| Ask Next Time / While Using | `STARTED · VERIFIED` | **none** | **nothing** |
+| **Always** | `STARTED · VERIFIED` | **present** | yes |
+
+So `requestBackgroundPermissionsAsync()` returns `granted: true` for an authorization that is
+**not** `Always`; `startLocationUpdatesAsync()` then succeeds, `hasStartedLocationUpdatesAsync()`
+reports the task registered, and **iOS silently delivers nothing**. Every symptom follows from
+that single gap: no positions ever, no blue pill, a plan row saying `tracking_enabled: true`,
+and a packet page telling the contact there is "no cell coverage".
+
+**`VERIFIED` was a false positive** — `hasStartedLocationUpdatesAsync()` only knows the JS-side
+task is registered. It cannot tell you iOS will honour it. The instrumentation still earned its
+keep: it ruled out the permission race I was confident about, and the *contrast between the two
+runs* is what located the real cause. Measuring beat guessing — after guessing wrong twice.
+
+**The fix (not yet written):**
+1. In `startTripTracking`, require **`Always`** explicitly — check the authorization *scope*,
+   not just `granted`. `expo-location` exposes it on the permission response
+   (`ios.scope === "always"`); treat `"whenInUse"` as **`background-denied`**.
+2. Stop reporting `"started"` on an authorization that cannot deliver. `VERIFIED` must mean
+   iOS will actually run the session.
+3. **Do not fail silently.** Tell the user, and reconcile the server row (`tracking_enabled`)
+   so the packet page stops promising a position that cannot arrive.
+4. **Request permission at the toggle, not at send** (Kai's observation). Opting in is the
+   moment to discover you cannot, while the user can still act on it — not inside the send
+   path where the failure is swallowed.
+
+**Still to verify:** that positions actually reach `trip_plan_locations` now that `Always` is
+granted. Trip `8ece4c82` is running for exactly that.
+
 ### 🔴 CONFIRMED BUG: trip tracking does not run (2026-09-21)
 **Confirmed by driving across town.** Plan `550b92df` was active from 22:57 UTC and Kai drove
 across Anchorage — **four hours, far past both the 500 m `distanceInterval` and the 10-minute
