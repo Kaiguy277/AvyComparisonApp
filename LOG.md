@@ -157,6 +157,24 @@ production confirms it — plan `97bb13f9` (22:44→22:46 UTC), `tracking_enable
   Every tracked trip so far is 0, so the write path has never once been exercised — a real
   gap, just not the one the recording exposed. Worth one walk of >500 m with a trip open.
 
+### CORRECTION + product finding: `timeInterval` is Android-only; iOS never falls back on time
+`node_modules/expo-location/build/Location.types.d.ts:113` marks `timeInterval` **`@platform
+android`**. On iOS only **`distanceInterval: 500`** applies, so the "10 minute" fallback I
+referred to repeatedly on 2026-09-21/22 **does not exist on this platform**. My earlier log
+lines saying "500 m *or* 10 minutes" are wrong.
+
+**Consequences:**
+- **Testing:** a stationary phone will never produce a position, however long a trip runs.
+  Trip `8ece4c82` ran 13 min with `Always` granted and the blue indicator visible, and
+  recorded 0 — that is correct behaviour, not a second bug. Verifying the upload path needs
+  ~500 m of real movement.
+- **Product, and worth a deliberate decision:** a party that *stops* stops reporting. Someone
+  sheltering, injured or waiting out weather emits nothing, and if they never got 500 m from
+  the trailhead the packet page shows **no position at all** — alongside the "probably no cell
+  coverage" line. For a tool whose purpose is telling SAR where someone is, "we only know where
+  you are while you keep moving" should be chosen on purpose, not inherited from a default.
+  Worth considering a periodic fix independent of distance.
+
 ### 🔴 ROOT CAUSE FOUND: tracking accepts a lesser authorization than it needs (2026-09-22)
 **The app treats "While Using / Ask Next Time" as sufficient for background tracking. It is
 not.** Two runs, same code, same diagnostic, opposite reality:
