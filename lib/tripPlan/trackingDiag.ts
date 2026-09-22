@@ -49,3 +49,50 @@ export async function readLastTrackingStart(): Promise<TrackingStartRecord | nul
     return null;
   }
 }
+
+// ── runtime: what happens AFTER tracking starts ─────────────────────────
+//
+// Starting is verified (see above) but positions were still never reaching
+// the server, so the failure is downstream: either iOS never dispatches the
+// task, or it does and the upload silently buffers. Uploads failing is a
+// NORMAL case for this app — the whole point is travel without signal — so
+// nothing in that path raises. That makes it invisible, which is why it
+// needs recording rather than reasoning about.
+const RUNTIME_KEY = "avy-trip-track-runtime-v1";
+
+export interface TrackingRuntimeRecord {
+  // Set every time iOS hands the task a batch of locations.
+  lastDispatchAt?: string;
+  lastDispatchPoints?: number;
+  // Points waiting to upload. Growing = captured but not delivered.
+  buffered?: number;
+  // "ok" | "skipped:<why>" | "http:<status>" | "throw:<message>"
+  lastUpload?: string;
+  lastUploadAt?: string;
+}
+
+export async function mergeTrackingRuntime(
+  patch: Partial<TrackingRuntimeRecord>,
+): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(RUNTIME_KEY);
+    const cur = raw ? JSON.parse(raw) : {};
+    await AsyncStorage.setItem(
+      RUNTIME_KEY,
+      JSON.stringify({ ...cur, ...patch }),
+    );
+  } catch {}
+}
+
+export async function readTrackingRuntime(): Promise<TrackingRuntimeRecord | null> {
+  try {
+    const raw = await AsyncStorage.getItem(RUNTIME_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object"
+      ? (parsed as TrackingRuntimeRecord)
+      : null;
+  } catch {
+    return null;
+  }
+}

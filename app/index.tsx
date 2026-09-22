@@ -75,6 +75,8 @@ import {
 } from "@/lib/backgroundRefresh";
 import {
   readLastTrackingStart,
+  readTrackingRuntime,
+  type TrackingRuntimeRecord,
   type TrackingStartRecord,
 } from "@/lib/tripPlan/trackingDiag";
 import { toggleDebugMode, useDebugMode } from "@/lib/debugMode";
@@ -1909,11 +1911,13 @@ function PushDiagnosticLine() {
   const [diag, setDiag] = useState<PushDiagnostic | null>(null);
   const [lastRefresh, setLastRefresh] = useState<LastRefreshRecord | null>(null);
   const [trackStart, setTrackStart] = useState<TrackingStartRecord | null>(null);
+  const [trackRun, setTrackRun] = useState<TrackingRuntimeRecord | null>(null);
   const debug = useDebugMode();
   const reload = useCallback(() => {
     readPushDiagnostic().then(setDiag);
     readLastRefresh().then(setLastRefresh);
     readLastTrackingStart().then(setTrackStart);
+    readTrackingRuntime().then(setTrackRun);
   }, []);
   useEffect(() => {
     reload();
@@ -1946,7 +1950,9 @@ function PushDiagnosticLine() {
   // why a trip's location sharing did or didn't start, without putting it in
   // front of every user. "started/verified" is the healthy case.
   const showTracking = !!trackStart && debug;
-  if (!showPush && !showBgWake && !showTracking) return null;
+  // Downstream half: did iOS ever dispatch the task, and did the upload land?
+  const showTrackRun = !!trackRun?.lastDispatchAt && debug;
+  if (!showPush && !showBgWake && !showTracking && !showTrackRun) return null;
   const trackingOk =
     trackStart?.result === "started" && trackStart?.detail !== "NOT-RUNNING-AFTER-START";
 
@@ -2071,6 +2077,52 @@ function PushDiagnosticLine() {
                 minute: "2-digit",
               })
               .toUpperCase()}
+          </Text>
+        </View>
+      ) : null}
+      {showTrackRun ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 6,
+          }}
+        >
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor:
+                trackRun!.lastUpload === "ok"
+                  ? palette.frost[500]
+                  : "#DC2626",
+            }}
+          />
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color:
+                trackRun!.lastUpload === "ok" ? palette.ink[400] : "#DC2626",
+            }}
+          >
+            FIX ·{" "}
+            {new Date(trackRun!.lastDispatchAt!)
+              .toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+              })
+              .toUpperCase()}
+            {" ×"}
+            {trackRun!.lastDispatchPoints ?? 0}
+            {" · UP "}
+            {(trackRun!.lastUpload ?? "NONE").toUpperCase()}
+            {typeof trackRun!.buffered === "number"
+              ? ` · BUF ${trackRun!.buffered}`
+              : ""}
           </Text>
         </View>
       ) : null}

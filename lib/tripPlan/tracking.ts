@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { callTripPlans } from "./api";
 import {
+  mergeTrackingRuntime,
   recordTrackingStart,
   type TrackingStartResult,
 } from "./trackingDiag";
@@ -101,6 +102,11 @@ export async function flushTrackingBuffer(): Promise<boolean> {
     });
 
     if (!r.ok) {
+      await mergeTrackingRuntime({
+        lastUpload: `http:${r.status}`,
+        lastUploadAt: new Date().toISOString(),
+        buffered: pending.length,
+      });
       // 409 means the server has already ended tracking for this plan
       // (checked in, cancelled, or tracking turned off). The queue is then
       // meaningless — drop it and stop, rather than retrying forever.
@@ -117,14 +123,31 @@ export async function flushTrackingBuffer(): Promise<boolean> {
 
     pending = pending.slice(chunk.length);
     await writeBuffer(pending);
+    await mergeTrackingRuntime({
+      lastUpload: "ok",
+      lastUploadAt: new Date().toISOString(),
+      buffered: pending.length,
+    });
   }
   return true;
 }
 
 async function recordLocations(locations: Location.LocationObject[]): Promise<void> {
+  await mergeTrackingRuntime({
+    lastDispatchAt: new Date().toISOString(),
+    lastDispatchPoints: locations.length,
+  });
   const plan = await loadActivePlan();
   // Defensive: iOS can deliver one more batch after we ask it to stop.
   if (!plan || plan.status === "closed" || !plan.trackingEnabled) {
+    // This tears tracking down, so record WHY — silently stopping on the
+    // first batch would look identical to never being dispatched at all.
+    await mergeTrackingRuntime({
+      lastUpload: `skipped:${
+        !plan ? "no-plan" : plan.status === "closed" ? "plan-closed" : "not-tracking"
+      }`,
+      lastUploadAt: new Date().toISOString(),
+    });
     await stopTripTracking();
     return;
   }
