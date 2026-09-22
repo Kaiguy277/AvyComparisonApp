@@ -203,11 +203,13 @@ delivers the create — so a 404'd point has almost no chance to recover.
 
 ### Reported from device use — NOT YET FIXED (2026-09-22)
 Captured while diagnosing tracking; neither is a blocker, both are real.
-1. **Multiline ROUTE / OBJECTIVE field traps the keyboard.** `return` inserts a newline (as it
-   must for a multiline field), and there is no Done affordance, so the only way out is tapping
-   some other part of the screen. On a form this long that is a guessing game. Fix: an
-   `InputAccessoryView` with **Done** above the keyboard for the multiline inputs — the
-   standard iOS answer. Check every multiline field, not just this one.
+1. ~~**Multiline ROUTE / OBJECTIVE field traps the keyboard.**~~ **COULD NOT REPRODUCE**
+   (Kai, same day). Reported as: `return` inserts a newline with no Done affordance, so the
+   only exit is tapping elsewhere. On retry it did not recur. **No change made** — the fix
+   would have been an `InputAccessoryView` with Done on the shared `TextField`
+   (`components/observation/formPrimitives.tsx`), which every multiline field in the app uses,
+   so it is a one-place change if it shows up again. Not worth editing a shared input
+   component on an unreproducible report.
 2. **Every profile contact is pre-selected in the composer.** Kai wants **all** contacts
    available but only the **last one he actually sent to** pre-checked. Current behaviour means
    a rushed user sends their trip plan to everyone by default — noisy, and it quietly widens
