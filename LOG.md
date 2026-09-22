@@ -201,6 +201,36 @@ delivers the create — so a 404'd point has almost no chance to recover.
 4. Require **`ios.scope === "always"`** in `startTripTracking` (separate root cause, 2026-09-22
    entry above). `expo-location` exposes it as `PermissionDetailsLocationIOS`.
 
+### ✅ TRACKING WORKS — first positions ever recorded (2026-09-22)
+Plan `cbbc8d9c`, **6 rows in `trip_plan_locations`**. After three days of zero across every
+tracked trip, the upload path delivers.
+
+**The insert timestamps prove the specific fix, not just "it works now":**
+| position `at` | server `created_at` |
+|---|---|
+| **21:21:48** ← captured at trip start | **22:16:34** |
+| 22:13:48 / 22:13:51 / 22:15:21 / 22:16:32 | 22:16:34 |
+| 22:16:49 | 22:16:50 |
+
+The first position was captured **one second before the plan existed server-side** (created
+21:21:49) — the 404 race exactly as diagnosed. It was buffered, **kept**, and delivered 55
+minutes later when a later fix flushed the queue. Under the old code that point was discarded:
+it 404'd, waited for another 500 m, and was then destroyed by check-in clearing the buffer
+unconditionally. **That is the trailhead position — the most useful one to a SAR crew — and it
+now survives the failure that used to erase it.**
+
+Coordinates trace real movement (61.188,-149.803 → 61.181,-149.790, eastward across
+Anchorage); accuracy 17–365 m, consistent with `LocationAccuracy.Balanced`.
+
+Also confirmed by this run: the corrected scope check no longer refuses a device where
+`Always` is granted but the scope comes back unreported.
+
+**Note for future confusion:** the packet page appeared empty because it was opened *before*
+22:16:34, when the first batch landed. With a 500 m distance trigger and no iOS time fallback,
+there is a real window at the start of every trip where the page legitimately has nothing to
+show. Worth considering whether the "no cell coverage" wording should distinguish "not yet"
+from "not for a while".
+
 ### Reported from device use — NOT YET FIXED (2026-09-22)
 Captured while diagnosing tracking; neither is a blocker, both are real.
 1. ~~**Multiline ROUTE / OBJECTIVE field traps the keyboard.**~~ **COULD NOT REPRODUCE**
