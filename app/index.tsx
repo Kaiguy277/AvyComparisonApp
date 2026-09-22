@@ -73,6 +73,10 @@ import {
   refreshFavoritesSnapshot,
   type LastRefreshRecord,
 } from "@/lib/backgroundRefresh";
+import {
+  readLastTrackingStart,
+  type TrackingStartRecord,
+} from "@/lib/tripPlan/trackingDiag";
 import { toggleDebugMode, useDebugMode } from "@/lib/debugMode";
 import { loadForecastBundle } from "@/lib/forecast/loadForecastBundle";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -1904,10 +1908,12 @@ export default function Index() {
 function PushDiagnosticLine() {
   const [diag, setDiag] = useState<PushDiagnostic | null>(null);
   const [lastRefresh, setLastRefresh] = useState<LastRefreshRecord | null>(null);
+  const [trackStart, setTrackStart] = useState<TrackingStartRecord | null>(null);
   const debug = useDebugMode();
   const reload = useCallback(() => {
     readPushDiagnostic().then(setDiag);
     readLastRefresh().then(setLastRefresh);
+    readLastTrackingStart().then(setTrackStart);
   }, []);
   useEffect(() => {
     reload();
@@ -1936,7 +1942,13 @@ function PushDiagnosticLine() {
   // time. Push errors stay visible regardless because they require
   // user action.
   const showBgWake = !!lastRefresh && debug;
-  if (!showPush && !showBgWake) return null;
+  // Tracking outcome. Same hidden-debug gate as BG WAKE: a developer can see
+  // why a trip's location sharing did or didn't start, without putting it in
+  // front of every user. "started/verified" is the healthy case.
+  const showTracking = !!trackStart && debug;
+  if (!showPush && !showBgWake && !showTracking) return null;
+  const trackingOk =
+    trackStart?.result === "started" && trackStart?.detail !== "NOT-RUNNING-AFTER-START";
 
   const onTap = async () => {
     Haptics.selectionAsync().catch(() => {});
@@ -2022,6 +2034,43 @@ function PushDiagnosticLine() {
               .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
               .toUpperCase()}{" "}
             VIA {lastRefresh.source.toUpperCase()}
+          </Text>
+        </View>
+      ) : null}
+      {showTracking ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 6,
+          }}
+        >
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: trackingOk ? palette.frost[500] : "#DC2626",
+            }}
+          />
+          <Text
+            variant="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color: trackingOk ? palette.ink[400] : "#DC2626",
+            }}
+          >
+            TRACKING · {trackStart!.result.toUpperCase()}
+            {trackStart!.detail ? ` · ${trackStart!.detail.toUpperCase()}` : ""}
+            {" · "}
+            {new Date(trackStart!.at)
+              .toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+              })
+              .toUpperCase()}
           </Text>
         </View>
       ) : null}

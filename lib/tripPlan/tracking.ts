@@ -5,6 +5,10 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { callTripPlans } from "./api";
+import {
+  recordTrackingStart,
+  type TrackingStartResult,
+} from "./trackingDiag";
 import { loadActivePlan, loadPlanSecret } from "./store";
 import {
   onLocationFix,
@@ -174,26 +178,36 @@ export async function isTrackingRunning(): Promise<boolean> {
   }
 }
 
-export type TrackingStartResult =
-  | "started"
-  | "unsupported"
-  | "foreground-denied"
-  | "background-denied"
-  | "error";
+// Start-outcome recording lives in ./trackingDiag so screens can read it
+// without importing this module (which defines background tasks on load).
+export type { TrackingStartResult, TrackingStartRecord } from "./trackingDiag";
 
-// Asks for permission and starts the background updates. Called only when
-// the user turns tracking on for a trip — never at launch, never
-// speculatively.
 export async function startTripTracking(): Promise<TrackingStartResult> {
-  if (!isSupported) return "unsupported";
+  const { result, detail } = await attemptTripTrackingStart();
+  await recordTrackingStart(result, detail);
+  return result;
+}
+
+async function attemptTripTrackingStart(): Promise<{
+  result: TrackingStartResult;
+  detail?: string;
+}> {
+  if (!isSupported) {
+    return {
+      result: "unsupported",
+      detail: `expoGo=${isExpoGo} os=${Platform.OS}`,
+    };
+  }
   try {
     const fg = await Location.requestForegroundPermissionsAsync();
-    if (!fg.granted) return "foreground-denied";
+    if (!fg.granted) return { result: "foreground-denied" };
     // iOS requires foreground before background can even be requested.
     const bg = await Location.requestBackgroundPermissionsAsync();
-    if (!bg.granted) return "background-denied";
+    if (!bg.granted)
+      return { result: "background-denied", detail: `status=${bg.status}` };
 
-    if (await isTrackingRunning()) return "started";
+    if (await isTrackingRunning())
+      return { result: "started", detail: "already-running" };
 
     // Only one location session at a time. The always-on refresh monitor is
     // deliberately low accuracy; tracking needs better, and running both
@@ -217,10 +231,21 @@ export async function startTripTracking(): Promise<TrackingStartResult> {
           "Sharing your location with your trip contacts until you check in.",
       },
     });
-    return "started";
+
+    // Verify rather than assume. startLocationUpdatesAsync resolving does not
+    // guarantee iOS accepted the session, and this is the one place where a
+    // false "started" would be actively harmful.
+    const running = await isTrackingRunning();
+    return {
+      result: "started",
+      detail: running ? "verified" : "NOT-RUNNING-AFTER-START",
+    };
   } catch (err) {
     console.warn("[trip-tracking] start failed", err);
-    return "error";
+    return {
+      result: "error",
+      detail: err instanceof Error ? err.message.slice(0, 120) : String(err),
+    };
   }
 }
 
