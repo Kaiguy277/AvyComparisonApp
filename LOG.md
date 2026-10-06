@@ -94,6 +94,21 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
 - Automated phone call on no check-in (Twilio) — Kai wants it; still parked. After 1.0.
 
 
+## 2026-10-06 — Quota reset: **build 41 running on EAS cloud** (Xcode 26.2 image)
+- **Kai's call: ship the email-only version first, voice calls after.** Nothing in `main`
+  needed changing — the handoff was accurate. Gates on `main` before building: tsc 0,
+  eslint 0, Vitest 171. Research commit `d8a7353` pushed first so the build is from a
+  clean tree.
+- `eas build -p ios --profile production --non-interactive --no-wait` → build
+  **`f5ad68c6`**, **1.0.0 (41)**, status `in queue` confirmed with `eas build:view` (not
+  inferred from the upload succeeding — that was the 2026-09-22 mistake). Credentials
+  resolved from Expo's servers; cert + profile valid to 2027-04-21.
+- `RELEASE_CHECKLIST.md` §5/§6 corrected: do not screen-record on-device (red pill hides
+  the blue indicator); step 5 needs 500 m of movement; local builds are not submittable.
+- **Next, in order:** build finishes → `eas submit -p ios --id f5ad68c6` → Kai: App
+  Privacy labels (§2), screen recording (§5), attach 41 in ASC, paste the **1.1 block**
+  from `APP_REVIEW_NOTES.md`, attach the recording, Add for Review.
+
 ## 2026-09-22 (later) — Automated VOICE call for overdue contacts: researched, not built
 - **Kai asked to look into automated calling for overdue alerts.** The 2026-09-17 ops note
   left one thing unverified — "the rest of the 2026 voice rules were not checked". Checked

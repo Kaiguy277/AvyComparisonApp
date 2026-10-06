@@ -171,7 +171,10 @@ From the rejection: *"reply to this and add a screen recording showing the persi
 background location usage on a physical device. Include the recording in the Notes field
 of the App Review Information section."*
 
-Record with iOS Control Center → Screen Recording. One continuous take, roughly 60s:
+**Do NOT record on-device.** iOS's red recording pill replaces the status bar, so the
+blue location indicator — the whole point of the recording — is hidden (found 2026-09-21).
+Film the phone with a second camera, or mirror it to the Mac and record with QuickTime
+(Movie Recording → camera dropdown → the iPhone). One continuous take, roughly 60–90s:
 
 1. Start on the trip form. Show the **"Share your location with these contacts while
    you're out"** toggle and switch it **on**.
@@ -179,7 +182,11 @@ Record with iOS Control Center → Screen Recording. One continuous take, roughl
 3. Show the **blue background-location indicator** in the status bar.
 4. **Background the app** (swipe home). Leave it backgrounded, indicator still visible.
 5. Open the packet page in Safari (the contact's share link) and show **"Last known
-   position"** with a timestamp.
+   position"** with a timestamp. **Caveat:** iOS only delivers a fix after ~500 m of
+   movement (`timeInterval` is Android-only), so a stationary take shows no position.
+   Either start the trip, drive/walk 500 m, then film this step, or drop it — Apple asked
+   for "persistent background location usage", which steps 3, 4 and 6 show. This step
+   was our own addition.
 6. Return to the app and **check in**. Show the blue indicator **disappear** — this is the
    part that proves tracking is scoped to an active trip.
 
@@ -188,13 +195,17 @@ that visibly stops when the trip ends.
 
 ---
 
-## 6. Build budget — NO LONGER A CONSTRAINT (updated 2026-09-20)
+## 6. Builds — cloud only for anything submittable (updated 2026-10-06)
 
-Builds are now produced **locally on Kai's Mac** (`eas build --local`), which does not touch
-the EAS cloud quota. Rebuilds are effectively free, bounded only by ~20 min of wall clock.
+Apple has required **Xcode 26 / the iOS 26 SDK** since 2026-04-28. This Intel Mac tops out
+at macOS Sequoia and cannot run Xcode 26, so **`eas build --local` produces test builds
+only** — fine for the Simulator and ad-hoc installs, rejected at upload (build 39 was).
 
-So §4 no longer has to be one perfect sitting. Still worth collecting problems in a batch
-rather than rebuilding per fix, but a second round costs nothing now.
+The submittable build is **`eas build -p ios --profile production`** (no `--local`); the
+profile pins `macos-sequoia-15.6-xcode-26.2`. The Free plan's iOS quota resets monthly
+(reset 2026-10-01); the quota check happens **after** upload, so wait for
+`eas build:view` to say `in queue` / `in progress` before believing it ran. `autoIncrement`
+burns a build number per attempt, refused or not.
 
-(Historic: as of build 35 the cloud plan had 1 build left, and it ran out — build 36 was
-refused. That is what moved the work to the Mac.)
+(Historic: builds 36 and 40 were refused on quota; 39 was built locally and rejected by
+Apple for the SDK.)
