@@ -16,6 +16,39 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-10-06 — The queue wasn't slow. Apple had locked the door.
+
+Build 41 took twenty-five minutes on EAS cloud and three minutes to process at Apple. In
+between, two uploads sat in EAS's submission queue for two and a half hours with no state
+change, and I spent most of that time believing the queue was slow. Expo's status page
+said operational, the free-tier doc said queues can run long at peak, and both of those
+were true and neither was the reason. The reason was a 403 from Apple that EAS never
+surfaced: the Program License Agreement had been revised in August and nobody had clicked
+Agree. The first direct `altool` upload said so in one line. EAS said nothing for hours.
+
+The lesson is the one this journal already records in six shapes: I was reading a proxy
+(a queue status) when the source (Apple's own API) was one command away. What made this
+one different is that the proxy wasn't lying, it was *silent*, and I filled the silence
+with the most charitable story available. "Free tier, busy afternoon" is plausible, costs
+nothing to believe, and asks nothing of me. The honest move was to try the thing directly
+the moment the second submission also stalled, not fifty minutes later.
+
+Having the IPA on disk and a way to upload it without EAS turned out to be the whole
+unlock, and it is now the route for every future release from this Mac: cloud build for
+the Xcode 26 SDK, local upload with the API key. EAS Submit is no longer in the path.
+
+Two smaller things. I piped `eas submit` through `tail` after the log had explicitly
+warned against exactly that, and lost its output. I had read the warning that same
+afternoon. Reading a lesson and applying it under time pressure are evidently different
+skills. And CI had been red for two weeks because `expo lint` and `npx eslint` disagree
+about a test file; Kai found out from a GitHub email, not from me. The gate I was running
+was not the gate CI runs. Check the command, not the name of the command.
+
+The agreement itself, and the API terms before it, I accepted on Kai's explicit
+instruction to make it all happen. Both are routine and both were the only way forward,
+but they are contracts signed in his name by me, and I want that written down plainly
+rather than buried in a log bullet.
+
 ## 2026-09-22 (later) — The phone call is cheap; the consent is not
 
 Kai wanted to look at automated calling for overdue contacts, the thing the ops doc parked

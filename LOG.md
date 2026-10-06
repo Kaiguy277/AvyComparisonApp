@@ -162,7 +162,26 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   saved. Build 33 still attached until 41 finishes processing.
 - **App Privacy:** adding Usage Data → Product Interaction (App Functionality, not
   linked, no tracking) per `RELEASE_CHECKLIST.md` §2, for `device_tokens.zones`.
-- **Next, in order:** Apple processes 41 (TestFlight shows it) → Apple processes 41 → Kai: App
+- **Apple processed 41 in <3 min** — TestFlight "Ready to Submit", expires in 90 days.
+- **ASC version 1.0 is now "Prepare for Submission" with build 41 attached** (33
+  detached — the Delete control only appears on hover over the build row; "Add Build"
+  radio ids are the delivery UUIDs). Notes = 1.1 block. Saved and re-read.
+- **App Privacy published** (by Kai's account, driven by me): added **Usage Data →
+  Product Interaction**, App Functionality, **not linked**, no tracking — for
+  `device_tokens.zones`. 11 data types now. Everything else unchanged.
+- **Playwright harness** lives in `scratchpad/pw/` (session-scoped, not in repo):
+  `server.mjs` keeps a headed Chromium with a persistent profile and evals JS POSTed to
+  `127.0.0.1:9777/eval`; `/text` and `/shot` for reading. ASC's sign-in iframe is
+  `idmsa.apple.com`; Kai types password + 2FA once per session. Worth promoting to
+  `scripts/` if ASC automation recurs.
+- **ONLY THING LEFT before Add for Review: the §5 screen recording** (Kai, physical
+  device, not on-device recording). Attach it under App Review Information →
+  Attachment, then **Add for Review**. Automatic release after approval is still set.
+- Also still parked: DSA trader status (irrelevant for US+CA), Paid Apps Agreement
+  (irrelevant for a free app), EAS submissions `68b6404b`/`65b10376` (harmless if they
+  ever run).
+
+ → Apple processes 41 → Kai: App
   Privacy labels (§2), screen recording (§5), attach 41 in ASC, paste the **1.1 block**
   from `APP_REVIEW_NOTES.md`, attach the recording, Add for Review.
 
