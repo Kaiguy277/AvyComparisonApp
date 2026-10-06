@@ -151,7 +151,18 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   The **EU DSA trader-status** notice is also irrelevant while availability is US+CA.
   Retries at +1 min and +2 min still 403'd; Apple propagates acceptance slowly, so a
   2-minute retry loop is running (up to 20 min).
-- **Next, in order:** IPA reaches Apple (altool or EAS, whichever first) → Apple processes 41 → Kai: App
+- ✅ **BUILD 41 UPLOADED TO APPLE — 22:40Z**, via `xcrun altool --upload-app` with the new
+  API key, first retry after acceptance (~3 min propagation). Delivery UUID
+  `0f402b08-eb03-44e1-ba31-29ba43390aeb`, 20.3 MB in 1.2 s. **The two EAS submissions
+  are now redundant** — if they ever run they will fail on the duplicate build number,
+  harmlessly. **Route for future releases from this Mac:** `eas build` (cloud) →
+  `eas build:view --json` for the IPA URL → `altool --upload-app --apiKey B2WAF9G84N
+  --apiIssuer 7aecf39c-…`. No EAS Submit needed.
+- **ASC version 1.0 → App Review Notes replaced with the 1.1 block** (2,785 chars) and
+  saved. Build 33 still attached until 41 finishes processing.
+- **App Privacy:** adding Usage Data → Product Interaction (App Functionality, not
+  linked, no tracking) per `RELEASE_CHECKLIST.md` §2, for `device_tokens.zones`.
+- **Next, in order:** Apple processes 41 (TestFlight shows it) → Apple processes 41 → Kai: App
   Privacy labels (§2), screen recording (§5), attach 41 in ASC, paste the **1.1 block**
   from `APP_REVIEW_NOTES.md`, attach the recording, Add for Review.
 
