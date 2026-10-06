@@ -94,6 +94,53 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
 - Automated phone call on no check-in (Twilio) — Kai wants it; still parked. After 1.0.
 
 
+## 2026-09-22 (later) — Automated VOICE call for overdue contacts: researched, not built
+- **Kai asked to look into automated calling for overdue alerts.** The 2026-09-17 ops note
+  left one thing unverified — "the rest of the 2026 voice rules were not checked". Checked
+  today against Twilio's own docs (pricing page dated Aug 2026):
+  - **Voice needs no 10DLC.** Outbound voice has its own trust stack: a **Primary Business
+    Profile** in Trust Hub (KYC, vetting 24–48 h), a **SHAKEN/STIR Trust Product** (A-level
+    attestation so the callee's phone shows a verified-caller mark), and optionally **Voice
+    Integrity** (registers the number with the AT&T/T-Mobile/Verizon spam analytics —
+    needs an **EIN or DUNS**, a US address, and an HTTPS site) plus **CNAM** so the call
+    shows "Whumpf" rather than a bare number. None of these is documented as a hard gate
+    on placing a call from an upgraded account, but a new low-volume number without them
+    is exactly the profile that gets labelled "Spam Likely", which for this feature is
+    fatal. **Treat the whole stack as required.**
+  - **Trial is useless** (5 pre-verified recipients only), as already recorded. Upgrade =
+    add a payment method; no plan tier.
+  - **Cost is noise:** local number $1.15/mo, outbound $0.014/min, answering-machine
+    detection $0.0075/call, basic TTS free. A two-minute overdue call to two contacts with
+    a retry is well under $0.20.
+  - **API is one POST** to `/2010-04-01/Accounts/{sid}/Calls.json` with inline `Twiml`
+    (≤4000 chars), `MachineDetection=DetectMessageEnd` (so a voicemail gets the message
+    after the beep), `StatusCallback` + `StatusCallbackEvent=completed`, `Timeout`. Final
+    statuses: completed / busy / failed / no-answer / canceled.
+  - **TCPA is the real risk, not Twilio.** A prerecorded/TTS call to a *cell phone* needs
+    prior express consent of the *called party* or an "emergency purposes" exception. The
+    contact never consented to us — the trip owner listed them. Overdue-party-in-the-
+    backcountry is a plausible emergency-purpose call, but that is a legal judgement, not
+    mine. Mitigations that cost nothing: only call on `nudge_1` / `nudge_2` / `expired`
+    (never heading_out / extended / checked_in); tell the contact in the heading-out email
+    that they may get an automated call; give a keypad opt-out. **Kai to decide whether
+    to get an opinion before shipping.**
+- **Design sketched (see `docs/TRIP_PLAN_OPS.md` Known gaps):** `voice` channel in
+  `notifyAll`, gated per template; TwiML `<Say>` + `<Gather numDigits=1>` (1 = "I've got
+  this", logged as a new `call_acknowledged` event on the packet page so other contacts
+  see someone answered); status callback into a new **`trip-plan-voice`** function
+  deployed `--no-verify-jwt` and gated by the `X-Twilio-Signature` HMAC; `no-answer`/
+  `busy` → one retry via the existing `nudge_failed` path, which must become
+  channel-aware (`retryFailed` assumes email today). Contact **phone becomes required**
+  in the composer when the channel is on (`contactSchema` says exactly this).
+- **Unverified and must be smoked before trusting:** whether Supabase rewrites a
+  `text/xml` TwiML response from the `<Gather action>` POST the way it rewrites HTML
+  GETs. If it does, route it through the Deno proxy (`deploy/main.ts`), which already
+  forwards POSTs.
+- **Not done, deliberately:** nothing provisioned, no code. Still parked behind the
+  1.0 submission. But the Business Profile / SHAKEN / Voice Integrity vetting is calendar
+  time (days), so if Kai wants this in the release after 1.0, start the Trust Hub
+  paperwork now while the EAS quota resets.
+
 ## 2026-09-20 — Mac unblocked: Xcode 16.2 in, **app built, running and SEEN in the Simulator**
 
 > Scope: Mac-only, as with the 2026-09-19 entry. Linux dev is unaffected.

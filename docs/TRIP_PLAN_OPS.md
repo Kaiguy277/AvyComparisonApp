@@ -93,3 +93,23 @@ See LOG 2026-09-09 for the sequence. Delete smoke plans afterwards:
     provisioned**. Trial is useless here regardless: it only sends to 5 pre-verified
     numbers, and you cannot pre-verify a user's emergency contacts.
   - If picking this up: verification is calendar time, not work time, so start it early.
+  - **VERIFIED 2026-09-22 (Twilio docs, pricing dated Aug 2026):** voice needs no 10DLC,
+    but treat this stack as required or the number gets "Spam Likely"-labelled: upgraded
+    account (payment method) → **Primary Business Profile** (Trust Hub KYC, 24–48 h) →
+    **SHAKEN/STIR Trust Product** (A attestation) → **Voice Integrity** (needs EIN or DUNS,
+    US address, HTTPS site — the Deno pages qualify) → **CNAM** "Whumpf". Cost: local
+    number $1.15/mo, $0.014/min outbound, AMD $0.0075/call, basic TTS free.
+  - **TCPA:** a prerecorded/TTS call to a cell needs the called party's prior express
+    consent or an emergency purpose. The contact never consented — the owner listed them.
+    Overdue-in-the-backcountry is plausibly emergency-purpose; that is a legal call, not
+    an engineering one. Mitigate regardless: call only on nudge_1 / nudge_2 / expired,
+    warn in the heading-out email, offer a keypad opt-out.
+  - **Sketch:** `voice` in `TRIP_NUDGE_CHANNELS`, gated per template; one POST to
+    `/2010-04-01/Accounts/{sid}/Calls.json` with inline `Twiml` (`<Say>` + `<Gather
+    numDigits="1">`, 1 = acknowledged → new `call_acknowledged` event on the packet page),
+    `MachineDetection=DetectMessageEnd`, `StatusCallback` → new `trip-plan-voice` fn
+    (`--no-verify-jwt`, verify `X-Twilio-Signature`); no-answer/busy → one retry through
+    `nudge_failed`, which means making `retryFailed` channel-aware. Composer: phone
+    required on contacts when the channel is on. Secrets: `TWILIO_ACCOUNT_SID`,
+    `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_E164`. **Smoke first:** whether Supabase rewrites
+    the `text/xml` TwiML reply to the Gather POST; fall back to the Deno proxy if so.

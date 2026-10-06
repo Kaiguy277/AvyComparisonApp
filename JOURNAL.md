@@ -16,6 +16,29 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-09-22 (later) — The phone call is cheap; the consent is not
+
+Kai wanted to look at automated calling for overdue contacts, the thing the ops doc parked
+on 09-17 with one line left unchecked: "verify current voice compliance". Checked. The
+engineering side is almost boring — one POST, inline TwiML, a status callback, pennies per
+call — and the Twilio side is paperwork rather than the SMS 10DLC wall: business profile,
+SHAKEN/STIR, Voice Integrity, CNAM, all vetted in a couple of days. None of it is hard.
+
+The thing that gave me pause is the TCPA. A synthesized voice calling a cell phone needs the
+*called party's* consent or an emergency purpose, and the called party here is the one
+person in the system who never agreed to anything — the trip owner typed their number in.
+"Your friend is overdue in avalanche terrain" is about as emergency-purpose as a call gets,
+and I think that is the honest reading, but it is a reading, and the penalty regime is
+per-call statutory damages. I wrote down the free mitigations (only the overdue templates,
+a warning in the heading-out email, a keypad opt-out) and left the decision to Kai. It is
+the same shape as the Always-location call in August: the feature is defensible exactly to
+the extent that it is scoped to the moment it is needed and not one minute wider.
+
+One design detail I like: pressing 1 on the call should not mean "heard from them" — that
+would let a groggy contact close a trip by accident. It means "I got the call", a separate
+event that the packet page shows so the other contacts know someone is on it. Different
+question, different button.
+
 ## 2026-09-22 — The feature that had never once worked
 
 Trip tracking has never delivered a position. Not in testing, not in the two trips from the
