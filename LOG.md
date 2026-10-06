@@ -203,6 +203,8 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   threw and the loop never saw `FINISHED`. Parse with `json.loads(..., strict=False)`.
   Also: a `Bash` background watcher has a 10-min ceiling — fine for a 5-min build, not a
   cold 25-min one; re-arm or poll by hand.
+- **Apple processed 42; ASC version 1.0 now has build 42 attached** (41 detached), notes
+  intact, still "Prepare for Submission". Kai to install 42 from TestFlight and re-record.
 - Also in the video: the iOS share sheet exposes Kai's real contacts' names and numbers.
   On the retake, tap Cancel on the share sheet promptly, or pick Copy.
 - ~~**ONLY THING LEFT before Add for Review: the §5 screen recording**~~ (superseded above) (Kai, physical
