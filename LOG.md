@@ -197,6 +197,12 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   downloads the IPA and uploads it with `altool` when it finishes. Then: swap 42 in on
   version 1.0, Kai re-records on 42 (install from TestFlight) so the video no longer
   shows an immediately-overdue trip, attach, Add for Review.
+- **Build 42 finished in 5 min** (cache warm) and **uploaded to Apple 23:50Z** via altool,
+  delivery `82e53ed2`. **Watcher stalled, Kai asked:** `eas build:view --json` emits a raw
+  control character inside a string (the multi-line commit message), so `json.load`
+  threw and the loop never saw `FINISHED`. Parse with `json.loads(..., strict=False)`.
+  Also: a `Bash` background watcher has a 10-min ceiling — fine for a 5-min build, not a
+  cold 25-min one; re-arm or poll by hand.
 - Also in the video: the iOS share sheet exposes Kai's real contacts' names and numbers.
   On the retake, tap Cancel on the share sheet promptly, or pick Copy.
 - ~~**ONLY THING LEFT before Add for Review: the §5 screen recording**~~ (superseded above) (Kai, physical
