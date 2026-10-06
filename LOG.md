@@ -105,7 +105,25 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   resolved from Expo's servers; cert + profile valid to 2027-04-21.
 - `RELEASE_CHECKLIST.md` §5/§6 corrected: do not screen-record on-device (red pill hides
   the blue indicator); step 5 needs 500 m of movement; local builds are not submittable.
-- **Next, in order:** build finishes → `eas submit -p ios --id f5ad68c6` → Kai: App
+- **Build 41 FINISHED** (~25 min). `eas submit -p ios --id f5ad68c6 --non-interactive` →
+  submission **`68b6404b`**, `IN_QUEUE` at 20:29Z. I piped the submit through `tail`
+  despite the 2026-09-17 lesson, so its output was invisible; checked the real state via
+  the EAS GraphQL API (`submissions{byId}`), which is the reliable read. The local CLI
+  process is only a watcher once the submission exists server-side — killed it, polling
+  GraphQL instead.
+- **EAS Submit stalled.** First submission `68b6404b` sat `IN_QUEUE` (priority NORMAL) with
+  no state change for **110+ min**; a second, `65b10376`, scheduled 21:21Z, same. Expo
+  status page: no incident, EAS Submit "operational"; the fyi queues doc says free-tier
+  *build* queues can exceed an hour at NA peak and says nothing about submissions.
+  Previous submissions (09-17) cleared in 13 s. Not waiting further.
+- **Fallback prepared: upload the IPA to Apple directly from this Mac.** Downloaded
+  `applicationArchiveUrl` → `scratchpad/whumpf-41.ipa` (20.3 MB) and **verified the
+  plist**: `1.0.0 (41)`, `DTSDKName iphoneos26.2`, `DTXcode 2620` — this is the first
+  artifact that meets Apple's Xcode 26 rule. `xcrun altool` 8.003 is present (Xcode
+  16.2). Needs an ASC credential Kai must mint: an **App Store Connect API key** (Users
+  and Access → Integrations → Team Keys; .p8 downloads once) or an app-specific password.
+  EAS's own key (`H86MGVC4HV`) lives on Expo's servers and cannot be exported.
+- **Next, in order:** IPA reaches Apple (altool or EAS, whichever first) → Apple processes 41 → Kai: App
   Privacy labels (§2), screen recording (§5), attach 41 in ASC, paste the **1.1 block**
   from `APP_REVIEW_NOTES.md`, attach the recording, Add for Review.
 
