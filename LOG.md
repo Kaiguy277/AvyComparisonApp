@@ -174,7 +174,32 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   `127.0.0.1:9777/eval`; `/text` and `/shot` for reading. ASC's sign-in iframe is
   `idmsa.apple.com`; Kai types password + 2FA once per session. Worth promoting to
   `scripts/` if ASC automation recurs.
-- **ONLY THING LEFT before Add for Review: the §5 screen recording** (Kai, physical
+- **Kai recorded the §5 video (QuickTime, `~/Downloads/recording.mov`, 100 s,
+  828×1792).** Reviewed frame by frame: the **blue background-location pill is visible
+  at 72–76 s with the app backgrounded**, and after I'M BACK only iOS's grey
+  recently-used arrow remains — exactly what Apple asked for. Note QuickTime's iPhone
+  capture pins the status bar to "9:41" + full bars; the pill still shows.
+- 🔴 **But the video also caught a real bug.** The trip went **OVERDUE the instant it was
+  created** (hub: "Back by Sat Sep 26 … Past your worry-by time. Your people have been
+  reminded"). Production plan `8871c89e`: created 23:14:54Z with `return_by`
+  **2026-09-27** and `worry_by` 2026-09-27; `nudge_1` emailed at 23:15:00 — **six
+  seconds after heading-out**. Cause: `app/trip/new.tsx` resumed the composer draft
+  saved on Sep 26 and spread its absolute times straight in; the template path
+  recomputes times, the resumed-draft path did not, and nothing checked that
+  `returnBy` was in the future. **Fix (`c032f78`):** `freshenTimes()` re-anchors a stale
+  resumed draft to now keeping trip length + worry offset; schema refuses a past
+  return at send ("Your return time has already passed"). **Server deliberately
+  unchanged** — a create flushed late from the outbox can legitimately carry a past
+  worry-by. +4 tests, **Vitest 175**. (Side note from the same rows: tracking recorded
+  2 positions during the ~30 s trip, and the "CHECK-IN QUEUED" label was just the outbox
+  UI — the check-in landed in 2 s, `late:false`.)
+- **Build 42 started on EAS cloud** (`6605d6d3`) with the fix. A background chain
+  downloads the IPA and uploads it with `altool` when it finishes. Then: swap 42 in on
+  version 1.0, Kai re-records on 42 (install from TestFlight) so the video no longer
+  shows an immediately-overdue trip, attach, Add for Review.
+- Also in the video: the iOS share sheet exposes Kai's real contacts' names and numbers.
+  On the retake, tap Cancel on the share sheet promptly, or pick Copy.
+- ~~**ONLY THING LEFT before Add for Review: the §5 screen recording**~~ (superseded above) (Kai, physical
   device, not on-device recording). Attach it under App Review Information →
   Attachment, then **Add for Review**. Automatic release after approval is still set.
 - Also still parked: DSA trader status (irrelevant for US+CA), Paid Apps Agreement
