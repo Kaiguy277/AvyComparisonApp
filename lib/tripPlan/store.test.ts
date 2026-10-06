@@ -1,13 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// store.ts imports SecureStore for plan secrets; nothing here touches it,
-// but it must resolve at import time in a node environment.
-vi.mock("expo-secure-store", () => ({
-  setItemAsync: vi.fn(),
-  getItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
-}));
-
 import { __store } from "../../test/mocks/asyncStorage";
 import {
   HISTORY_LIMIT,
@@ -20,6 +12,16 @@ import {
   updateActivePlan,
   type ActivePlan,
 } from "./store";
+
+// vi.mock is hoisted above the imports by Vitest, so declaring it after them is
+// safe and keeps eslint import/first happy (CI lints with --max-warnings=0).
+// store.ts imports SecureStore for plan secrets; nothing here touches it,
+// but it must resolve at import time in a node environment.
+vi.mock("expo-secure-store", () => ({
+  setItemAsync: vi.fn(),
+  getItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
 
 function plan(over: Partial<ActivePlan> = {}): ActivePlan {
   return {
