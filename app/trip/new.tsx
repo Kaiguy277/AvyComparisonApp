@@ -40,6 +40,7 @@ import {
   TRIP_LIMITS,
   type TripTemplate,
   emptyDraft,
+  freshenTimes,
   tripPlanDraftSchema,
   type TripPlanDraftInput,
   type VehicleProfile,
@@ -194,7 +195,9 @@ export default function TripNewScreen() {
       } else {
         const saved = await loadDraft();
         if (saved) {
-          next = {
+          // A draft can be days old; its absolute times must not come back
+          // with it (an already-past return makes the trip overdue on send).
+          next = freshenTimes({
             ...base,
             ...saved,
             subject: { ...p.subject, ...saved.subject },
@@ -202,7 +205,7 @@ export default function TripNewScreen() {
             vehicle: saved.vehicle ?? defaultVehicle,
             gear: { ...p.gear, ...saved.gear },
             contacts: saved.contacts && saved.contacts.length > 0 ? saved.contacts : base.contacts,
-          };
+          });
         }
       }
       // TODAY always starts open: it's the confirm step (who, which car,

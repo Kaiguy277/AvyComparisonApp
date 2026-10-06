@@ -337,6 +337,18 @@ export const tripPlanDraftSchema = z
         message: "Worry-by time can't be before your return time.",
       });
     }
+    // A return time that has already passed means the plan is overdue the
+    // moment it lands, and the contacts get an "overdue" email seconds after
+    // "heading out". Seen on device 2026-10-06: a draft saved on Sep 26 was
+    // resumed on Oct 6 with its old times. (Only the client checks this —
+    // the server must still accept a late-arriving create from the outbox.)
+    if (ret <= Date.now()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["returnBy"],
+        message: "Your return time has already passed. Set when you'll be back.",
+      });
+    }
     if (worry - ret > TRIP_LIMITS.maxWorryOffsetHours * 3_600_000) {
       ctx.addIssue({
         code: "custom",
@@ -428,7 +440,37 @@ export type TripTemplate = z.infer<typeof tripTemplateSchema>;
 
 // ───────────────────────────── helpers ─────────────────────────────────────
 
-export function defaultTimes(now: Date = new Date(), tripHours = TRIP_LIMITS.defaultTripHours) {
+// Re-anchor a draft whose times are stale (return already passed) to "now",
+// keeping the trip length and worry offset the user had chosen. Used when a
+// saved composer draft is resumed days later. A draft whose return is still
+// in the future is returned untouched.
+export function freshenTimes<T extends { departAt: string; returnBy: string; worryBy: string }>(
+  d: T,
+  now: Date = new Date(),
+): T {
+  const depart = Date.parse(d.departAt);
+  const ret = Date.parse(d.returnBy);
+  const worry = Date.parse(d.worryBy);
+  if (Number.isFinite(ret) && ret > now.getTime()) return d;
+  const H = 3_600_000;
+  const tripHours =
+    Number.isFinite(depart) && Number.isFinite(ret) && ret > depart
+      ? Math.min(72, Math.max(1, (ret - depart) / H))
+      : TRIP_LIMITS.defaultTripHours;
+  const worryHours =
+    Number.isFinite(worry) && Number.isFinite(ret) && worry >= ret
+      ? Math.min(TRIP_LIMITS.maxWorryOffsetHours, (worry - ret) / H)
+      : TRIP_LIMITS.defaultWorryOffsetHours;
+  const t = defaultTimes(now, tripHours);
+  return {
+    ...d,
+    departAt: t.departAt,
+    returnBy: t.returnBy,
+    worryBy: new Date(Date.parse(t.returnBy) + worryHours * H).toISOString(),
+  };
+}
+
+export function defaultTimes(now: Date = new Date(), tripHours: number = TRIP_LIMITS.defaultTripHours) {
   const depart = new Date(now);
   // Round up to the next 15 minutes.
   depart.setSeconds(0, 0);

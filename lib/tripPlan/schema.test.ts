@@ -3,6 +3,7 @@ import {
   TRIP_LIMITS,
   contactSchema,
   defaultTimes,
+  freshenTimes,
   emptyDraft,
   normalizePhone,
   tripPlanDraftSchema,
@@ -76,6 +77,20 @@ describe("trip plan draft", () => {
     expect(r.success).toBe(false);
     if (r.success) return;
     expect(r.error.issues.some((i) => i.path.join(".") === "returnBy")).toBe(true);
+  });
+
+  it("rejects a return time that has already passed", () => {
+    const d = validDraft();
+    const depart = new Date(Date.now() - 10 * 24 * H);
+    const r = tripPlanDraftSchema.safeParse({
+      ...d,
+      departAt: depart.toISOString(),
+      returnBy: new Date(depart.getTime() + 8 * H).toISOString(),
+      worryBy: new Date(depart.getTime() + 11 * H).toISOString(),
+    });
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(r.error.issues.some((i) => i.path.join(".") === "returnBy" && /already passed/.test(i.message))).toBe(true);
   });
 
   it("rejects worry-by before return", () => {
@@ -155,5 +170,34 @@ describe("defaultTimes", () => {
     const now = new Date("2026-11-01T09:50:00Z"); // DST ends 2026-11-01 in Anchorage
     const t = defaultTimes(now, 8);
     expect(Date.parse(t.returnBy) - Date.parse(t.departAt)).toBe(8 * H);
+  });
+});
+
+describe("freshenTimes", () => {
+  it("leaves a draft alone while its return is still ahead", () => {
+    const d = validDraft();
+    expect(freshenTimes(d)).toBe(d);
+  });
+
+  it("re-anchors a stale draft to now, keeping trip length and worry offset", () => {
+    const now = new Date("2026-10-06T23:10:00Z");
+    const d = validDraft({
+      departAt: "2026-09-26T22:00:00Z",
+      returnBy: "2026-09-27T06:00:00Z", // 8h trip
+      worryBy: "2026-09-27T09:00:00Z", // +3h worry
+    });
+    const f = freshenTimes(d, now);
+    expect(f.departAt).toBe("2026-10-06T23:15:00.000Z");
+    expect(Date.parse(f.returnBy) - Date.parse(f.departAt)).toBe(8 * H);
+    expect(Date.parse(f.worryBy) - Date.parse(f.returnBy)).toBe(3 * H);
+    expect(tripPlanDraftSchema.safeParse(f).success).toBe(true);
+    expect(f.areaName).toBe(d.areaName);
+  });
+
+  it("falls back to defaults when the stale times are unusable", () => {
+    const now = new Date("2026-10-06T23:10:00Z");
+    const f = freshenTimes(validDraft({ departAt: "", returnBy: "", worryBy: "" }), now);
+    expect(Date.parse(f.returnBy) - Date.parse(f.departAt)).toBe(TRIP_LIMITS.defaultTripHours * H);
+    expect(Date.parse(f.worryBy) - Date.parse(f.returnBy)).toBe(TRIP_LIMITS.defaultWorryOffsetHours * H);
   });
 });
