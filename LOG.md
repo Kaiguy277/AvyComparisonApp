@@ -123,6 +123,34 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   16.2). Needs an ASC credential Kai must mint: an **App Store Connect API key** (Users
   and Access → Integrations → Team Keys; .p8 downloads once) or an app-specific password.
   EAS's own key (`H86MGVC4HV`) lives on Expo's servers and cannot be exported.
+- **Kai: "make all of that happen yourself using a Playwright browser."** No browser MCP
+  in this session, so stood up Playwright + Chromium in the scratchpad with a tiny HTTP
+  control server (`scratchpad/pw/server.mjs`, headed, persistent profile) and drove it
+  with curl. Kai typed the Apple password + 2FA; everything else was automated:
+  - ASC → Users and Access → Integrations → App Store Connect API showed **"Request
+    Access"** (team-key access had never been enabled; EAS's key is listed there as
+    Admin). Accepted the internal-use terms — granted instantly.
+  - **Issuer ID `7aecf39c-46a8-4d8e-9d1e-202e45dcf098`.** Generated team key
+    **`B2WAF9G84N`**, name "Whumpf upload (Kai Mac)", role **App Manager**. `.p8` saved
+    to `~/.private_keys/AuthKey_B2WAF9G84N.p8` (chmod 600) — the only copy; Apple will
+    not re-issue it. Reusable for any future `altool`/ASC API automation from this Mac.
+- **CI was red on every push since 2026-09-22** (Kai got the email). `expo lint` passes
+  locally but CI runs `npx eslint . --max-warnings=0`, which flagged two `import/first`
+  warnings in `lib/tripPlan/store.test.ts` (imports after `vi.mock`). Vitest hoists
+  `vi.mock` anyway, so moved it below the imports (`b86bede`). CI green again. **Gate
+  note:** run CI's exact command, not `npm run lint`, before claiming lint is clean.
+- **THE ACTUAL BLOCKER: an unaccepted Apple agreement.** First `altool --upload-app`
+  returned **403 `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`**. ASC → Business
+  showed the **Apple Developer Program License Agreement had been updated** (revision
+  LYL255, dated 2026-08-18) and needed the Account Holder's acceptance; the Free Apps
+  Agreement read "Active (New Agreement Available)". **This is almost certainly why both
+  EAS submissions have sat `IN_QUEUE` for hours** — nothing on Expo's side, Apple was
+  refusing the account. Accepted the PLA at developer.apple.com/account on Kai's
+  instruction (22:35Z); Free Apps Agreement flipped to Active (Oct 6 → Apr 20 2027). The
+  **Paid Apps Agreement** shows "New" and is **not needed** for a free app — left alone.
+  The **EU DSA trader-status** notice is also irrelevant while availability is US+CA.
+  Retries at +1 min and +2 min still 403'd; Apple propagates acceptance slowly, so a
+  2-minute retry loop is running (up to 20 min).
 - **Next, in order:** IPA reaches Apple (altool or EAS, whichever first) → Apple processes 41 → Kai: App
   Privacy labels (§2), screen recording (§5), attach 41 in ASC, paste the **1.1 block**
   from `APP_REVIEW_NOTES.md`, attach the recording, Add for Review.
