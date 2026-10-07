@@ -30,9 +30,13 @@ Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
   automated overdue call (nudge_1 / nudge_2 / expired only). Flip
   `VOICE_CALLS_ENABLED` in `lib/tripPlan/schema.ts` in the same release so the
   composer collects contact phones.
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_E164` — the voice channel.
-  Account kai@kaiconsulting.ai. The auth token also gates `trip-plan-voice` (every
-  Twilio callback is HMAC-signed with it).
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_E164` — the voice channel, all
+  set 2026-10-06. Account kai@kaiconsulting.ai (SID `AC96f60e…`; password and auth token
+  are in Kai's macOS Keychain, see LOG 2026-10-06 evening). The number is **+1 907 202-9385**
+  (`PNc2ac534512962baa1e2bb90a00d8538b`, Anchorage, $1.15/mo). Trust Hub: business profile
+  `BU16129d…` approved; SHAKEN/STIR `BU180313…` approved + number attached; CNAM "Whumpf"
+  `BU990a77…` and Voice Integrity `BUa68163…` submitted 2026-10-07. The auth token also
+  gates `trip-plan-voice` (every Twilio callback is HMAC-signed with it).
 - `TRIP_PLAN_VOICE_BASE` — **set to `https://whumpf-pages.kaimyersa.deno.net/voice`**
   (the Deno proxy's `/voice` route). Required: Supabase rewrites the TwiML reply to
   `text/plain` (smoked 2026-10-06), and Twilio rejects that. Both the callback URLs handed

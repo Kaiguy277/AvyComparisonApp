@@ -189,6 +189,44 @@ Format per entry:
   gone); signed `POST /voice?a=status…` (HMAC over the deno.net URL with the real token)
   → **204**; tampered → **403 bad_signature** as JSON; `/privacy` still `text/html`
   with its title. The whole Twilio callback path is now proven except for a real call.
+- **✅ Business Profile APPROVED** — email "Twilio Business Profile Approved" at 02:30Z,
+  ~10 min after submission (not the 24–48 h the docs quote).
+- **✅ Number bought via the API: `+1 907 202-9385`** (Anchorage; the two numbers the
+  console had shown were gone by then — `21422 not available`), SID
+  `PNc2ac534512962baa1e2bb90a00d8538b`, friendly name "Whumpf overdue calls", $1.15/mo
+  from the $20 balance. Secret **`TWILIO_FROM_E164=+19072029385`** set. No voice URL yet
+  (inbound calls to it are unhandled — a TwiML Bin saying "this is Whumpf's automated
+  alert line" is a cheap follow-up).
+- **✅ SHAKEN/STIR done (free).** Approving the profile auto-created a SHAKEN/STIR trust
+  product (`BU1803130120bf9514d567cc355a89b8d0`, policy `RN7a97559e…`, `twilio-approved`)
+  bound to the customer profile. Attaching the number needed two steps via the Trust Hub
+  API — assign `PNc2ac…` to the **customer profile** first (`RAc829b1…`), then to the
+  trust product (`RA4b15f5…`); the product refuses the number until the profile has it.
+  Policies found by paging `/v1/Policies` (244 of them): Voice Integrity
+  `RN5b3660f9598883b1df4e77f77acefba0` (end-user `voice_integrity_information`: use_case,
+  average_business_day_call_volume, business_employee_count, notes), CNAM
+  `RNf3db3cd1fe25fcfd3c3ded065c8fea53` (end-user `cnam_information`: cnam_display_name).
+  Both only need the approved primary business profile as support. **Price-checking before
+  creating either** (Kai's rule).
+- **✅ CNAM "Whumpf" SUBMITTED (free — Twilio support doc: no fee to add/remove CNAM;
+  the $0.01 is per *lookup*, which we never do; display name ≤15 chars, starts with a
+  letter).** Via the API: trust product `BU990a7796f2f9bf77286f7ec4dd401c21` (policy
+  `RNf3db3c…`), end-user `IT7b34db…` (`cnam_display_name: Whumpf`), entity assignments
+  for the end-user and the business profile, number `PNc2ac…` attached, evaluation
+  `compliant`, status → **`in-review`**. Shows "Whumpf" on US landline/mobile caller ID
+  once carriers propagate (days).
+- **✅ Voice Integrity SUBMITTED.** Price check: no fee statement exists anywhere — not on
+  the US voice pricing page (which lists Branded Calling $0.12/call and emergency $0.75/mo
+  but no Voice Integrity line), not in the docs, and the console registration wizard shows
+  no fee notice where Twilio's paid registrations do. Treated as free. Via the API: trust
+  product `BUa68163106e767812aed5c926f87f55ca` (policy `RN5b3660…`), end-user `IT3aa2a6…`
+  (use_case **Emergency Notifications**, 1 call/day, 1 employee, notes describing the
+  overdue-contact alert), profile + number attached, evaluation `compliant`, status
+  **`in-review`**.
+- **Twilio trust stack: COMPLETE as far as we can take it.** Upgraded · profile approved ·
+  number +1 907 202-9385 · SHAKEN/STIR attached · CNAM in review · Voice Integrity in
+  review. Remaining Twilio follow-up: an inbound voice URL for the number (callers back
+  currently get Twilio's default), and whatever the two reviews come back with.
 
 ---
 
