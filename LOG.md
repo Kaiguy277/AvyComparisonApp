@@ -176,8 +176,19 @@ Format per entry:
   matching event row → `event_missing`); the same signature with a tampered body → **403
   bad_signature**. So: secrets propagated without a redeploy, `voiceBase()` resolves to
   the project-ref host inside the function (matches what the sweeper would hand Twilio),
-  and the HMAC path works against Twilio's real token. Only the TwiML content-type (proxy
-  route, needs the Deno token) remains unverified live.
+  and the HMAC path works against Twilio's real token.
+- **✅ Deno proxy REDEPLOYED with `/voice` (Kai: "do all the stuff with deno").** Kai
+  signed in to console.deno.com with his Google passkey in the harness window; I created
+  an **Organization Token** "Claude Code - whumpf-pages proxy redeploys (2026-10-06)",
+  3-month expiry (the older "deployctl - whumpf pages proxy" token is still active but its
+  value was never recoverable). Stored in the Keychain: service `deno-deploy-org-token
+  (whumpf-pages)`, account `kaimyersa`. Deployed per `deploy/README.md` (`jsr:@deno/deploy
+  --org kaimyersa --app whumpf-pages --prod main.ts`), build `d4b0tkvd4vcz`. Secret
+  **`TRIP_PLAN_VOICE_BASE=https://whumpf-pages.kaimyersa.deno.net/voice`** set.
+  **Verified on the real host:** `GET /voice?a=ping` → `200 text/xml` (the rewrite is
+  gone); signed `POST /voice?a=status…` (HMAC over the deno.net URL with the real token)
+  → **204**; tampered → **403 bad_signature** as JSON; `/privacy` still `text/html`
+  with its title. The whole Twilio callback path is now proven except for a real call.
 
 ---
 

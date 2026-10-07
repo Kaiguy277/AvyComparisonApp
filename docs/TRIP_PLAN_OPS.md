@@ -33,9 +33,10 @@ Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_E164` — the voice channel.
   Account kai@kaiconsulting.ai. The auth token also gates `trip-plan-voice` (every
   Twilio callback is HMAC-signed with it).
-- `TRIP_PLAN_VOICE_BASE` — optional. Public URL of `trip-plan-voice` as Twilio must
-  reach it; default `$SUPABASE_URL/functions/v1/trip-plan-voice`. Set it only if the
-  TwiML replies have to be routed through the Deno proxy (see Known gaps smoke note).
+- `TRIP_PLAN_VOICE_BASE` — **set to `https://whumpf-pages.kaimyersa.deno.net/voice`**
+  (the Deno proxy's `/voice` route). Required: Supabase rewrites the TwiML reply to
+  `text/plain` (smoked 2026-10-06), and Twilio rejects that. Both the callback URLs handed
+  to Twilio and the signature check are built from this value.
 - `TRIP_PLAN_PAGE_BASE` — `https://avycomparison.supabase.co/functions/v1/trip-plan-page`.
   The project has a **vanity subdomain** (`avycomparison.supabase.co`, free, activated
   2026-09-11) so the link a contact receives reads as this app rather than a random

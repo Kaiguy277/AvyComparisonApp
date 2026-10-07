@@ -34,8 +34,8 @@ started) keep working, and the 303 they return is rewritten back to this origin.
 - **Origin:** `https://whumpf-pages.kaimyersa.deno.net` (Deno Deploy, org `kaimyersa`,
   app `whumpf-pages`, Google login on the account).
 - Packet base secret is set: `TRIP_PLAN_PAGE_BASE=https://whumpf-pages.kaimyersa.deno.net/p`.
-- Voice callbacks must use this host too: `TRIP_PLAN_VOICE_BASE=https://whumpf-pages.kaimyersa.deno.net/voice`
-  (set alongside the Twilio secrets when the channel goes live).
+- Voice callbacks use this host too: `TRIP_PLAN_VOICE_BASE=https://whumpf-pages.kaimyersa.deno.net/voice`
+  (set 2026-10-06; `/voice` deployed and verified the same day).
 - App Store privacy/support URLs should point at `/privacy` and `/support` on this host
   (pending — do it next time ASC is open).
 
@@ -45,7 +45,9 @@ The `deno deploy` **wrapper double-forwards every flag** ("Option --x can only o
 once"), so deploy by invoking the tool directly, which gets clean args:
 
 ```
-export DENO_DEPLOY_TOKEN=<org token from console.deno.com › Settings › Organization Tokens>
+export DENO_DEPLOY_TOKEN=$(security find-generic-password -s "deno-deploy-org-token (whumpf-pages)" -a kaimyersa -w)
+# (an org token from console.deno.com › Settings › Organization Tokens, kept in Kai's macOS
+#  Keychain since 2026-10-06; expires 2027-01; make a new one there if it has lapsed)
 cd deploy
 deno run -A --node-modules-dir=auto jsr:@deno/deploy --org kaimyersa --app whumpf-pages --prod main.ts
 ```
