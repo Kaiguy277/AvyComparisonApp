@@ -227,6 +227,20 @@ Format per entry:
   number +1 907 202-9385 · SHAKEN/STIR attached · CNAM in review · Voice Integrity in
   review. Remaining Twilio follow-up: an inbound voice URL for the number (callers back
   currently get Twilio's default), and whatever the two reviews come back with.
+- **✅ FIRST REAL CALL — the whole path works end to end.** `scratchpad/testcall.ts` ran
+  the production adapter code (`renderVoiceScript` → `gatherTwiml` → `placeCall`, callbacks
+  via `voiceCallbackUrl` = the deno.net proxy) against a fake overdue plan, to Kai's own
+  phone: call `CA7ae4f3fb00d90939763692bb8e25405e`, 02:42:02Z, **completed · answered_by
+  `human` · 54 s**. Kai pressed 1 → Twilio POSTed the Gather action through the proxy →
+  `trip-plan-voice` verified the signature and logged `outcome: acknowledged` (the
+  `call_acknowledged` insert no-ops on the fake plan id — FK). TwiML (958 chars) rendered
+  fine with Polly.Joanna; AMD `DetectMessageEnd` classified a live answer as human. Cost
+  not yet rated by Twilio; expected ≈ $0.02. **Nothing in production changed:** the
+  channel is still off (`TRIP_NUDGE_CHANNELS` unset → email only).
+- **Still open before enabling `voice`:** Kai's TCPA decision (legal read? notice wording?
+  opt-out?); flip `VOICE_CALLS_ENABLED` in the app + add `voice` to the secret in the same
+  release; redeploy trip-plans / sweeper / page (they carry the new adapter); merge the
+  branch; inbound voice URL for the number; CNAM + Voice Integrity review outcomes.
 
 ---
 

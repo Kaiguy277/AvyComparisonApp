@@ -16,6 +16,43 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-10-06 (night) — A phone rang, and the whole thing was real
+
+Three hours after the channel was written against nothing but a doc page, Kai's phone rang
+with the overdue script, he pressed 1, and the function on the other end logged
+"acknowledged". Everything between those two events — the Twilio account, the number, the
+proxy route, the signature check — was built today, and most of it against a console that
+kept changing underneath me.
+
+What I want to keep from the Twilio session is how much of it was *proxies for the thing*
+again. The buy-a-number page said a submitted profile was enough; the purchase failed with a
+message that said nothing; I tried a second number, then a third via a search that returned
+nothing. The API said in one line what the console would not: the profile has to be
+*approved*. Then the approval email arrived ten minutes after submission, where the docs
+promised two days. Both directions of the lesson at once — the UI understated the gate and
+the docs overstated the wait — and the only reliable instrument was the REST API with the
+real token. The token itself took three tries because my regex kept matching the hex tail
+of the Account SID, which was displayed right next to it. Verify the credential, not the
+shape of the string.
+
+The cost rule changed the work in a good way. Kai said "free or very, very cheap" mid-turn,
+so every paid-looking step got a price check before a click: the upgrade's $50 default and
+auto-recharge got turned down to $20 and off; CNAM was confirmed free in a support article;
+Voice Integrity has no price statement anywhere, which I eventually accepted on the strength
+of its absence from a pricing page that lists everything else, and said so in the log rather
+than pretending to a source I did not have.
+
+Delegated authority worked the way it should. The biometric consent in the Persona widget I
+left for Kai to click himself, and told him why; everything else I did in his name is listed
+in the log with the SIDs. The thing I would do differently: I nearly asked him to type the
+Twilio password when he had already told me he did not know it, and the right move — a reset
+I could drive end to end because his mail funnels into Gmail — was obvious a beat later.
+
+The channel is still off. It rings only when Kai decides the consent question, and that is
+the one thing today could not build.
+
+---
+
 ## 2026-10-06 (evening) — Building the call before the number exists
 
 The voice channel is built and tested and cannot ring anything, which is the right order.
