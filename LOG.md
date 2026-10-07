@@ -82,9 +82,13 @@ Format per entry:
   `trip-plan-voice`, forwards the form POST + `X-Twilio-Signature`, re-serves the reply
   as `text/xml` (or `application/json` for the error bodies), no HTML/CSP headers, no
   redirect rewriting. `TRIP_PLAN_VOICE_BASE` must therefore be
-  `https://whumpf-pages.kaimyersa.deno.net/voice` when the channel goes live. **Proxy not
-  yet redeployed** — needs `DENO_DEPLOY_TOKEN` (console.deno.com › Organization Tokens),
-  which is not on this machine.
+  `https://whumpf-pages.kaimyersa.deno.net/voice` when the channel goes live. **Verified
+  locally** (`deno run -A deploy/main.ts` against the deployed function): `GET /voice?a=
+  ping` → `200 text/xml`, unsigned `POST /voice?a=status…` → `503 application/json
+  {"error":"voice_not_configured"}`. **Proxy not yet redeployed to deno.net** — needs
+  `DENO_DEPLOY_TOKEN` (console.deno.com › Organization Tokens), not on this machine.
+- **Branch pushed:** `feat/voice-nudges` → `42def69` on origin (CI runs the same gates).
+  Not merged. Merge after Kai's TCPA decision and the Twilio paperwork, not before.
 - **Not done, deliberately:** no DB migration (the `call_acknowledged` event type needs
   none — `trip_plan_events.type` is free text). No keypad opt-out yet: it needs a per-
   contact column and is part of the TCPA decision, not a free add-on. `TRIP_NUDGE_CHANNELS`
@@ -135,9 +139,13 @@ Format per entry:
   Apple password + 2FA; the rest is scriptable. Consider promoting to `scripts/`.
 
 ### Next (after approval)
-- Voice-call nudges for overdue contacts: research + design in `docs/TRIP_PLAN_OPS.md`
-  "Known gaps" and LOG 2026-09-22 (later). Kai wants it. TCPA consent is the open
-  question; Trust Hub paperwork is calendar time — start it early.
+- **Voice-call nudges: BUILT on `feat/voice-nudges` (2026-10-06 evening entry), not
+  merged, not live.** Blocked on Kai for: Twilio login (+ card for the upgrade, business
+  details for Trust Hub), a `DENO_DEPLOY_TOKEN` to redeploy the proxy's `/voice` route,
+  and the TCPA decision (legal read? heading-out notice wording? keypad opt-out?). Then:
+  set `TWILIO_*` + `TRIP_PLAN_VOICE_BASE` secrets, redeploy trip-plans / sweeper /
+  page / voice, one real call to Kai's phone, add `voice` to `TRIP_NUDGE_CHANNELS`, flip
+  `VOICE_CALLS_ENABLED`, merge.
 - Turn off the hidden `TRACKING`/`FIX` debug lines before any store-screenshot session.
 - Open product questions from 09-22 still stand: "no position yet" vs "no coverage" copy;
   periodic fix for a stationary party; accept-after-close positions (privacy call).
