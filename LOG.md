@@ -260,6 +260,25 @@ Format per entry:
   redeploy trip-plans / trip-plan-sweeper / trip-plan-page (`--no-verify-jwt`) /
   trip-plan-voice (`--no-verify-jwt`) · sweeper-driven end-to-end test with a real
   overdue plan and Kai as the contact · merge to `main`.
+- **✅ LIVE AND VERIFIED END TO END through the production sweeper (02:51–02:54Z).**
+  Smoke plan `ceb01adc-a3c9-434b-9718-54f3fe7a11fb` (`owner_device_id
+  smoke-device-voice-e2e`, contact Kai with phone + email, worry_by already past):
+  - create → `heading_out` **emailed only** (no call — the template gate holds); the email
+    carries the new call notice with Kai's number and the "press 1" line.
+  - sweep (triggered by hand with the cron key; Kai: "I'd like my phone to ring now") →
+    `overdue`, two `nudge_sent` rows at 02:53:23 — email + **voice**, call
+    `CA0f1eef0440a4d313b6b4cec3f199dc3c` from +1 907 202-9385, **completed · human · 52 s**.
+  - status callback via the proxy updated the voice row → packet timeline reads
+    "Automated call (nudge_1) to Kai: **answered**"; Kai pressed 1 → `call_acknowledged`
+    (actor contact, 02:54:19) → timeline "Kai pressed 1 on the automated call — they got
+    the alert."
+  - inbound: a signed POST to `/voice?a=inbound` returns the spoken greeting as text/xml;
+    the number's Voice URL points there.
+  - checked in afterwards to close it (no nudge_2 in an hour); smoke rows deleted per the
+    ops doc. Gates before merge: tsc 0 · eslint 0 · **197 tests** · deno check clean.
+- **Composer note for the next build:** `VOICE_CALLS_ENABLED = true` makes the contact
+  phone required; build 42 (in review) does not have it, so its users' phoneless contacts
+  simply get email only. Nothing to do for 1.0.
 
 ---
 

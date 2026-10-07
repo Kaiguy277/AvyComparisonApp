@@ -35,7 +35,9 @@ In one line (2026-10-06): **Whumpf 1.0 (build 42) is in App Review** ("Waiting f
 auto-release on approval). Builds come from **EAS cloud** (Xcode 26 image) and go to Apple by
 **direct `altool` upload with the ASC API key** — not EAS Submit, not local builds (this Intel
 Mac cannot run Xcode 26). Lint gate: run `npx eslint . --ext .ts,.tsx --max-warnings=0`, the
-command CI runs, not just `npm run lint`.
+command CI runs, not just `npm run lint`. **The overdue VOICE call (Twilio) went live
+2026-10-07** — `docs/TRIP_PLAN_OPS.md` has the secrets, SIDs and the TCPA decision; LOG
+2026-10-06 evening / 2026-10-07 has the build and the end-to-end verification.
 
 The 2026-08-07 audit's findings are in `LOG.md` under that date.
 
