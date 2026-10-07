@@ -21,7 +21,54 @@ Format per entry:
 
 ---
 
-## SESSION HANDOFF → read this first (updated 2026-09-22)
+## SESSION HANDOFF → read this first (updated 2026-10-06)
+
+**State:** **Whumpf 1.0 (build 42) is `Waiting for Review` at Apple, submitted 2026-10-06
+~00:05Z (Oct 6, 4:01 PM AKDT).** Automatic release on approval, US + Canada. `main` green
+(tsc 0, eslint 0 via CI's exact command, **Vitest 175**), all pushed, CI green.
+
+### What shipped in build 42 (vs the 2026-09-22 handoff)
+- Everything from the old handoff, plus `c032f78`: a resumed composer draft can no longer
+  carry a return time that has already passed (found by the review recording — the trip
+  was overdue on send and the contact got the overdue email 6 s after heading-out).
+
+### How the build got to Apple — this is the route from now on
+1. `eas build -p ios --profile production --non-interactive --no-wait` (cloud; the
+   profile pins Xcode 26.2. Free quota: builds only — submissions are not metered).
+2. `eas build:view <id> --json` → `artifacts.applicationArchiveUrl`. **Parse with
+   `json.loads(..., strict=False)`** — the JSON carries raw newlines from commit messages.
+3. `curl -L -o x.ipa <url>`; verify `DTSDKName` ≥ `iphoneos26`.
+4. `xcrun altool --upload-app -f x.ipa -t ios --apiKey B2WAF9G84N --apiIssuer
+   7aecf39c-46a8-4d8e-9d1e-202e45dcf098` — key at `~/.private_keys/AuthKey_B2WAF9G84N.p8`
+   (App Manager, the only copy). ~3 min to "Ready to Submit" in TestFlight.
+5. ASC: version → Build → hover row → Delete → Add Build (radio ids are delivery UUIDs).
+**Do not use EAS Submit.** It sat `IN_QUEUE` for hours and never surfaced Apple's 403.
+
+### What blocked today, so nobody re-discovers it
+- **Apple's Program License Agreement (Aug 2026 revision) was unaccepted** → every upload
+  403'd `REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`. Accepted at developer.apple.com/account
+  (Kai's instruction). Propagates in ~3 min. The Paid Apps Agreement and EU DSA trader
+  notice are still pending and **irrelevant** (free app, US+CA).
+- ASC API team-key access had never been enabled ("Request Access") — done.
+
+### If App Review rejects
+- Notes carry the 1.1 LOCATION block; attachment `recording2.mov` shows the blue pill
+  backgrounded and gone after check-in. Review history + reasoning:
+  `docs/APP_REVIEW_NOTES.md`.
+- Browser harness for ASC: `scratchpad/pw/server.mjs` (session-scoped). Kai types the
+  Apple password + 2FA; the rest is scriptable. Consider promoting to `scripts/`.
+
+### Next (after approval)
+- Voice-call nudges for overdue contacts: research + design in `docs/TRIP_PLAN_OPS.md`
+  "Known gaps" and LOG 2026-09-22 (later). Kai wants it. TCPA consent is the open
+  question; Trust Hub paperwork is calendar time — start it early.
+- Turn off the hidden `TRACKING`/`FIX` debug lines before any store-screenshot session.
+- Open product questions from 09-22 still stand: "no position yet" vs "no coverage" copy;
+  periodic fix for a stationary party; accept-after-close positions (privacy call).
+
+---
+
+## (superseded 2026-10-06) SESSION HANDOFF (updated 2026-09-22)
 
 **State:** `main` green — tsc 0, eslint 0, **Vitest 171**. All pushed. Supersedes the
 2026-09-18 handoff, which is now wrong in several places.
@@ -205,6 +252,17 @@ faults plus one server fault; all fixed, `trip-plans` **deployed (v12)**.
   cold 25-min one; re-arm or poll by hand.
 - **Apple processed 42; ASC version 1.0 now has build 42 attached** (41 detached), notes
   intact, still "Prepare for Submission". Kai to install 42 from TestFlight and re-record.
+- **Retake on build 42 (`~/Downloads/recording2.mov`, 100 s) reviewed frame by frame:**
+  trip reads **LIVE** with Oct 7 times (fix confirmed on device), share sheet cancelled
+  before contacts appeared, **blue pill at 72–76 s backgrounded, gone from 88 s after
+  I'M BACK**. This is the one to attach. Minor: the hidden debug lines (`TRACKING ·
+  STARTED · VERIFIED`, `FIX … UP OK`) are visible on the home screen at 0:05 — same gate
+  as `BG WAKE`, harmless, but worth turning off before a store-screenshot session.
+- ✅ **SUBMITTED FOR APP REVIEW — 1.0 (42), "Waiting for Review"**, 4:01 PM AKDT.
+  Attached `recording2.mov` (67 MB; the Attachment input is the `input[type=file]` nearest
+  the label, uploads on its own, no Save needed), reloaded to verify build 42 + notes +
+  attachment, **Add for Review** → draft submission → **Submit for Review** → "1 Item
+  Submitted. It can take up to 48 hours." Automatic release on approval.
 - Also in the video: the iOS share sheet exposes Kai's real contacts' names and numbers.
   On the retake, tap Cancel on the share sheet promptly, or pick Copy.
 - ~~**ONLY THING LEFT before Add for Review: the §5 screen recording**~~ (superseded above) (Kai, physical

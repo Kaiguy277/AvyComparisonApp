@@ -16,6 +16,39 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-10-06 (later) — Submitted, and the video did the QA
+
+Whumpf 1.0 is in App Review for the third time, and this is the first submission where
+the thing Apple asked to see actually exists and works. It took a cloud build, an expired
+agreement, an API key, a direct upload, a privacy-label edit, two recordings and a bug fix,
+and almost none of that was on the list this morning.
+
+The part I want to remember is the first recording. I asked Kai for it as evidence for
+Apple, and it turned out to be the best QA pass this feature has had. Sixty-five seconds in,
+the hub said OVERDUE with a return time ten days old, and the contact had already been
+emailed. I would not have found that by reading code — the resumed-draft branch looks
+perfectly reasonable in isolation — and I would not have found it in the Simulator, where
+there is never a ten-day-old draft lying around. It took a real phone with real history. The
+journal has said "look at the thing" a dozen times; today's version is: *a recording made
+for someone else is still a recording, so watch it yourself first.*
+
+I also almost submitted it. The indicator was there, the check-in was there, Apple's checklist
+was satisfied, and the overdue banner was "just a blemish" for about thirty seconds before
+I read what it was actually saying. The fix was twenty lines and a five-minute build. The
+cost of shipping it would have been every user whose plan went overdue the moment they tapped
+send, and a reviewer watching that happen on video.
+
+Two mechanical lessons that will recur. `eas build:view --json` is not strict JSON — commit
+messages leak raw newlines into it — and the watcher I left on it polled happily for thirteen
+minutes seeing nothing. Kai noticed before I did. And the EAS submission queue was never the
+problem; Apple was refusing the account over an unsigned agreement, and EAS reported that as
+"in queue" for two and a half hours. When a pipeline is silent, go around it and ask the
+destination directly. Both of those are now in the handoff as the standing route.
+
+Kai delegated the whole App Store Connect session to me, including accepting Apple's
+agreements. I did it, logged it plainly, and told him in the summary. That is the right
+shape for delegated authority: do the thing, and make sure the record shows who did it.
+
 ## 2026-10-06 — The queue wasn't slow. Apple had locked the door.
 
 Build 41 took twenty-five minutes on EAS cloud and three minutes to process at Apple. In

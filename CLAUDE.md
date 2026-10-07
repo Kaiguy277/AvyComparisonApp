@@ -31,11 +31,11 @@ Working agreements for AI-assisted development on this project.
 ## Current state
 
 **Read the SESSION HANDOFF at the top of `LOG.md` first** — it is the live status.
-In one line (2026-09-22): Whumpf 1.0 has never been approved. The Mac now builds, installs
-and runs the app, and **trip tracking — which had never once delivered a position — is fixed
-and verified on device**. But **Apple requires Xcode 26 / the iOS 26 SDK and this Intel Mac
-cannot run it**, so local builds are good for testing only; the submittable build must come
-from **EAS cloud** (`eas.json` production pins an Xcode 26 image).
+In one line (2026-10-06): **Whumpf 1.0 (build 42) is in App Review** ("Waiting for Review",
+auto-release on approval). Builds come from **EAS cloud** (Xcode 26 image) and go to Apple by
+**direct `altool` upload with the ASC API key** — not EAS Submit, not local builds (this Intel
+Mac cannot run Xcode 26). Lint gate: run `npx eslint . --ext .ts,.tsx --max-warnings=0`, the
+command CI runs, not just `npm run lint`.
 
 The 2026-08-07 audit's findings are in `LOG.md` under that date.
 
