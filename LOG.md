@@ -96,8 +96,88 @@ Format per entry:
 - **Twilio console (Trust Hub paperwork):** browser harness (`scripts/asc-browser/
   server.mjs`, run from the session scratchpad) opened to the Twilio login with
   `kai@kaiconsulting.ai` pre-filled (the account's email, per the 2026-09-17 verification
-  mail). Waiting on Kai for password + 2FA before the upgrade / Business Profile /
-  SHAKEN-STIR / Voice Integrity steps. Nothing accepted or submitted in his name yet.
+  mail). **The account was created by an earlier Claude session and no password was ever
+  recorded**, so (Kai's instruction, 2026-10-06 evening) I requested a **Twilio password
+  reset** for `kai@kaiconsulting.ai` from the login page — the one action taken in his name
+  so far. The reset mail landed in Gmail at 01:34Z; its link is open in the harness window
+  for Kai to type the new password. Upgrade / Business Profile / SHAKEN-STIR / Voice
+  Integrity still pending. **Kai then asked me to choose and store the password:** a
+  28-char random one, generated in the shell and never shown in the transcript, is in the
+  **macOS login Keychain** on this Mac — service `twilio.com (Whumpf)`, account
+  `kai@kaiconsulting.ai` (`security find-generic-password -s "twilio.com (Whumpf)" -a
+  kai@kaiconsulting.ai -w`). Reset completed 01:36Z ("Password Changed!"). Login then hit
+  **SMS 2FA to Kai's phone ending 8064** — that is the per-login step Kai must do. Kai
+  entered it in the window; console reached (`My First Twilio Account`, trial, SID
+  `AC96f60e…`). The new console is `1console.twilio.com`; the old `console.twilio.com/
+  billing/...` URLs 404 — use the top-bar **Upgrade** button.
+- **Cost decision (Kai, 2026-10-06 evening): "free or very, very cheap" → $20 one-time
+  top-up approved, no auto-recharge, no further paid options without asking.** Upgrade
+  wizard filled in Kai's name: Step 1 **Business**, legal name **K.ai Consulting LLC**,
+  **4139 Vista Court, Anchorage, AK 99508-5729** (the EIN letter / business license
+  address, chosen over Kai's Gould Hall office so Trust Hub vetting matches the EIN
+  record); Step 2 **$20**, auto-recharge **off**. Step 3 is Stripe card entry — Kai types
+  it. Business facts came from the iCloud PDFs (`~/Library/Mobile Documents/
+  com~apple~CloudDocs/Documents/K.ai Consulting, LLC/Docs/`: EIN letter CP 575 G,
+  AK business license #2220515, Articles of Organization) — **not** the GitHub repo, which
+  is only the website code.
+- **✅ Twilio account UPGRADED (~01:58Z).** "Upgrade complete": Business / K.ai Consulting
+  LLC / 4139 Vista Court, starting balance **$20**, auto-recharge **Off**, Mastercard
+  ending 9148 (Kai typed the card). The trial limits are gone; the account can now call
+  any number. Next in the console: Business Profile → SHAKEN/STIR → number → Voice
+  Integrity / CNAM (price-check each before submitting; nothing further paid without
+  asking).
+- **Business Profile = Persona KYC with biometrics.** Trust Hub → Primary profile →
+  Business → step 2 is an embedded `inquiry.withpersona.com` widget whose first button
+  is consent to biometric processing (government ID + selfie, kept ≤3 years). **Left for
+  Kai to click and complete himself** — not something to accept on his behalf. Free.
+  **Everything else in Twilio is gated on it:** the Buy-a-Number page says "To buy a
+  number, you will need a primary compliance profile" (local numbers confirmed at
+  **$1.15/mo**; search area code 907 once unblocked), and SHAKEN/STIR, Voice Integrity
+  and CNAM all attach to an approved profile + number. Vetting is 24–48 h after submit.
+- **✅ Primary (Business) compliance profile SUBMITTED (~02:20Z)** — "Thanks for
+  submitting your primary compliance profile! Your profile is being reviewed." Kai
+  clicked the Persona biometric consent himself; I filled the rest in his name: Direct
+  Customer · legal name **KAI CONSULTING LLC** (exactly as on the CP 575, per the form's
+  instruction — the billing name stays `K.ai Consulting LLC`) · EIN (from the letter) ·
+  industry PROFESSIONAL_SERVICES · Limited Liability Corporation · website
+  `https://kaiconsulting.ai` · region USA and Canada · address 4139 Vista Court,
+  Anchorage, Alaska 99508 · notification email `kai@kaiconsulting.ai` (watch Gmail for
+  the approval). Persona widget gotcha: field ids re-render after each select, so fill
+  by position/type and re-list between steps. Profile SID `BU16129d57e6eff5a0d82ce780274085e0`,
+  status **Pending review**.
+- **Number purchase: two attempts FAILED in the console** ("Failed to purchase the phone
+  number. Please try again.") for both Anchorage 907 numbers on offer (+1 907 206-5634,
+  +1 907 313-6813, $1.15/mo each). The buy page's banner now reads "US local numbers
+  (10DLC) require *submitting* a compliance profile" — so pending should be enough; the
+  generic error gives no code. Active numbers: none (nothing was charged). Next: buy via
+  the REST API (`POST IncomingPhoneNumbers.json`), which returns a real error code.
+  Reading the **auth token** needs a Twilio verification code (SMS) — the first grab was
+  a decoy hex string and 401'd (`20003`); keychain entry `twilio-auth-token (Whumpf)` is
+  to be overwritten with the real one once the code is entered.
+- **Auth token captured** (verification code from the Twilio email, entered in the window;
+  the token is the 32-hex string that is NOT the SID's tail — the first two grabs were
+  the SID). Keychain: service `twilio-auth-token (Whumpf)`, account = the Account SID.
+  Verified: `GET /Accounts/{sid}.json` → `active`, type `Full`.
+- **ROOT CAUSE of the failed purchases, from the API:** `POST IncomingPhoneNumbers.json`
+  → 401 code 20003 *"Primary compliance profile is not approved. Please refer to
+  documentation and complete the KYC process in Trust Hub."* So a number needs an
+  **approved** profile; the console banner ("require submitting") is wrong. The API's
+  `AvailablePhoneNumbers/US/Local?AreaCode=907` also returns empty for now. **Twilio is
+  blocked on vetting (24–48 h).** When the approval email lands at kai@kaiconsulting.ai:
+  buy +1 907 206-5634 or whatever 907 is on offer via the API, then SHAKEN/STIR → Voice
+  Integrity → CNAM.
+- **Supabase secrets set early (inert):** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` on
+  project tfvxhsgwrwvendrnbrgf, so the deployed `trip-plan-voice` can be smoke-tested with
+  a genuinely signed request. No `TWILIO_FROM_E164` (no number yet) and `voice` is NOT in
+  `TRIP_NUDGE_CHANNELS`, so nothing can place a call.
+- **✅ Signed smoke of the live `trip-plan-voice`:** a POST to the project-ref host
+  (`…supabase.co/functions/v1/trip-plan-voice?a=status&p=…&c=…&tpl=nudge_1`) carrying an
+  `X-Twilio-Signature` computed with the real auth token → **204** (signature OK, no
+  matching event row → `event_missing`); the same signature with a tampered body → **403
+  bad_signature**. So: secrets propagated without a redeploy, `voiceBase()` resolves to
+  the project-ref host inside the function (matches what the sweeper would hand Twilio),
+  and the HMAC path works against Twilio's real token. Only the TwiML content-type (proxy
+  route, needs the Deno token) remains unverified live.
 
 ---
 
