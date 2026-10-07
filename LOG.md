@@ -242,6 +242,25 @@ Format per entry:
   release; redeploy trip-plans / sweeper / page (they carry the new adapter); merge the
   branch; inbound voice URL for the number; CNAM + Voice Integrity review outcomes.
 
+## 2026-10-07 — Voice channel GOES LIVE: Kai's TCPA decision, flag flipped, functions redeployed
+- **DECISION (Kai, 2026-10-06 ~19:00 AKDT): the overdue call relies on the TCPA
+  "emergency purposes" exception (47 CFR 64.1200(f)(4) — "calls made necessary in any
+  situation affecting the health and safety of consumers"). No contact opt-in gate, no
+  legal read.** I laid out the alternative (collect prior express consent via a one-tap
+  link in the heading-out email + press-9 opt-out) and the exposure ($500/call statutory,
+  class risk scales with App Store volume); Kai chose the exception. The no-cost
+  mitigations stay: calls only on nudge_1 / nudge_2 / expired, max two attempts, press 1 =
+  receipt only, and the heading-out email tells the contact up front (wording as proposed
+  2026-10-06, unchanged). Not built, by this decision: opt-in link, keypad opt-out.
+- **Going live, in order:** `VOICE_CALLS_ENABLED = true` (contact phone now required in
+  the composer; ships with the next build after 42) · `schema.test.ts` made
+  flag-independent · `trip-plan-voice` gains `?a=inbound` (a spoken "this is Whumpf's
+  automated alert line… check your email or call 911" for anyone who calls the number
+  back; set as the number's Voice URL) · secret `TRIP_NUDGE_CHANNELS=email,voice` ·
+  redeploy trip-plans / trip-plan-sweeper / trip-plan-page (`--no-verify-jwt`) /
+  trip-plan-voice (`--no-verify-jwt`) · sweeper-driven end-to-end test with a real
+  overdue plan and Kai as the contact · merge to `main`.
+
 ---
 
 ## SESSION HANDOFF → read this first (updated 2026-10-06)

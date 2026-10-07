@@ -259,7 +259,7 @@ export type PartyMember = z.infer<typeof partyMemberSchema>;
 // same release, so the composer insists on the number the call needs. Older
 // clients keep working either way: the server still accepts a contact with no
 // phone and simply emails them.
-export const VOICE_CALLS_ENABLED = false;
+export const VOICE_CALLS_ENABLED = true; // channel live 2026-10-07 (TRIP_NUDGE_CHANNELS=email,voice)
 
 // A trusted person. Email is required because it is the server's primary
 // nudge channel; phone is required too once the overdue voice call is on

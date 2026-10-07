@@ -125,11 +125,13 @@ See LOG 2026-09-09 for the sequence. Delete smoke plans afterwards:
     **SHAKEN/STIR Trust Product** (A attestation) → **Voice Integrity** (needs EIN or DUNS,
     US address, HTTPS site — the Deno pages qualify) → **CNAM** "Whumpf". Cost: local
     number $1.15/mo, $0.014/min outbound, AMD $0.0075/call, basic TTS free.
-  - **TCPA:** a prerecorded/TTS call to a cell needs the called party's prior express
-    consent or an emergency purpose. The contact never consented — the owner listed them.
-    Overdue-in-the-backcountry is plausibly emergency-purpose; that is a legal call, not
-    an engineering one. Mitigate regardless: call only on nudge_1 / nudge_2 / expired,
-    warn in the heading-out email, offer a keypad opt-out.
+  - **TCPA — DECIDED 2026-10-06 (Kai): we rely on the "emergency purposes" exception**
+    (a prerecorded/TTS call to a cell otherwise needs the called party's prior express
+    consent; the contact never consented — the owner listed them). No opt-in gate and no
+    legal read, by Kai's decision. Mitigations in place: calls only on nudge_1 / nudge_2 /
+    expired, max two attempts, press 1 records receipt only, the heading-out email says
+    an automated call may come. If this is ever revisited: a one-tap consent link in the
+    heading-out email + a press-9 opt-out (one per-contact column) is the sketch.
   - **Sketch:** `voice` in `TRIP_NUDGE_CHANNELS`, gated per template; one POST to
     `/2010-04-01/Accounts/{sid}/Calls.json` with inline `Twiml` (`<Say>` + `<Gather
     numDigits="1">`, 1 = acknowledged → new `call_acknowledged` event on the packet page),

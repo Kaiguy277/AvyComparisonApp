@@ -6,6 +6,7 @@ import {
   freshenTimes,
   emptyDraft,
   makeTripPlanDraftSchema,
+  VOICE_CALLS_ENABLED,
   normalizePhone,
   tripPlanDraftSchema,
   type TripPlanDraftInput,
@@ -205,8 +206,13 @@ describe("freshenTimes", () => {
 
 describe("contact phone requirement (voice channel)", () => {
   it("is optional while the voice channel is off", () => {
-    const r = tripPlanDraftSchema.safeParse(validDraft({ contacts: [{ id: "c1", displayName: "Alex", email: "a@example.com" }] }));
+    const schema = makeTripPlanDraftSchema({ requireContactPhone: false });
+    const r = schema.safeParse(validDraft({ contacts: [{ id: "c1", displayName: "Alex", email: "a@example.com" }] }));
     expect(r.success).toBe(true);
+  });
+  it("the shipped schema follows VOICE_CALLS_ENABLED", () => {
+    const r = tripPlanDraftSchema.safeParse(validDraft({ contacts: [{ id: "c1", displayName: "Alex", email: "a@example.com" }] }));
+    expect(r.success).toBe(!VOICE_CALLS_ENABLED);
   });
   it("is required, per contact, once the voice channel is on", () => {
     const schema = makeTripPlanDraftSchema({ requireContactPhone: true });

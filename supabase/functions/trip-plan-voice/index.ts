@@ -13,6 +13,9 @@
 //        nudge_sent row records how it ended (answered / voicemail);
 //        busy / no-answer / failed / canceled → the row becomes
 //        nudge_failed and the sweeper retries once (see retryFailed).
+//   POST ?a=inbound
+//        the number's Voice URL: someone called the alert line back. Says
+//        what the number is and hangs up. Signed by Twilio like the rest.
 //   GET  ?a=ping
 //        static TwiML, unauthenticated, no data — exists so we can check
 //        from outside whether this host delivers text/xml unmodified.
@@ -61,6 +64,17 @@ serve(async (req) => {
   if (!ok) {
     log({ fn: "trip-plan-voice", a, outcome: "bad_signature", status: 403 });
     return json(403, { error: "bad_signature" });
+  }
+
+  if (a === "inbound") {
+    log({ fn: "trip-plan-voice", a, outcome: "greeted", duration_ms: Date.now() - t0 });
+    return twiml(
+      sayAndHangupTwiml(
+        "This is the automated alert line for Whumpf, the trip plan app. It can't take calls. " +
+          "If you received a call from this number, someone listed you as their emergency contact and is overdue from a backcountry trip. " +
+          "Check your email for their trip page, which has everything rescuers will ask for, or call 9 1 1. Goodbye.",
+      ),
+    );
   }
 
   const planId = url.searchParams.get("p") ?? "";
