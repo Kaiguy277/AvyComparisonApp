@@ -293,11 +293,29 @@ Format per entry:
 
 ---
 
-## SESSION HANDOFF → read this first (updated 2026-10-06)
+## SESSION HANDOFF → read this first (updated 2026-10-07)
 
-**State:** **Whumpf 1.0 (build 42) is `Waiting for Review` at Apple, submitted 2026-10-06
-~00:05Z (Oct 6, 4:01 PM AKDT).** Automatic release on approval, US + Canada. `main` green
-(tsc 0, eslint 0 via CI's exact command, **Vitest 175**), all pushed, CI green.
+**State:** **Whumpf 1.0 (build 42) is still `Waiting for Review` at Apple** (submitted
+2026-10-06 ~00:05Z; no decision as of 2026-10-07 14:00Z). Automatic release on approval,
+US + Canada. **The overdue VOICE call is LIVE in production** (2026-10-07): Twilio number
++1 907 202-9385, `TRIP_NUDGE_CHANNELS=email,voice`, all trust products approved, verified
+end to end through the real sweeper with Kai as the contact. `main` green (tsc 0, eslint 0
+via CI's exact command, **Vitest 197**), all pushed.
+
+### Voice channel — where everything lives
+- Design + build: LOG 2026-10-06 (evening) and 2026-10-07 below. Ops facts (secrets, SIDs,
+  number, TCPA decision, redeploy commands): `docs/TRIP_PLAN_OPS.md`. Proxy route and
+  Deno token: `deploy/README.md`.
+- Credentials are in **Kai's macOS login Keychain**, never in the repo: Twilio password
+  (`twilio.com (Whumpf)`), Twilio auth token (`twilio-auth-token (Whumpf)`), Deno Deploy
+  org token (`deno-deploy-org-token (whumpf-pages)`, expires 2027-01).
+- Twilio login is `kai@kaiconsulting.ai` + SMS 2FA to Kai's phone; the API with the
+  Keychain token is more reliable than the console UI for anything Trust Hub.
+- **TCPA: Kai decided (2026-10-06) the calls fall under the emergency-purposes exception.**
+  No opt-in gate, no opt-out keypress, no legal read. Mitigations: three templates only,
+  two attempts, press 1 = receipt only, notice in the heading-out email.
+- Build 42 does not have `VOICE_CALLS_ENABLED`; its users' phoneless contacts get email
+  only. The next build makes contact phone required in the composer.
 
 ### What shipped in build 42 (vs the 2026-09-22 handoff)
 - Everything from the old handoff, plus `c032f78`: a resumed composer draft can no longer
@@ -331,13 +349,14 @@ Format per entry:
   Apple password + 2FA; the rest is scriptable. Consider promoting to `scripts/`.
 
 ### Next (after approval)
-- **Voice-call nudges: BUILT on `feat/voice-nudges` (2026-10-06 evening entry), not
-  merged, not live.** Blocked on Kai for: Twilio login (+ card for the upgrade, business
-  details for Trust Hub), a `DENO_DEPLOY_TOKEN` to redeploy the proxy's `/voice` route,
-  and the TCPA decision (legal read? heading-out notice wording? keypad opt-out?). Then:
-  set `TWILIO_*` + `TRIP_PLAN_VOICE_BASE` secrets, redeploy trip-plans / sweeper /
-  page / voice, one real call to Kai's phone, add `voice` to `TRIP_NUDGE_CHANNELS`, flip
-  `VOICE_CALLS_ENABLED`, merge.
+- Voice channel is live and merged. Watch the first real overdue call in the wild:
+  `trip_plan_events` rows with `payload->>channel = 'voice'` and the packet timeline.
+  CNAM display propagates over days — check a call shows "Whumpf" on a handset.
+- Smoke-plan rows from the 2026-10-06/07 tests (`owner_device_id like 'smoke-device-%'`)
+  are closed and self-purge 7 days after close; Kai declined a manual delete.
+- Cost watch: $20 balance, auto-recharge OFF — Twilio suspends outbound when it hits $0.
+  At ~$1.15/mo + ~$0.02/call that is a year away, but a low-balance check belongs on the
+  ops list before next season.
 - Turn off the hidden `TRACKING`/`FIX` debug lines before any store-screenshot session.
 - Open product questions from 09-22 still stand: "no position yet" vs "no coverage" copy;
   periodic fix for a stationary party; accept-after-close positions (privacy call).
