@@ -276,6 +276,17 @@ Format per entry:
     the number's Voice URL points there.
   - checked in afterwards to close it (no nudge_2 in an hour); smoke rows deleted per the
     ops doc. Gates before merge: tsc 0 · eslint 0 · **197 tests** · deno check clean.
+- **✅ CNAM "Whumpf" APPROVED** — email "CNAM Enrollment Request Approved" 13:43Z
+  2026-10-07; carriers "will soon start displaying" it (propagation is days). **Voice
+  Integrity is `twilio-approved` too** per the Trust Hub API (no email for it). All three
+  trust products approved; the stack is complete. No App Review decision from Apple yet.
+  Balance still $20.00 — the two test calls and the number are not rated/billed yet.
+- **Not done (Kai stopped both at the prompt, 2026-10-06 night):** the smoke-plan cleanup
+  (`delete from trip_plans where owner_device_id like 'smoke-device-%'`) and the
+  fast-forward merge of `feat/voice-nudges` into `main`. The smoke plan is **closed**
+  (checked in), so it cannot nudge again; its rows purge themselves 7 days after close.
+  The branch is pushed and green; `main` does not yet carry the voice channel code that
+  production is running.
 - **Composer note for the next build:** `VOICE_CALLS_ENABLED = true` makes the contact
   phone required; build 42 (in review) does not have it, so its users' phoneless contacts
   simply get email only. Nothing to do for 1.0.
