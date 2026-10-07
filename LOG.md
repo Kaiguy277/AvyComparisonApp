@@ -21,6 +21,82 @@ Format per entry:
 
 ---
 
+## 2026-10-06 (evening) — Overdue VOICE call: channel built on `feat/voice-nudges`; Twilio trust stack started
+- **Apple first.** Checked Gmail for any App Store Connect reply before touching anything:
+  nothing from App Review since the 00:05Z submission — only the TestFlight "build 42
+  available" notice, the agreement-signed receipt and the ASC API access approval. Build 42
+  stays untouched, still `Waiting for Review`.
+- **Branch `feat/voice-nudges`** (off `main` at `c032f78`+docs). Design exactly as decided
+  2026-09-22 (`docs/TRIP_PLAN_OPS.md` Known gaps, LOG 2026-09-22 (later)):
+  - **`_shared/twilio.ts` (new):** `placeCall` (one POST to `/2010-04-01/Accounts/{sid}/
+    Calls.json`, inline `Twiml`, `MachineDetection=DetectMessageEnd`, `StatusCallback` +
+    `StatusCallbackEvent=completed`, `Timeout=30`), `gatherTwiml` / `sayAndHangupTwiml`
+    (Polly.Joanna, Twilio's free basic tier), and `verifyTwilioRequest` — the
+    `X-Twilio-Signature` HMAC-SHA1 check, reproducing Twilio's documented test vector
+    (`0/KCTR6DLpKmkAf8muzZqo1nDgQ=`) and accepting the `:443` variant Twilio sometimes
+    signs. Runtime-neutral (Web Crypto only) so Vitest covers it.
+  - **`_shared/trip-plan-notify.ts`:** `voice` channel in `notifyAll`, gated by
+    `VOICE_TEMPLATES = {nudge_1, nudge_2, expired}` — never heading_out / extended /
+    checked_in / cancelled / heard_from / search_started / late_check_in. A contact with no
+    `phone_e164` is simply not called. The `nudge_sent` row for a call carries
+    `channel: "voice"`, `provider_id` = call SID, `call_status: "queued"`, `attempts`.
+    `renderVoiceScript` is the spoken text (no packet contents; subject's number read
+    digit-by-digit via `spokenPhone`; ends "Press 1 to confirm you got this call").
+    `retryFailed` is now **channel-aware**: a voice row re-places the call, an email row
+    re-sends; voice caps at **2 attempts** (`VOICE_MAX_ATTEMPTS`), email stays at 3. Rows
+    written before this change (no `channel`) default to email.
+  - **Heading-out email** gains a paragraph when the voice channel is on AND the contact
+    has a phone: "If Kai is overdue, Whumpf will also call you at +1… with an automated
+    message… Press 1 on that call to confirm you got it. The call is only ever made when
+    Kai is overdue." **Proposed wording — Kai to approve (TCPA item).**
+  - **`trip-plan-voice` (new function, deploy `--no-verify-jwt`):** `?a=gather` (Gather
+    action; `Digits=1` → `call_acknowledged` event, actor `contact`, idempotent on CallSid;
+    explicitly NOT "heard from"), `?a=status` (final CallStatus: `completed` → row keeps
+    `answered_by` (human / machine_*) + duration; `busy`/`no-answer`/`failed`/`canceled` →
+    row becomes `nudge_failed` with `next_attempt_at` +10 min, or terminal `null` once
+    `attempts ≥ 2`), `GET ?a=ping` (static TwiML, no auth, for the content-type smoke).
+    Signature is verified against `voiceBase() + query` — the URL Twilio was handed — not
+    `req.url`, which differs behind the gateway. `TRIP_PLAN_VOICE_BASE` overrides the base
+    if callbacks must go via the Deno proxy.
+  - **Packet page timeline:** voice `nudge_sent` reads "Automated call (nudge_1) to Alex:
+    answered / message left on voicemail / no answer / calling"; `nudge_failed` rows now
+    render sensibly (were raw `nudge_failed`); new `call_acknowledged` line "Alex pressed 1
+    on the automated call — they got the alert."
+  - **Composer:** `VOICE_CALLS_ENABLED` (`lib/tripPlan/schema.ts`, **false until the
+    secret flips**) makes contact phone required via `makeTripPlanDraftSchema({
+    requireContactPhone })`; the Phone field shows `required` + hint "If you're overdue, an
+    automated call goes here too." Server `createSchema` stays lenient (older clients).
+  - **Tests:** `_shared/twilio.test.ts` (6), `_shared/trip-plan-notify.test.ts` (13: voice
+    only on the three templates, never on the other seven, off when the channel is off,
+    nudge_failed on Twilio 401 / missing secrets, channel-aware retry + caps, heading-out
+    notice gating), `schema.test.ts` +2 (phone optional off / required per-contact on).
+    Deno env + fetch are stubbed; the fake Supabase client records inserts/updates.
+  - **Gates (all green):** `npm run typecheck` 0 errors; `npx eslint . --ext .ts,.tsx
+    --max-warnings=0` 0; `npm test` **196 passed** (was 175); `deno check` clean on
+    trip-plan-voice, trip-plans, trip-plan-sweeper, trip-plan-page and `deploy/main.ts`.
+- **SMOKED: Supabase rewrites `text/xml` too.** Deployed `trip-plan-voice` (inert: no
+  Twilio secrets → every POST is 503, GET `?a=ping` is static) and curled it on both
+  hosts: `200`, **`content-type: text/plain`**, `content-security-policy: default-src
+  'none'; sandbox`. Same treatment as HTML. Twilio rejects non-XML content types, so the
+  callbacks go through the **Deno proxy**: `deploy/main.ts` gains `/voice` →
+  `trip-plan-voice`, forwards the form POST + `X-Twilio-Signature`, re-serves the reply
+  as `text/xml` (or `application/json` for the error bodies), no HTML/CSP headers, no
+  redirect rewriting. `TRIP_PLAN_VOICE_BASE` must therefore be
+  `https://whumpf-pages.kaimyersa.deno.net/voice` when the channel goes live. **Proxy not
+  yet redeployed** — needs `DENO_DEPLOY_TOKEN` (console.deno.com › Organization Tokens),
+  which is not on this machine.
+- **Not done, deliberately:** no DB migration (the `call_acknowledged` event type needs
+  none — `trip_plan_events.type` is free text). No keypad opt-out yet: it needs a per-
+  contact column and is part of the TCPA decision, not a free add-on. `TRIP_NUDGE_CHANNELS`
+  untouched in prod; no Twilio secrets set; nothing can ring until both happen.
+- **Twilio console (Trust Hub paperwork):** browser harness (`scripts/asc-browser/
+  server.mjs`, run from the session scratchpad) opened to the Twilio login with
+  `kai@kaiconsulting.ai` pre-filled (the account's email, per the 2026-09-17 verification
+  mail). Waiting on Kai for password + 2FA before the upgrade / Business Profile /
+  SHAKEN-STIR / Voice Integrity steps. Nothing accepted or submitted in his name yet.
+
+---
+
 ## SESSION HANDOFF → read this first (updated 2026-10-06)
 
 **State:** **Whumpf 1.0 (build 42) is `Waiting for Review` at Apple, submitted 2026-10-06

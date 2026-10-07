@@ -26,7 +26,16 @@ Live since 2026-09-09. Spec: `docs/specs/2026-09-09-spec-trip-plan.md`.
   deleted from Porkbun once the new sender has run for a while. The Resend account is shared with AK RFP Hub (akrfp.com, keys RFP_app/
   RFP@/STT); this app only uses its own key "TripPlanner" and its own subdomain. Never
   send from akrfp.com again.
-- `TRIP_NUDGE_CHANNELS` — optional, default `email`. Add `sms` when Twilio lands.
+- `TRIP_NUDGE_CHANNELS` — optional, default `email`. Add `voice` to turn on the
+  automated overdue call (nudge_1 / nudge_2 / expired only). Flip
+  `VOICE_CALLS_ENABLED` in `lib/tripPlan/schema.ts` in the same release so the
+  composer collects contact phones.
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_E164` — the voice channel.
+  Account kai@kaiconsulting.ai. The auth token also gates `trip-plan-voice` (every
+  Twilio callback is HMAC-signed with it).
+- `TRIP_PLAN_VOICE_BASE` — optional. Public URL of `trip-plan-voice` as Twilio must
+  reach it; default `$SUPABASE_URL/functions/v1/trip-plan-voice`. Set it only if the
+  TwiML replies have to be routed through the Deno proxy (see Known gaps smoke note).
 - `TRIP_PLAN_PAGE_BASE` — `https://avycomparison.supabase.co/functions/v1/trip-plan-page`.
   The project has a **vanity subdomain** (`avycomparison.supabase.co`, free, activated
   2026-09-11) so the link a contact receives reads as this app rather than a random
@@ -59,7 +68,10 @@ Superseded (still present): **trips.kaiconsulting.ai**
 supabase functions deploy trip-plans --use-api
 supabase functions deploy trip-plan-sweeper --use-api
 supabase functions deploy trip-plan-page --no-verify-jwt --use-api
+supabase functions deploy trip-plan-voice --no-verify-jwt --use-api
 ```
+`trip-plan-voice` is called by Twilio, which sends no Supabase headers — the
+`X-Twilio-Signature` check is its only gate, so `--no-verify-jwt` is required.
 **Deploy after every change to `supabase/functions/**` — edge code does not ship with
 the app build.** On 2026-09-11 the live page was several commits stale (still titled
 "trip plan", no gear inventory row, no photo) because app builds had gone out without a
@@ -72,6 +84,15 @@ See LOG 2026-09-09 for the sequence. Delete smoke plans afterwards:
 ## Known gaps
 - Push-to-owner ("Alex opened your plan") is a stub until `device_tokens` carries a
   trip device id.
+- **Voice channel BUILT 2026-10-06 on `feat/voice-nudges`, not yet live.** Everything
+  below the 2026-09-22 sketch is implemented (`_shared/twilio.ts`, `voice` in
+  `notifyAll`, `trip-plan-voice`, channel-aware `retryFailed`, `call_acknowledged`
+  on the packet page, composer phone requirement behind `VOICE_CALLS_ENABLED`).
+  Still needed before `voice` goes into `TRIP_NUDGE_CHANNELS`: Twilio account
+  upgraded + Trust Hub stack (Business Profile → SHAKEN/STIR → Voice Integrity →
+  CNAM), a number in `TWILIO_FROM_E164`, the three secrets, Kai's TCPA decision
+  (legal read or not; heading-out notice wording; keypad opt-out or not), and one
+  real test call to Kai's own phone with the sweeper driving it.
 - **SMS channel not implemented — and reconsider the channel before building it.**
   Decided 2026-09-17 to park this until after the first App Store release.
   - Email via Resend is the system of record and is genuinely solid: `nudge_failed`

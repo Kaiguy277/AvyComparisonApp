@@ -15,11 +15,20 @@
 //   /p?t=<token>   → trip-plan-page   (the packet a contact opens)
 //   /privacy       → legal/privacy
 //   /support       → legal/support
+//   /voice?a=…     → trip-plan-voice  (Twilio's Gather action + status callback)
 //   /              → redirects to /privacy
 //
 // POSTs are forwarded too, so the packet page's contact actions (extend,
 // heard from, started a search) keep working; same-origin, so the page's
 // own `form-action 'self'` CSP is satisfied.
+//
+// /voice exists for the same reason as the rest: Supabase rewrites the
+// TwiML reply (text/xml) to text/plain + sandbox CSP exactly as it does
+// HTML (verified 2026-10-06), and Twilio rejects non-XML content types. The
+// proxy forwards Twilio's form POST and its X-Twilio-Signature untouched,
+// and re-serves the reply as text/xml. The function verifies the signature
+// against THIS origin's URL (TRIP_PLAN_VOICE_BASE), so the query string
+// must pass through unchanged — it does, see below.
 
 const SUPABASE = Deno.env.get("SUPABASE_FUNCTIONS_URL") ??
   "https://avycomparison.supabase.co/functions/v1";
@@ -28,6 +37,7 @@ const ROUTES: Record<string, string> = {
   "/p": "/trip-plan-page",
   "/privacy": "/legal/privacy",
   "/support": "/legal/support",
+  "/voice": "/trip-plan-voice",
 };
 
 // Headers we set ourselves rather than pass through — either because
@@ -81,12 +91,31 @@ Deno.serve(async (req) => {
       ...(req.headers.get("content-type")
         ? { "Content-Type": req.headers.get("content-type")! }
         : {}),
+      // Twilio's request signature; trip-plan-voice refuses without it.
+      ...(req.headers.get("x-twilio-signature")
+        ? { "X-Twilio-Signature": req.headers.get("x-twilio-signature")! }
+        : {}),
     },
     redirect: "manual",
     ...(req.method === "POST" ? { body: await req.text() } : {}),
   };
 
   const res = await fetch(upstream, init);
+
+  // Twilio webhooks: no HTML headers, no redirect rewriting — just the
+  // upstream status and body with the content type Supabase stripped.
+  if (path === "/voice") {
+    const body = await res.text();
+    const isXml = body.trimStart().startsWith("<");
+    return new Response(body.length ? body : null, {
+      status: res.status,
+      headers: {
+        "Content-Type": isXml ? "text/xml; charset=utf-8" : "application/json",
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    });
+  }
 
   // A 303 from the packet page's form handler points back at the Supabase
   // host; rewrite it to this origin so the user stays on the pretty URL.

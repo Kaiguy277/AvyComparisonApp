@@ -5,6 +5,7 @@ import {
   defaultTimes,
   freshenTimes,
   emptyDraft,
+  makeTripPlanDraftSchema,
   normalizePhone,
   tripPlanDraftSchema,
   type TripPlanDraftInput,
@@ -199,5 +200,28 @@ describe("freshenTimes", () => {
     const f = freshenTimes(validDraft({ departAt: "", returnBy: "", worryBy: "" }), now);
     expect(Date.parse(f.returnBy) - Date.parse(f.departAt)).toBe(TRIP_LIMITS.defaultTripHours * H);
     expect(Date.parse(f.worryBy) - Date.parse(f.returnBy)).toBe(TRIP_LIMITS.defaultWorryOffsetHours * H);
+  });
+});
+
+describe("contact phone requirement (voice channel)", () => {
+  it("is optional while the voice channel is off", () => {
+    const r = tripPlanDraftSchema.safeParse(validDraft({ contacts: [{ id: "c1", displayName: "Alex", email: "a@example.com" }] }));
+    expect(r.success).toBe(true);
+  });
+  it("is required, per contact, once the voice channel is on", () => {
+    const schema = makeTripPlanDraftSchema({ requireContactPhone: true });
+    const r = schema.safeParse(
+      validDraft({
+        contacts: [
+          { id: "c1", displayName: "Alex", email: "a@example.com", phone: "907-555-0101" },
+          { id: "c2", displayName: "Sam", email: "s@example.com" },
+        ],
+      }),
+    );
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    const paths = r.error.issues.map((i) => i.path.join("."));
+    expect(paths).toContain("contacts.1.phone");
+    expect(paths).not.toContain("contacts.0.phone");
   });
 });

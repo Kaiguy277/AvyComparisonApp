@@ -254,8 +254,16 @@ export const partyMemberSchema = z.object({
 });
 export type PartyMember = z.infer<typeof partyMemberSchema>;
 
-// A trusted person. Email is required in v1 because it is the server's
-// nudge channel; phone becomes required once SMS ships.
+// The server places an automated voice call to each contact when a plan goes
+// overdue once `voice` is in its TRIP_NUDGE_CHANNELS secret. Flip this in the
+// same release, so the composer insists on the number the call needs. Older
+// clients keep working either way: the server still accepts a contact with no
+// phone and simply emails them.
+export const VOICE_CALLS_ENABLED = false;
+
+// A trusted person. Email is required because it is the server's primary
+// nudge channel; phone is required too once the overdue voice call is on
+// (enforced at the draft level, see makeTripPlanDraftSchema).
 export const contactSchema = z.object({
   id: z.string().min(1),
   displayName: text(80).pipe(z.string().min(1, required)),
@@ -266,7 +274,8 @@ export type Contact = z.infer<typeof contactSchema>;
 
 // ───────────────────────────── the draft ───────────────────────────────────
 
-export const tripPlanDraftSchema = z
+export function makeTripPlanDraftSchema({ requireContactPhone }: { requireContactPhone: boolean }) {
+  return z
   .object({
     // Where
     zoneId: z.string().optional(),
@@ -382,8 +391,18 @@ export const tripPlanDraftSchema = z
         });
       }
       emails.add(c.email);
+      if (requireContactPhone && !c.phone) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["contacts", i, "phone"],
+          message: "Their cell number — the overdue call goes here.",
+        });
+      }
     });
   });
+}
+
+export const tripPlanDraftSchema = makeTripPlanDraftSchema({ requireContactPhone: VOICE_CALLS_ENABLED });
 
 export type TripPlanDraft = z.infer<typeof tripPlanDraftSchema>;
 export type TripPlanDraftInput = z.input<typeof tripPlanDraftSchema>;

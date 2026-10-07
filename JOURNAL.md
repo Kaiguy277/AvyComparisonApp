@@ -16,6 +16,41 @@ thread with the same context the last one had.
 
 ---
 
+## 2026-10-06 (evening) — Building the call before the number exists
+
+The voice channel is built and tested and cannot ring anything, which is the right order.
+The Twilio side is calendar time — vetting takes days — so the console work went first in
+spirit (the login is open with Kai's email filled in) while the code happened in parallel.
+
+The design question I kept returning to is what "sent" means for a call. For email,
+Resend accepting the message is as much as we will ever know. For a call, Twilio queueing it
+tells you nothing: the interesting outcome arrives minutes later on the status callback, and
+"no answer" is the normal case for a phone at 9 pm, not an error. So the `nudge_sent` row is
+written at placement with `call_status: "queued"`, and the callback either fills in how it
+ended or flips the row to `nudge_failed` so the existing sweeper retry picks it up. That
+reuses the retry machinery that already exists instead of adding a second one; the only new
+concept is that `retryFailed` has to look at the row's channel, which it never needed before
+because there was only one. Two attempts for voice, not three — a third ring on a number the
+callee never gave us starts to look like harassment, and the email is still going out.
+
+Pressing 1 is the other place I was careful. It would be tempting to treat it as "heard from
+them" because that closes the loop, but it means only "a human received the alert". Closing
+the trip for everyone must stay a deliberate tap on the page. So it is a new
+`call_acknowledged` event, visible on the timeline, and nothing else.
+
+The signature check has a trap worth remembering: Twilio signs the URL *it was given*, and
+behind the Supabase gateway `req.url` is not that URL. Both the callback URLs we hand out and
+the verification rebuild the same string from one `voiceBase()`, so they cannot drift. I
+verified the HMAC against Twilio's own documented example before trusting the implementation,
+which took one `node -e` and saved an afternoon of "why does Twilio say 403".
+
+The open question is the one that was always open: TCPA consent. The code does the cheap
+mitigations (three templates only, a notice in the heading-out email, 1 to acknowledge) but
+whether to get a legal read, and whether an opt-out keypress is needed, is Kai's call and is
+written up for him. The notice wording in the email is a proposal, not a decision.
+
+---
+
 ## 2026-10-06 (later) — Submitted, and the video did the QA
 
 Whumpf 1.0 is in App Review for the third time, and this is the first submission where

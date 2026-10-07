@@ -18,6 +18,7 @@ implementation of the page to maintain.
 | `/p?t=<token>` | `trip-plan-page` — the packet a contact opens |
 | `/privacy` | `legal/privacy` |
 | `/support` | `legal/support` |
+| `/voice?a=…` | `trip-plan-voice` — Twilio's Gather action and status callback (TwiML reply re-served as `text/xml`; `X-Twilio-Signature` forwarded) |
 | `/healthz` | liveness |
 
 POSTs are forwarded so the packet's contact actions (extend, heard from, search
@@ -33,6 +34,8 @@ started) keep working, and the 303 they return is rewritten back to this origin.
 - **Origin:** `https://whumpf-pages.kaimyersa.deno.net` (Deno Deploy, org `kaimyersa`,
   app `whumpf-pages`, Google login on the account).
 - Packet base secret is set: `TRIP_PLAN_PAGE_BASE=https://whumpf-pages.kaimyersa.deno.net/p`.
+- Voice callbacks must use this host too: `TRIP_PLAN_VOICE_BASE=https://whumpf-pages.kaimyersa.deno.net/voice`
+  (set alongside the Twilio secrets when the channel goes live).
 - App Store privacy/support URLs should point at `/privacy` and `/support` on this host
   (pending — do it next time ASC is open).
 

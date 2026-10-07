@@ -28,6 +28,7 @@ import {
   type PartyMember,
   type SubjectProfile,
   type VehicleProfile,
+  VOICE_CALLS_ENABLED,
 } from "@/lib/tripPlan/schema";
 
 type Errors = Record<string, string>;
@@ -377,7 +378,7 @@ export function ContactsEditor({
           </View>
           <TextField label="Name" required value={c.displayName} onChangeText={(t) => update(i, { displayName: t })} autoCapitalize="words" error={errors[`contacts.${i}.displayName`]} />
           <TextField label="Email" required hint="Where the overdue reminders go." value={c.email} onChangeText={(t) => update(i, { email: t })} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} error={errors[`contacts.${i}.email`]} />
-          <TextField label="Phone" value={c.phone ?? ""} onChangeText={(t) => update(i, { phone: t })} keyboardType="phone-pad" error={errors[`contacts.${i}.phone`]} />
+          <TextField label="Phone" required={VOICE_CALLS_ENABLED} hint={VOICE_CALLS_ENABLED ? "If you're overdue, an automated call goes here too." : undefined} value={c.phone ?? ""} onChangeText={(t) => update(i, { phone: t })} keyboardType="phone-pad" error={errors[`contacts.${i}.phone`]} />
         </View>
       ))}
       {value.length < max ? (

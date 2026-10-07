@@ -359,6 +359,15 @@ ${timeline}
   return page(`Where ${name} is — ${d.areaName}`, body);
 }
 
+// How a voice call ended, from the Twilio status callback (trip-plan-voice).
+function callOutcome(p: Record<string, unknown>): string {
+  const status = String(p.call_status ?? "queued");
+  const by = String(p.answered_by ?? "");
+  if (status === "completed") return by.startsWith("machine") ? "message left on voicemail" : "answered";
+  if (status === "queued" || status === "initiated" || status === "ringing" || status === "in-progress") return "calling";
+  return status.replace("-", " ");
+}
+
 function describeEvent(
   e: { type: string; actor: string; contact_id: string | null; payload: Record<string, unknown> },
   nameOf: (id: string | null) => string,
@@ -368,7 +377,15 @@ function describeEvent(
   switch (e.type) {
     case "created": return "Plan created.";
     case "opened": return `${who} opened this page.`;
-    case "nudge_sent": return `Reminder (${e.payload?.template ?? "nudge"}) emailed to ${nameOf(e.contact_id)}.`;
+    case "nudge_sent": return e.payload?.channel === "voice"
+      ? `Automated call (${e.payload?.template ?? "nudge"}) to ${nameOf(e.contact_id)}: ${callOutcome(e.payload)}.`
+      : `Reminder (${e.payload?.template ?? "nudge"}) emailed to ${nameOf(e.contact_id)}.`;
+    case "nudge_failed": return e.payload?.channel === "voice"
+      ? `Automated call (${e.payload?.template ?? "nudge"}) to ${nameOf(e.contact_id)}: ${callOutcome(e.payload)}${e.payload?.next_attempt_at ? " — will try once more" : ""}.`
+      : `Reminder (${e.payload?.template ?? "nudge"}) to ${nameOf(e.contact_id)} could not be emailed${e.payload?.next_attempt_at ? " — retrying" : ""}.`;
+    // Pressing 1 on the call. Deliberately NOT "heard from the subject" —
+    // it only says the contact received the alert.
+    case "call_acknowledged": return `${nameOf(e.contact_id)} pressed 1 on the automated call — they got the alert.`;
     case "extended": return `${who} extended the worry-by time${note}.`;
     case "heard_from": return `${who} heard from the subject${note}.`;
     case "search_started": return `${who} recorded that a search has started${note}.`;
